@@ -1,0 +1,80 @@
+---
+alwaysApply: true
+---
+# Guía de estilo para Memoria Viva Nicaragua
+
+## Paleta de colores
+- **Color primario claro**: #4A6192 (Slate Blue oscuro) - Para barras de navegación, botones principales
+- **Color primario oscuro**: #2E3A59 (Charcoal) - Para encabezados, acentos importantes
+- **Color de acento**: #A3B18A (Verde sage) - Para elementos interactivos, destacados
+- **Fondo principal**: #F8F8F5 (Blanco hueso) - Fondo general, más suave que blanco puro
+- **Fondo secundario**: #FFFFFF (Blanco) - Para tarjetas, elementos elevados
+- **Texto oscuro**: #1A1D25 - Para texto principal
+- **Texto claro**: #7D8597 - Para texto secundario, subtítulos
+
+## Tipografía
+- **Fuente principal**: Montserrat
+  - Regular (400) para texto general
+  - Medium (500) para subtítulos
+  - SemiBold (600) para títulos de secciones
+  - Tamaños: 14sp (texto), 16sp (subtítulos), 20sp (títulos)
+
+- **Fuente de títulos**: Playfair Display
+  - Bold (700) para títulos principales
+  - Tamaños: 24sp-32sp
+
+## Elementos visuales
+- **Iconografía**:
+  - Set de iconos Material Design con estilo outlined
+  - Tamaño: 24dp
+  - Color: #4A6192 (primario) o #A3B18A (acento)
+  - Iconos culturales personalizados para secciones especiales
+
+- **Imágenes**:
+  - Bordes redondeados: 8dp para tarjetas pequeñas, 12dp para grandes
+  - Sombras sutiles: elevation 2dp-4dp
+  - Overlay gradiente en imágenes con texto: #2E3A59 con 30% opacidad
+
+## Componentes clave
+- **Tarjetas de relato**:
+  - Fondo: #FFFFFF
+  - Borde: Redondeado 12dp
+  - Sombra: Elevation 2dp
+  - Padding interno: 16dp
+  - Espacio entre tarjetas: 12dp
+
+- **Botones**:
+  - Primarios: Relleno #4A6192, texto blanco, bordes redondeados 24dp
+  - Secundarios: Borde #4A6192, texto #4A6192, fondo transparente
+  - Terciarios: Solo texto #4A6192, sin borde ni fondo
+  - Tamaño: 48dp altura, padding horizontal 16dp-24dp
+
+- **Campos de entrada**:
+  - Borde inferior: 1dp #7D8597
+  - Foco: Borde inferior 2dp #A3B18A
+  - Relleno: Transparente o #F8F8F5
+  - Texto de ayuda: #7D8597, 12sp
+
+- **Navegación inferior**:
+  - Fondo: #FFFFFF
+  - Iconos inactivos: #7D8597
+  - Icono activo: #A3B18A
+  - Indicador: Pequeña línea o punto #A3B18A
+
+## Estilos específicos por sección
+- **Feed de relatos**:
+  - Estilo Instagram con tarjetas a ancho completo
+  - Avatar circular del autor: 40dp
+  - Nombre usuario: Montserrat SemiBold 16sp
+  - Ubicación: Montserrat Regular 12sp, #7D8597
+  - Acciones: Iconos 24dp, espaciados 16dp
+
+- **Mapa interactivo**:
+  - Marcadores personalizados con colores por categoría
+  - Tarjetas de información: Elevation 4dp, fondo #FFFFFF
+  - Controles de mapa: Botones circulares, fondo #FFFFFF, icono #4A6192
+
+- **Calendario**:
+  - Día actual: Círculo #A3B18A
+  - Días con eventos: Punto #4A6192 bajo número
+  - Eventos: Tarjetas con borde izquierdo 4dp #A3B18A

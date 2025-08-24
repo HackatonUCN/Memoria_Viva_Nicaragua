@@ -1,0 +1,87 @@
+---
+alwaysApply: false
+---
+# Plan de desarrollo: Memoria Viva Nicaragua (1 mes)
+
+## Semana 1: Configuración y autenticación
+### Días 1-2: Configuración inicial
+- Crear proyecto Flutter
+- Configurar Firebase (Authentication, Firestore, Storage)
+- Instalar dependencias principales
+- Configurar estructura de carpetas (Clean Architecture)
+
+### Días 3-5: Autenticación y navegación
+- Implementar splash screen
+- Crear pantallas de registro/login
+- Integrar autenticación con Google
+- Configurar navegación principal (bottom bar/drawer)
+- Implementar gestión de estado con BLoC
+
+### Días 6-7: Tema y diseño base
+- Crear sistema de tema (colores, tipografía)
+- Implementar componentes UI reutilizables
+- Configurar responsive design para todas las plataformas
+- Probar en Android, iOS y web
+
+## Semana 2: Funcionalidades de relatos
+### Días 8-9: Publicación de relatos
+- Crear formulario para publicar relatos
+- Implementar subida de imágenes a Firebase Storage
+- Desarrollar grabación/subida de audio y video
+- Integrar selección de ubicación
+
+### Días 10-12: Feed y visualización
+- Desarrollar feed principal (estilo Instagram)
+- Implementar carga paginada de relatos
+- Crear vista detallada de relatos
+- Añadir sección "Mis Relatos"
+
+### Días 13-14: Mapa interactivo
+- Integrar Google Maps
+- Implementar marcadores geolocalizados
+- Crear filtros para el mapa
+- Desarrollar tarjetas de detalles para puntos
+
+## Semana 3: Calendario y biblioteca
+### Días 15-17: Calendario cultural
+- Implementar vista de calendario
+- Crear sistema para mostrar eventos por día
+- Desarrollar formulario para sugerir eventos
+- Implementar sistema de aprobación de eventos
+
+### Días 18-20: Biblioteca de saberes
+- Crear estructura de categorías
+- Implementar navegación por categorías
+- Desarrollar sistema de búsqueda
+- Crear formulario para añadir saberes
+
+### Día 21: Perfil de usuario
+- Implementar pantalla de perfil
+- Crear funcionalidad para editar información
+- Añadir gestión de sesión
+- Desarrollar sistema de permisos
+
+## Semana 4: Juegos y finalización
+### Días 22-24: Juegos didácticos
+- Implementar juego de trivia
+- Crear juego de adivinanzas
+- Desarrollar juego de emparejar cartas
+- Implementar sistema de puntajes
+
+### Días 25-26: Optimización
+- Optimizar rendimiento
+- Implementar caché offline
+- Ajustar diseño responsive
+- Corregir bugs identificados
+
+### Días 27-28: Pruebas
+- Realizar pruebas en múltiples dispositivos
+- Probar funcionalidades offline
+- Verificar responsive design
+- Comprobar rendimiento
+
+### Días 29-30: Finalización
+- Preparar versión final
+- Crear material para presentación
+- Documentar código y funcionalidades
+- Preparar demostración para hackathon

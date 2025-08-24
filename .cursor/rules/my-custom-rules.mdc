@@ -1,0 +1,144 @@
+---
+alwaysApply: true
+---
+# Proyecto: Memoria Viva Nicaragua
+
+## Propósito
+Desarrollar una aplicación educativa para preservar, registrar y compartir saberes populares, culturales y tradiciones nicaragüenses. Conectar el sistema educativo con familias y comunidades para transmitir el patrimonio cultural a nuevas generaciones.
+
+## Plataformas objetivo
+- Android
+- iOS 
+- Web
+
+## Tecnologías y herramientas
+- **Framework**: Flutter con Dart
+- **Backend**: Firebase
+  - Authentication: Gestión de usuarios y autenticación con Google
+  - Firestore: Base de datos para relatos, eventos, saberes y puntajes
+  - Storage: Almacenamiento de multimedia (imágenes, videos, audios)
+  - Cloud Functions: Para validaciones y notificaciones
+- **Paquetes clave**:
+  - firebase_core, firebase_auth, cloud_firestore, firebase_storage
+  - firebase_ui_auth para autenticación rápida
+  - google_maps_flutter para el mapa interactivo
+  - table_calendar para el calendario cultural
+  - image_picker, file_picker para subir multimedia
+  - cached_network_image para carga eficiente
+  - responsive_framework para diseño adaptable
+  - provider para gestión de estado (más simple para principiantes)
+  - device_preview para simular dispositivos
+  - flutter_screenutil para escalar tamaños
+  - auto_size_text para textos adaptables
+  - url_strategy para URLs limpias en web
+  - flutter_form_builder para formularios
+
+## Arquitectura y patrón de diseño
+- **Arquitectura**: Simplificada basada en capas
+- **Patrón de diseño**: Provider (más simple para principiantes)
+- **Estructura de directorios**:
+  ```
+  lib/
+  ├── config/ (constantes, tema, rutas)
+  ├── models/ (modelos de datos)
+  ├── providers/ (gestores de estado)
+  ├── screens/ (páginas de la aplicación)
+  ├── services/ (servicios de Firebase)
+  ├── widgets/ (componentes reutilizables)
+  └── main.dart
+  ```
+
+## Pantallas principales
+1. **Splash Screen y Autenticación**: 
+   - Bienvenida y opciones de inicio de sesión/registro/invitado
+   - Integración con autenticación de Google
+
+2. **Home (Feed)**: 
+   - Feed principal de relatos de todos los usuarios
+   - Diseño tipo Instagram
+   - Acceso a las demás funciones
+
+3. **Mapa Interactivo**: 
+   - Geolocalización de relatos y eventos
+   - Puntos de colores diferentes para distinguir tipos
+   - Tarjetas de detalles al tocar puntos
+
+4. **Publicar Relato**: 
+   - Formulario para subir historias
+   - Opciones para texto, imágenes, audio, video y ubicación
+
+5. **Mis Relatos**: 
+   - Sección personalizada de publicaciones del usuario
+   - Filtradas por ID de usuario
+
+6. **Calendario Cultural**: 
+   - Vista calendario con festividades y eventos
+   - Detalles por día seleccionado
+   - Formulario para sugerir eventos (requiere aprobación)
+
+7. **Biblioteca de Saberes**: 
+   - Navegación por categorías (dichos, refranes, recetas)
+   - Contenido colaborativo subido por usuarios
+
+8. **Juegos Didácticos**: 
+   - Menú de acceso a juegos interactivos
+   - Incluye Trivia, Adivinanzas y Emparejar Cartas
+
+9. **Perfil de Usuario**:
+   - Edición de información personal
+   - Gestión de sesión
+
+## Funcionalidades principales
+1. **Publicación colaborativa**: 
+   - Relatos en formatos multimedia (texto, imagen, audio, video)
+   - Geolocalización de contenido
+
+2. **Mapa interactivo**: 
+   - Memorias geolocalizadas por barrio, municipio o comunidad
+   - Filtrado y visualización interactiva
+
+3. **Calendario cultural**: 
+   - Eventos tradicionales, ferias y festividades
+   - Sugerencias colaborativas con moderación
+
+4. **Biblioteca colaborativa**: 
+   - Saberes populares categorizados
+   - Sistema de aporte y búsqueda
+
+5. **Juegos didácticos**: 
+   - Aprendizaje sobre identidad, soberanía y valores patrios
+   - Mecánicas sencillas pero efectivas
+
+6. **Sistema de usuarios**: 
+   - Diferentes niveles de permisos (administrador, registrado, invitado)
+   - Usuarios registrados pueden publicar, invitados solo ver
+
+## Diseño responsive
+- **Estrategia responsive**:
+  - MediaQuery y LayoutBuilder para adaptar widgets al tamaño
+  - Flex, Expanded y Flexible para layouts proporcionales
+  - OrientationBuilder para modos vertical/horizontal
+  - Constantes de diseño específicas por plataforma
+  - Navegación adaptable: drawer para móvil, menú superior para web
+  - Auto-sizing para textos e imágenes
+
+- **Consideraciones por plataforma**:
+  - **Web**: URLs limpias, efectos hover, optimización de assets
+  - **iOS/Android**: Controles nativos según plataforma
+
+## Plan de implementación (priorización)
+1. Autenticación y navegación básica
+2. Publicación y visualización de relatos
+3. Mapa interactivo
+4. Calendario cultural
+5. Biblioteca de saberes
+6. Juegos didácticos (comenzando con uno simple)
+
+## Buenas prácticas
+- Firestore Rules para proteger datos
+- Caché offline para mejorar experiencia
+- Firebase Analytics para seguimiento
+- Pruebas en múltiples dispositivos
+- Optimización para plataformas específicas
+- Código comentado para facilitar mantenimiento
+- Reutilización de widgets para consistencia
