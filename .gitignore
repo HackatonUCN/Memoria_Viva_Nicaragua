@@ -10,6 +10,15 @@
 .svn/
 migrate_working_dir/
 
+# Environment files
+.env
+.env.*
+*.env
+env.dart
+environment.dart
+firebase_options_dev.dart
+firebase_options_prod.dart
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -97,17 +106,9 @@ coverage/
 google-services.json
 GoogleService-Info.plist
 
-# Environment variables and secrets
+# Environment variables
 .env*
 *.env
-.env.local
-.env.development
-.env.test
-.env.production
-*.env.*
-firebase_options.dart
-google-services.json
-GoogleService-Info.plist
 
 # Local configuration
 local.properties

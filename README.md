@@ -1,4 +1,13 @@
-# Memoria Viva Nicaragua 🇳🇮
+# Memoria Viva Nicaragua
+
+## Configuración del Proyecto
+
+1. Clona el repositorio
+2. Copia `.env.example` a `.env` y configura tus variables de entorno
+3. Ejecuta `flutter pub get`
+4. Ejecuta `flutter run`
+
+Para más detalles sobre la configuración de variables de entorno, consulta [ENVIRONMENT.md](ENVIRONMENT.md) 🇳🇮
 
 [![Flutter Version](https://img.shields.io/badge/Flutter-3.9.0-blue.svg)](https://flutter.dev/)
 [![Style: Effective Dart](https://img.shields.io/badge/style-effective_dart-40c4ff.svg)](https://dart.dev/guides/language/effective-dart)
@@ -83,9 +92,9 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 📞 Contacto
 
-Tu Nombre - [@tu_twitter](https://twitter.com/tu_twitter) - email@ejemplo.com
+ hackatonucn@gmail.com
 
-Link del proyecto: [https://github.com/tu-usuario/memoria_viva_nicaragua](https://github.com/tu-usuario/memoria_viva_nicaragua)
+Link del proyecto: [https://github.com/HackatonUCN//memoria_viva_nicaragua](https://github.com/HackatonUCN//memoria_viva_nicaragua)
 
 ## 🙏 Agradecimientos
 
