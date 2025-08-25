@@ -97,9 +97,17 @@ coverage/
 google-services.json
 GoogleService-Info.plist
 
-# Environment variables
+# Environment variables and secrets
 .env*
 *.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env.*
+firebase_options.dart
+google-services.json
+GoogleService-Info.plist
 
 # Local configuration
 local.properties
