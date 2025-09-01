@@ -224,7 +224,7 @@ class EventoCulturalAggregate {
   }) {
     final cambios = <String, dynamic>{};
     
-    if (titulo != null && titulo != _evento.nombre) {
+    if (titulo != null && titulo != _evento.titulo) {
       cambios['titulo'] = titulo;
     }
     

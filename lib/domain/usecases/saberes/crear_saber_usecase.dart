@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../entities/saber_popular.dart';
 import '../../entities/user.dart';
@@ -6,6 +5,7 @@ import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/saber_exception.dart';
 import '../../exceptions/categoria_exception.dart';
+import '../../failures/failures.dart';
 import '../../repositories/saber_popular_repository.dart';
 import '../../repositories/categoria_repository.dart';
 import '../../repositories/user_repository.dart';
@@ -14,6 +14,8 @@ import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
 import '../../events/saber_popular_events.dart';
+import '../../failures/result.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para crear un nuevo saber popular
 class CrearSaberUseCase {
@@ -38,7 +40,7 @@ class CrearSaberUseCase {
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [UserNotFoundException] si el usuario no existe
   /// - [SaberException] para otros errores
-  Future<SaberPopular> execute({
+  UseCaseResult<SaberPopular> execute({
     required String titulo,
     required String contenido,
     required String autorId,
@@ -151,17 +153,10 @@ class CrearSaberUseCase {
       // TODO: Publicar evento de dominio
       // eventBus.publish(evento);
       
-      return saber;
+      return Success<SaberPopular, Failure>(saber);
     } catch (e) {
-      if (e is SaberPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is SaberInvalidContentException ||
-          e is SaberLocationException ||
-          e is SaberMediaException ||
-          e is SaberDuplicadoException) {
-        rethrow;
-      }
-      throw SaberException('Error al crear saber popular: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<SaberPopular, Failure>(failure);
     }
   }
 }

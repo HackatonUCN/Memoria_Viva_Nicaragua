@@ -2,6 +2,9 @@ import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar el rol de un usuario (solo admin)
 class ActualizarRolUseCase {
@@ -18,7 +21,7 @@ class ActualizarRolUseCase {
   /// Throws:
   /// - [UserNotFoundException] si el usuario no existe
   /// - [AuthException] si el que ejecuta no es admin o hay otro error
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String userId,
     required UserRole nuevoRol,
@@ -40,11 +43,9 @@ class ActualizarRolUseCase {
         userId: userId,
         nuevoRol: nuevoRol,
       );
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is UserNotFoundException || e is AuthException) {
-        rethrow;
-      }
-      throw AuthException('Error al actualizar rol: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

@@ -1,6 +1,9 @@
 import '../../entities/user.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar el perfil del usuario
 class ActualizarPerfilUseCase {
@@ -13,7 +16,7 @@ class ActualizarPerfilUseCase {
   /// Throws:
   /// - [UserNotFoundException] si el usuario no existe
   /// - [AuthException] si hay algún error durante el proceso
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String userId,
     String? nombre,
     String? avatarUrl,
@@ -36,11 +39,9 @@ class ActualizarPerfilUseCase {
         municipio: municipio,
         biografia: biografia,
       );
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is UserNotFoundException) {
-        rethrow;
-      }
-      throw AuthException('Error al actualizar perfil: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

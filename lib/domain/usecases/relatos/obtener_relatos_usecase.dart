@@ -1,6 +1,8 @@
 import '../../entities/relato.dart';
-import '../../exceptions/relato_exception.dart';
 import '../../repositories/relato_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener relatos con diferentes filtros
 class ObtenerRelatosUseCase {
@@ -9,70 +11,76 @@ class ObtenerRelatosUseCase {
   ObtenerRelatosUseCase(this._relatoRepository);
 
   /// Obtiene todos los relatos activos
-  Future<List<Relato>> execute() async {
+  UseCaseResult<List<Relato>> execute() async {
     try {
-      return await _relatoRepository.obtenerRelatos();
+      final data = await _relatoRepository.obtenerRelatos();
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al obtener relatos: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene relatos por categoría
-  Future<List<Relato>> porCategoria(String categoriaId) async {
+  UseCaseResult<List<Relato>> porCategoria(String categoriaId) async {
     try {
-      return await _relatoRepository.obtenerRelatosPorCategoria(categoriaId);
+      final data = await _relatoRepository.obtenerRelatosPorCategoria(categoriaId);
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al obtener relatos por categoría: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene relatos por autor
-  Future<List<Relato>> porAutor(String autorId) async {
+  UseCaseResult<List<Relato>> porAutor(String autorId) async {
     try {
-      return await _relatoRepository.obtenerRelatosPorAutor(autorId);
+      final data = await _relatoRepository.obtenerRelatosPorAutor(autorId);
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al obtener relatos por autor: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene relatos por ubicación
-  Future<List<Relato>> porUbicacion({
+  UseCaseResult<List<Relato>> porUbicacion({
     String? departamento,
     String? municipio,
   }) async {
     try {
-      return await _relatoRepository.obtenerRelatosPorUbicacion(
+      final data = await _relatoRepository.obtenerRelatosPorUbicacion(
         departamento: departamento,
         municipio: municipio,
       );
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al obtener relatos por ubicación: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene relatos cercanos a una ubicación
-  Future<List<Relato>> cercanos({
+  UseCaseResult<List<Relato>> cercanos({
     required double latitud,
     required double longitud,
     required double radioKm,
   }) async {
     try {
-      return await _relatoRepository.obtenerRelatosCercanos(
+      final data = await _relatoRepository.obtenerRelatosCercanos(
         latitud: latitud,
         longitud: longitud,
         radioKm: radioKm,
       );
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al obtener relatos cercanos: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Busca relatos por texto
-  Future<List<Relato>> buscar(String texto) async {
+  UseCaseResult<List<Relato>> buscar(String texto) async {
     try {
-      return await _relatoRepository.buscarRelatos(texto);
+      final data = await _relatoRepository.buscarRelatos(texto);
+      return Success<List<Relato>, Failure>(data);
     } catch (e) {
-      throw RelatoException('Error al buscar relatos: $e');
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
     }
   }
 

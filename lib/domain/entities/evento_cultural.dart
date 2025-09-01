@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../value_objects/ubicacion.dart';
 import '../value_objects/multimedia.dart';
 import '../enums/tipos_evento.dart';
@@ -6,7 +5,7 @@ import '../enums/tipos_evento.dart';
 /// Entidad para eventos culturales (creados por admin)
 class EventoCultural {
   final String id;
-  final String nombre;
+  final String titulo;
   final String descripcion;
   final TipoEvento tipo;
   
@@ -32,6 +31,7 @@ class EventoCultural {
   
   // Metadata
   final String creadoPorId;     // ID del admin
+  final String creadoPorNombre; // Nombre del admin
   final DateTime fechaCreacion;
   final DateTime fechaActualizacion;
   
@@ -39,9 +39,9 @@ class EventoCultural {
   final bool eliminado;
   final DateTime? fechaEliminacion;
 
-  const EventoCultural({
+  EventoCultural({
     required this.id,
-    required this.nombre,
+    required this.titulo,
     required this.descripcion,
     required this.tipo,
     required this.categoriaId,
@@ -51,6 +51,7 @@ class EventoCultural {
     required this.fechaFin,
     required this.organizador,
     required this.creadoPorId,
+    required this.creadoPorNombre,
     required this.fechaCreacion,
     required this.fechaActualizacion,
     this.imagenes = const [],
@@ -59,7 +60,14 @@ class EventoCultural {
     this.contacto,
     this.eliminado = false,
     this.fechaEliminacion,
-  });
+  }) : assert(id != ''),
+       assert(titulo.trim() != ''),
+       assert(descripcion.trim() != ''),
+       assert(categoriaId != ''),
+       assert(categoriaNombre.trim() != ''),
+       assert(organizador.trim() != ''),
+       assert(creadoPorId != ''),
+       assert(creadoPorNombre.trim() != '');
 
   /// Crea una copia con campos actualizados
   EventoCultural copyWith({
@@ -82,7 +90,7 @@ class EventoCultural {
   }) {
     return EventoCultural(
       id: this.id,
-      nombre: nombre ?? this.nombre,
+      titulo: nombre ?? this.titulo,
       descripcion: descripcion ?? this.descripcion,
       tipo: tipo ?? this.tipo,
       categoriaId: categoriaId ?? this.categoriaId,
@@ -96,8 +104,9 @@ class EventoCultural {
       organizador: organizador ?? this.organizador,
       contacto: contacto ?? this.contacto,
       creadoPorId: this.creadoPorId,
+      creadoPorNombre: this.creadoPorNombre,
       fechaCreacion: this.fechaCreacion,
-      fechaActualizacion: fechaActualizacion ?? DateTime.now(),
+      fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
       eliminado: eliminado ?? this.eliminado,
       fechaEliminacion: fechaEliminacion ?? this.fechaEliminacion,
     );
@@ -107,7 +116,7 @@ class EventoCultural {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'nombre': nombre,
+      'nombre': titulo,
       'descripcion': descripcion,
       'tipo': tipo.value,
       'categoriaId': categoriaId,
@@ -121,6 +130,7 @@ class EventoCultural {
       'organizador': organizador,
       'contacto': contacto,
       'creadoPorId': creadoPorId,
+      'creadoPorNombre': creadoPorNombre,
       'fechaCreacion': fechaCreacion,
       'fechaActualizacion': fechaActualizacion,
       'eliminado': eliminado,
@@ -132,7 +142,7 @@ class EventoCultural {
   factory EventoCultural.fromMap(Map<String, dynamic> map) {
     return EventoCultural(
       id: map['id'] as String,
-      nombre: map['nombre'] as String,
+      titulo: map['nombre'] as String,
       descripcion: map['descripcion'] as String,
       tipo: TipoEvento.fromString(map['tipo'] as String),
       categoriaId: map['categoriaId'] as String,
@@ -141,18 +151,19 @@ class EventoCultural {
       imagenes: (map['imagenes'] as List<dynamic>?)
           ?.map((i) => Multimedia.fromMap(i as Map<String, dynamic>))
           .toList() ?? [],
-      fechaInicio: (map['fechaInicio'] as Timestamp).toDate(),
-      fechaFin: (map['fechaFin'] as Timestamp).toDate(),
+      fechaInicio: _parseDateTime(map['fechaInicio']),
+      fechaFin: _parseDateTime(map['fechaFin']),
       esRecurrente: map['esRecurrente'] as bool? ?? false,
       frecuencia: map['frecuencia'] as String?,
       organizador: map['organizador'] as String,
       contacto: map['contacto'] as String?,
       creadoPorId: map['creadoPorId'] as String,
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      creadoPorNombre: map['creadoPorNombre'] as String,
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
       eliminado: map['eliminado'] as bool? ?? false,
       fechaEliminacion: map['fechaEliminacion'] != null 
-          ? (map['fechaEliminacion'] as Timestamp).toDate()
+          ? _parseDateTime(map['fechaEliminacion'])
           : null,
     );
   }
@@ -169,14 +180,15 @@ class EventoCultural {
     required DateTime fechaFin,
     required String organizador,
     required String creadoPorId,
+    required String creadoPorNombre,
     List<Multimedia> imagenes = const [],
     bool esRecurrente = false,
     String? frecuencia,
     String? contacto,
   }) {
     return EventoCultural(
-      id: FirebaseFirestore.instance.collection('eventos').doc().id,
-      nombre: nombre,
+      id: _generateId(),
+      titulo: nombre,
       descripcion: descripcion,
       tipo: tipo,
       categoriaId: categoriaId,
@@ -190,8 +202,9 @@ class EventoCultural {
       organizador: organizador,
       contacto: contacto,
       creadoPorId: creadoPorId,
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      creadoPorNombre: creadoPorNombre,
+      fechaCreacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -199,8 +212,8 @@ class EventoCultural {
   EventoCultural marcarEliminado() {
     return copyWith(
       eliminado: true,
-      fechaEliminacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaEliminacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -209,9 +222,18 @@ class EventoCultural {
     return copyWith(
       eliminado: false,
       fechaEliminacion: null,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is EventoCultural && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 /// Entidad para sugerencias de eventos (creadas por usuarios)
@@ -252,7 +274,7 @@ class SugerenciaEvento {
   final DateTime fechaCreacion;
   final DateTime fechaActualizacion;
 
-  const SugerenciaEvento({
+  SugerenciaEvento({
     required this.id,
     required this.nombre,
     required this.descripcion,
@@ -274,7 +296,14 @@ class SugerenciaEvento {
     this.estado = EstadoSugerencia.pendiente,
     this.razonRechazo,
     this.eventoId,
-  });
+  }) : assert(id != ''),
+       assert(nombre.trim() != ''),
+        assert(descripcion.trim() != ''),
+        assert(categoriaId != ''),
+        assert(categoriaNombre.trim() != ''),
+        assert(organizador.trim() != ''),
+        assert(sugeridoPorId != ''),
+        assert(sugeridoPorNombre.trim() != '');
 
   /// Crea una copia con campos actualizados
   SugerenciaEvento copyWith({
@@ -317,7 +346,7 @@ class SugerenciaEvento {
       sugeridoPorId: this.sugeridoPorId,
       sugeridoPorNombre: this.sugeridoPorNombre,
       fechaCreacion: this.fechaCreacion,
-      fechaActualizacion: fechaActualizacion ?? DateTime.now(),
+      fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
     );
   }
 
@@ -361,8 +390,8 @@ class SugerenciaEvento {
       imagenes: (map['imagenes'] as List<dynamic>?)
           ?.map((i) => Multimedia.fromMap(i as Map<String, dynamic>))
           .toList() ?? [],
-      fechaInicio: (map['fechaInicio'] as Timestamp).toDate(),
-      fechaFin: (map['fechaFin'] as Timestamp).toDate(),
+      fechaInicio: _parseDateTime(map['fechaInicio']),
+      fechaFin: _parseDateTime(map['fechaFin']),
       esRecurrente: map['esRecurrente'] as bool? ?? false,
       frecuencia: map['frecuencia'] as String?,
       organizador: map['organizador'] as String,
@@ -372,8 +401,8 @@ class SugerenciaEvento {
       eventoId: map['eventoId'] as String?,
       sugeridoPorId: map['sugeridoPorId'] as String,
       sugeridoPorNombre: map['sugeridoPorNombre'] as String,
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
     );
   }
 
@@ -396,7 +425,7 @@ class SugerenciaEvento {
     String? contacto,
   }) {
     return SugerenciaEvento(
-      id: FirebaseFirestore.instance.collection('sugerencias_eventos').doc().id,
+      id: _generateId(),
       nombre: nombre,
       descripcion: descripcion,
       tipo: tipo,
@@ -412,8 +441,8 @@ class SugerenciaEvento {
       contacto: contacto,
       sugeridoPorId: sugeridoPorId,
       sugeridoPorNombre: sugeridoPorNombre,
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -422,7 +451,7 @@ class SugerenciaEvento {
     return copyWith(
       estado: EstadoSugerencia.aprobada,
       eventoId: eventoId,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -431,7 +460,54 @@ class SugerenciaEvento {
     return copyWith(
       estado: EstadoSugerencia.rechazada,
       razonRechazo: razon,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SugerenciaEvento && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
+ DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+}
+
+String _generateId({int length = 20}) {
+  const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  final StringBuffer buffer = StringBuffer();
+  final int max = chars.length;
+  int seed = DateTime.now().microsecondsSinceEpoch;
+  for (int i = 0; i < length; i++) {
+    seed = 1664525 * seed + 1013904223;
+    final int index = (seed & 0x7FFFFFFF) % max;
+    buffer.write(chars[index]);
+  }
+  return buffer.toString();
 }

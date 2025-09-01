@@ -7,6 +7,9 @@ import '../../repositories/saber_popular_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
 import '../../events/saber_popular_events.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para eliminar un saber popular (soft delete)
 class EliminarSaberUseCase {
@@ -28,7 +31,7 @@ class EliminarSaberUseCase {
   /// - [SaberPermissionException] si no tiene permisos
   /// - [SaberAlreadyDeletedException] si ya está eliminado
   /// - [SaberException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String usuarioId,
     required String saberId,
   }) async {
@@ -91,14 +94,9 @@ class EliminarSaberUseCase {
           saberesCompartidos: autor.saberesCompartidos - 1,
         );
       }
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is SaberNotFoundException || 
-          e is UserNotFoundException ||
-          e is SaberPermissionException ||
-          e is SaberAlreadyDeletedException) {
-        rethrow;
-      }
-      throw SaberException('Error al eliminar saber: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

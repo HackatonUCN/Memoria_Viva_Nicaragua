@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../entities/relato.dart';
 import '../../entities/user.dart';
@@ -12,6 +11,9 @@ import '../../repositories/user_repository.dart';
 import '../../validators/contenido_validator.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para crear un nuevo relato
 class CrearRelatoUseCase {
@@ -36,7 +38,7 @@ class CrearRelatoUseCase {
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [UserNotFoundException] si el usuario no existe
   /// - [RelatoException] para otros errores
-  Future<Relato> execute({
+  UseCaseResult<Relato> execute({
     required String titulo,
     required String contenido,
     required String autorId,
@@ -156,17 +158,10 @@ class CrearRelatoUseCase {
         relatosPublicados: autor.relatosPublicados + 1,
       );
 
-      return relato;
+      return Success<Relato, Failure>(relato);
     } catch (e) {
-      if (e is UserNotFoundException || 
-          e is CategoriaNotFoundException ||
-          e is RelatoPermissionException ||
-          e is RelatoInvalidContentException ||
-          e is RelatoLocationException ||
-          e is RelatoMediaException) {
-        rethrow;
-      }
-      throw RelatoException('Error al crear relato: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<Relato, Failure>(failure);
     }
   }
 }

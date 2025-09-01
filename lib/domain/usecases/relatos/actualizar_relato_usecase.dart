@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../entities/relato.dart';
 import '../../entities/user.dart';
@@ -12,6 +11,9 @@ import '../../repositories/user_repository.dart';
 import '../../validators/contenido_validator.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar un relato existente
 class ActualizarRelatoUseCase {
@@ -37,7 +39,7 @@ class ActualizarRelatoUseCase {
   /// - [RelatoInvalidContentException] si el contenido es inválido
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [RelatoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String relatoId,
     required String usuarioId,
     String? titulo,
@@ -168,18 +170,10 @@ class ActualizarRelatoUseCase {
 
       // Guardar el relato actualizado
       await _relatoRepository.guardarRelato(relatoActualizado);
-
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is RelatoNotFoundException || 
-          e is UserNotFoundException ||
-          e is RelatoPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is RelatoInvalidContentException ||
-          e is RelatoLocationException ||
-          e is RelatoMediaException) {
-        rethrow;
-      }
-      throw RelatoException('Error al actualizar relato: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<void, Failure>(failure);
     }
   }
 }

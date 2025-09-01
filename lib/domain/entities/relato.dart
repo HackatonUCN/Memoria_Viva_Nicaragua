@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../value_objects/ubicacion.dart';
 import '../value_objects/multimedia.dart';
 import '../enums/estado_moderacion.dart';
@@ -41,7 +40,7 @@ class Relato {
   final bool eliminado;
   final DateTime? fechaEliminacion;
 
-  const Relato({
+  Relato({
     required this.id,
     required this.titulo,
     required this.contenido,
@@ -61,7 +60,16 @@ class Relato {
     this.compartidos = 0,
     this.eliminado = false,
     this.fechaEliminacion,
-  });
+  }) : assert(id != ''),
+       assert(titulo.trim() != ''),
+       assert(contenido.trim() != ''),
+       assert(autorId != ''),
+       assert(autorNombre.trim() != ''),
+       assert(categoriaId != ''),
+       assert(categoriaNombre.trim() != ''),
+       assert(reportes >= 0),
+       assert(likes >= 0),
+       assert(compartidos >= 0);
 
   /// Crea una copia del relato con campos actualizados
   Relato copyWith({
@@ -93,7 +101,7 @@ class Relato {
       multimedia: multimedia ?? this.multimedia,
       etiquetas: etiquetas ?? this.etiquetas,
       fechaCreacion: this.fechaCreacion,
-      fechaActualizacion: fechaActualizacion ?? DateTime.now(),
+      fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
       estado: estado ?? this.estado,
       reportes: reportes ?? this.reportes,
       procesado: procesado ?? this.procesado,
@@ -129,6 +137,15 @@ class Relato {
     };
   }
 
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Relato && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
   /// Crea desde Map de Firestore
   factory Relato.fromMap(Map<String, dynamic> map) {
     return Relato(
@@ -146,8 +163,8 @@ class Relato {
           ?.map((m) => Multimedia.fromMap(m as Map<String, dynamic>))
           .toList() ?? [],
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
       estado: EstadoModeracion.fromString(map['estado'] as String),
       reportes: map['reportes'] as int? ?? 0,
       procesado: map['procesado'] as bool? ?? false,
@@ -155,7 +172,7 @@ class Relato {
       compartidos: map['compartidos'] as int? ?? 0,
       eliminado: map['eliminado'] as bool? ?? false,
       fechaEliminacion: map['fechaEliminacion'] != null 
-          ? (map['fechaEliminacion'] as Timestamp).toDate()
+          ? _parseDateTime(map['fechaEliminacion'])
           : null,
     );
   }
@@ -173,7 +190,7 @@ class Relato {
     List<String> etiquetas = const [],
   }) {
     return Relato(
-      id: FirebaseFirestore.instance.collection('relatos').doc().id,
+      id: _generateId(),
       titulo: titulo,
       contenido: contenido,
       autorId: autorId,
@@ -183,8 +200,8 @@ class Relato {
       ubicacion: ubicacion,
       multimedia: multimedia,
       etiquetas: etiquetas,
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -192,8 +209,8 @@ class Relato {
   Relato marcarEliminado() {
     return copyWith(
       eliminado: true,
-      fechaEliminacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaEliminacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -202,7 +219,7 @@ class Relato {
     return copyWith(
       eliminado: false,
       fechaEliminacion: null,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -211,7 +228,7 @@ class Relato {
     return copyWith(
       estado: EstadoModeracion.reportado,
       reportes: reportes + 1,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -220,7 +237,45 @@ class Relato {
     return copyWith(
       estado: aprobar ? EstadoModeracion.activo : EstadoModeracion.oculto,
       procesado: true,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+    if (value is DateTime) {
+      return value.isUtc ? value : value.toUtc();
+    }
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+    }
+    if (value is double) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+    }
+    if (value is String) {
+      return DateTime.parse(value).toUtc();
+    }
+    try {
+      final dynamic dyn = value;
+      final DateTime dt = dyn.toDate();
+      return dt.isUtc ? dt : dt.toUtc();
+    } catch (_) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+  }
+
+  static String _generateId({int length = 20}) {
+    const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final StringBuffer buffer = StringBuffer();
+    final int max = chars.length;
+    int seed = DateTime.now().microsecondsSinceEpoch;
+    for (int i = 0; i < length; i++) {
+      seed = 1664525 * seed + 1013904223;
+      final int index = (seed & 0x7FFFFFFF) % max;
+      buffer.write(chars[index]);
+    }
+    return buffer.toString();
   }
 }

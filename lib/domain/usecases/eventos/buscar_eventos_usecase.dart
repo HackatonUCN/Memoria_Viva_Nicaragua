@@ -1,6 +1,9 @@
 import '../../entities/evento_cultural.dart';
 import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para buscar eventos culturales
 class BuscarEventosUseCase {
@@ -14,15 +17,15 @@ class BuscarEventosUseCase {
   /// 
   /// Throws:
   /// - [EventoException] si hay algún error durante la búsqueda
-  Future<List<EventoCultural>> execute(String texto) async {
+  UseCaseResult<List<EventoCultural>> execute(String texto) async {
     try {
       if (texto.trim().isEmpty) {
-        return [];
+        return const Success<List<EventoCultural>, Failure>(<EventoCultural>[]);
       }
-      
-      return await _eventoRepository.buscarEventos(texto);
+      final data = await _eventoRepository.buscarEventos(texto);
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al buscar eventos: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
@@ -34,7 +37,7 @@ class BuscarEventosUseCase {
   /// Throws:
   /// - [EventoLocationException] si hay un error con las coordenadas
   /// - [EventoException] si hay algún otro error
-  Future<List<EventoCultural>> buscarCercanos({
+  UseCaseResult<List<EventoCultural>> buscarCercanos({
     required double latitud,
     required double longitud,
     double radioKm = 10,
@@ -44,16 +47,14 @@ class BuscarEventosUseCase {
         throw EventoLocationException.coordenadasInvalidas();
       }
       
-      return await _eventoRepository.obtenerEventosCercanos(
+      final data = await _eventoRepository.obtenerEventosCercanos(
         latitud: latitud,
         longitud: longitud,
         radioKm: radioKm,
       );
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      if (e is EventoLocationException) {
-        rethrow;
-      }
-      throw EventoException('Error al buscar eventos cercanos: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 }

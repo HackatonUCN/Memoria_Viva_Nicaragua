@@ -1,6 +1,5 @@
 import '../../entities/evento_cultural.dart';
 import '../../entities/user.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
@@ -13,6 +12,9 @@ import '../../validators/contenido_validator.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
 import '../../enums/tipos_evento.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para crear una sugerencia de evento
 class CrearSugerenciaUseCase {
@@ -36,7 +38,7 @@ class CrearSugerenciaUseCase {
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [UserNotFoundException] si el usuario no existe
   /// - [EventoException] para otros errores
-  Future<SugerenciaEvento> execute({
+  UseCaseResult<SugerenciaEvento> execute({
     required String usuarioId,
     required String nombre,
     required String descripcion,
@@ -134,18 +136,9 @@ class CrearSugerenciaUseCase {
       // Guardar la sugerencia
       await _eventoRepository.guardarSugerencia(sugerencia);
 
-      return sugerencia;
+      return Success<SugerenciaEvento, Failure>(sugerencia);
     } catch (e) {
-      if (e is UserNotFoundException ||
-          e is EventoPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is EventoInvalidContentException ||
-          e is EventoInvalidDateException ||
-          e is EventoLocationException ||
-          e is EventoMediaException) {
-        rethrow;
-      }
-      throw EventoException('Error al crear sugerencia: $e');
+      return FailureResult<SugerenciaEvento, Failure>(mapExceptionToFailure(e));
     }
   }
 }

@@ -2,6 +2,9 @@ import '../../entities/categoria.dart';
 import '../../enums/tipos_contenido.dart';
 import '../../exceptions/categoria_exception.dart';
 import '../../repositories/categoria_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener categorías filtradas por tipo
 class ObtenerCategoriasPorTipoUseCase {
@@ -15,11 +18,12 @@ class ObtenerCategoriasPorTipoUseCase {
   /// 
   /// Throws:
   /// - [CategoriaException] si hay algún error durante el proceso
-  Future<List<Categoria>> execute(TipoContenido tipo) async {
+  UseCaseResult<List<Categoria>> execute(TipoContenido tipo) async {
     try {
-      return await _categoriaRepository.obtenerCategoriasPorTipo(tipo);
+      final data = await _categoriaRepository.obtenerCategoriasPorTipo(tipo);
+      return Success<List<Categoria>, Failure>(data);
     } catch (e) {
-      throw CategoriaException('Error al obtener categorías por tipo: $e');
+      return FailureResult<List<Categoria>, Failure>(mapExceptionToFailure(CategoriaException('Error al obtener categorías por tipo: $e')));
     }
   }
 

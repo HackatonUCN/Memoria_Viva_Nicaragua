@@ -1,5 +1,8 @@
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para cerrar sesión
 class LogoutUseCase {
@@ -11,11 +14,12 @@ class LogoutUseCase {
   /// 
   /// Throws:
   /// - [AuthException] si hay algún error durante el proceso
-  Future<void> execute() async {
+  UseCaseResult<void> execute() async {
     try {
       await _userRepository.cerrarSesion();
+      return Success<void, Failure>(null);
     } catch (e) {
-      throw AuthException('Error al cerrar sesión: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(AuthException('Error al cerrar sesión: $e')));
     }
   }
 }

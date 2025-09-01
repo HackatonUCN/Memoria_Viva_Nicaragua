@@ -90,7 +90,7 @@ class ContenidoValidator {
   void validarEventoCultural(EventoCultural evento) {
     final errores = <String>[];
 
-    if (evento.nombre.length < MIN_TITULO_LENGTH || evento.nombre.length > MAX_TITULO_LENGTH) {
+    if (evento.titulo.length < MIN_TITULO_LENGTH || evento.titulo.length > MAX_TITULO_LENGTH) {
       errores.add('El nombre debe tener entre $MIN_TITULO_LENGTH y $MAX_TITULO_LENGTH caracteres');
     }
 

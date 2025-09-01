@@ -1,6 +1,9 @@
 import '../../entities/user.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para registrar un nuevo usuario
 class RegisterUserUseCase {
@@ -14,7 +17,7 @@ class RegisterUserUseCase {
   /// - [EmailAlreadyInUseException] si el email ya está registrado
   /// - [WeakPasswordException] si la contraseña es débil
   /// - [NetworkException] si hay problemas de conexión
-  Future<User> execute({
+  UseCaseResult<User> execute({
     required String email,
     required String password,
     required String nombre,
@@ -36,18 +39,18 @@ class RegisterUserUseCase {
       // Enviar email de verificación
       await _userRepository.enviarEmailVerificacion();
 
-      return user;
+      return Success<User, Failure>(user);
     } catch (e) {
       if (e is EmailAlreadyInUseException) {
-        rethrow;
+        return FailureResult<User, Failure>(mapExceptionToFailure(e));
       }
       if (e.toString().contains('weak-password')) {
-        throw WeakPasswordException();
+        return FailureResult<User, Failure>(mapExceptionToFailure(WeakPasswordException()));
       }
       if (e.toString().contains('network-error')) {
-        throw NetworkException();
+        return FailureResult<User, Failure>(mapExceptionToFailure(NetworkException()));
       }
-      throw AuthException('Error al registrar usuario: $e');
+      return FailureResult<User, Failure>(mapExceptionToFailure(AuthException('Error al registrar usuario: $e')));
     }
   }
 }

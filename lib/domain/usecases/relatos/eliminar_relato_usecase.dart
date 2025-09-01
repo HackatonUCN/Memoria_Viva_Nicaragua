@@ -4,6 +4,9 @@ import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';
 import '../../repositories/relato_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para eliminar un relato (soft delete)
 class EliminarRelatoUseCase {
@@ -25,7 +28,7 @@ class EliminarRelatoUseCase {
   /// - [RelatoPermissionException] si no tiene permisos
   /// - [RelatoAlreadyDeletedException] si ya está eliminado
   /// - [RelatoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String usuarioId,
     required String relatoId,
   }) async {
@@ -65,14 +68,10 @@ class EliminarRelatoUseCase {
           relatosPublicados: autor.relatosPublicados - 1,
         );
       }
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is RelatoNotFoundException || 
-          e is UserNotFoundException ||
-          e is RelatoPermissionException ||
-          e is RelatoAlreadyDeletedException) {
-        rethrow;
-      }
-      throw RelatoException('Error al eliminar relato: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<void, Failure>(failure);
     }
   }
 }

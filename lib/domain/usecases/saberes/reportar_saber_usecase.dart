@@ -8,6 +8,9 @@ import '../../repositories/user_repository.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
 import '../../events/saber_popular_events.dart';
 import '../../policies/moderacion_policy.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para reportar un saber popular
 class ReportarSaberUseCase {
@@ -31,7 +34,7 @@ class ReportarSaberUseCase {
   /// - [SaberAlreadyReportedException] si ya fue reportado por este usuario
   /// - [SaberPermissionException] si el usuario no puede reportar
   /// - [SaberPopularException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String usuarioId,
     required String saberId,
     required String razon,
@@ -93,13 +96,9 @@ class ReportarSaberUseCase {
       // }
       
       // TODO: Notificar a moderadores
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is UserNotFoundException || 
-          e is SaberNotFoundException ||
-          e is SaberAlreadyReportedException) {
-        rethrow;
-      }
-      throw SaberPopularException('Error al reportar saber: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

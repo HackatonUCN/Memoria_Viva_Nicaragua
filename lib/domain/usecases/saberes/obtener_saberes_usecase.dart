@@ -1,6 +1,8 @@
 import '../../entities/saber_popular.dart';
-import '../../exceptions/saber_exception.dart';
 import '../../repositories/saber_popular_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener saberes populares con diferentes filtros
 class ObtenerSaberesUseCase {
@@ -9,53 +11,58 @@ class ObtenerSaberesUseCase {
   ObtenerSaberesUseCase(this._saberRepository);
 
   /// Obtiene todos los saberes activos
-  Future<List<SaberPopular>> execute() async {
+  UseCaseResult<List<SaberPopular>> execute() async {
     try {
-      return await _saberRepository.obtenerSaberes();
+      final data = await _saberRepository.obtenerSaberes();
+      return Success<List<SaberPopular>, Failure>(data);
     } catch (e) {
-      throw SaberException('Error al obtener saberes: $e');
+      return FailureResult<List<SaberPopular>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene saberes por categoría
-  Future<List<SaberPopular>> porCategoria(String categoriaId) async {
+  UseCaseResult<List<SaberPopular>> porCategoria(String categoriaId) async {
     try {
-      return await _saberRepository.obtenerSaberesPorCategoria(categoriaId);
+      final data = await _saberRepository.obtenerSaberesPorCategoria(categoriaId);
+      return Success<List<SaberPopular>, Failure>(data);
     } catch (e) {
-      throw SaberException('Error al obtener saberes por categoría: $e');
+      return FailureResult<List<SaberPopular>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene saberes por autor
-  Future<List<SaberPopular>> porAutor(String autorId) async {
+  UseCaseResult<List<SaberPopular>> porAutor(String autorId) async {
     try {
-      return await _saberRepository.obtenerSaberesPorAutor(autorId);
+      final data = await _saberRepository.obtenerSaberesPorAutor(autorId);
+      return Success<List<SaberPopular>, Failure>(data);
     } catch (e) {
-      throw SaberException('Error al obtener saberes por autor: $e');
+      return FailureResult<List<SaberPopular>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene saberes por ubicación
-  Future<List<SaberPopular>> porUbicacion({
+  UseCaseResult<List<SaberPopular>> porUbicacion({
     String? departamento,
     String? municipio,
   }) async {
     try {
-      return await _saberRepository.obtenerSaberesPorUbicacion(
+      final data = await _saberRepository.obtenerSaberesPorUbicacion(
         departamento: departamento,
         municipio: municipio,
       );
+      return Success<List<SaberPopular>, Failure>(data);
     } catch (e) {
-      throw SaberException('Error al obtener saberes por ubicación: $e');
+      return FailureResult<List<SaberPopular>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Busca saberes por texto
-  Future<List<SaberPopular>> buscar(String texto) async {
+  UseCaseResult<List<SaberPopular>> buscar(String texto) async {
     try {
-      return await _saberRepository.buscarSaberes(texto);
+      final data = await _saberRepository.buscarSaberes(texto);
+      return Success<List<SaberPopular>, Failure>(data);
     } catch (e) {
-      throw SaberException('Error al buscar saberes: $e');
+      return FailureResult<List<SaberPopular>, Failure>(mapExceptionToFailure(e));
     }
   }
 

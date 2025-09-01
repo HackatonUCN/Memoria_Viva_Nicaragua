@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../enums/roles_usuario.dart';
 
 /// Entidad que representa un usuario en la aplicación Memoria Viva Nicaragua
@@ -25,8 +24,8 @@ class User {
   final bool activo;             // Estado de la cuenta
   final bool notificacionesActivas; // Preferencias de notificación
   
-  /// Constructor constante para la inmutabilidad
-  const User({
+  /// Constructor con invariantes básicas
+  User({
     required this.id,
     required this.nombre,
     required this.email,
@@ -42,7 +41,12 @@ class User {
     this.saberesCompartidos = 0,
     this.puntajeTotal = 0,
     this.notificacionesActivas = true,
-  });
+  }) : assert(id != ''),
+       assert(nombre.trim() != ''),
+       assert(email.trim() != '' && email.contains('@')),
+       assert(relatosPublicados >= 0),
+       assert(saberesCompartidos >= 0),
+       assert(puntajeTotal >= 0);
 
   /// Crea una copia del usuario con campos actualizados
   User copyWith({
@@ -65,7 +69,7 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       rol: rol ?? this.rol,
       fechaRegistro: this.fechaRegistro,
-      ultimaModificacion: DateTime.now(),
+      ultimaModificacion: DateTime.now().toUtc(),
       departamento: departamento ?? this.departamento,
       municipio: municipio ?? this.municipio,
       biografia: biografia ?? this.biografia,
@@ -98,7 +102,7 @@ class User {
     };
   }
 
-  /// Crea una instancia de User desde un Map de Firestore
+  /// Crea una instancia de User desde un Map
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       id: map['id'] as String,
@@ -106,8 +110,8 @@ class User {
       email: map['email'] as String,
       rol: UserRole.fromString(map['rol'] as String),
       avatarUrl: map['avatarUrl'] as String?,
-      fechaRegistro: (map['fechaRegistro'] as Timestamp).toDate(),
-      ultimaModificacion: (map['ultimaModificacion'] as Timestamp).toDate(),
+      fechaRegistro: _parseDateTime(map['fechaRegistro']),
+      ultimaModificacion: _parseDateTime(map['ultimaModificacion']),
       departamento: map['departamento'] as String?,
       municipio: map['municipio'] as String?,
       biografia: map['biografia'] as String?,
@@ -139,11 +143,14 @@ class User {
       departamento: departamento,
       municipio: municipio,
       biografia: biografia,
-      fechaRegistro: DateTime.now(),
-      ultimaModificacion: DateTime.now(),
+      fechaRegistro: DateTime.now().toUtc(),
+      ultimaModificacion: DateTime.now().toUtc(),
       activo: true,
     );
   }
+
+  bool get esAdmin => rol == UserRole.admin;
+  bool get esInvitado => rol == UserRole.invitado;
 
   /// Actualiza las estadísticas del usuario
   User actualizarEstadisticas({
@@ -156,5 +163,30 @@ class User {
       relatosPublicados: nuevosRelatos != null ? relatosPublicados + nuevosRelatos : null,
       saberesCompartidos: nuevosSaberes != null ? saberesCompartidos + nuevosSaberes : null,
     );
+  }
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }

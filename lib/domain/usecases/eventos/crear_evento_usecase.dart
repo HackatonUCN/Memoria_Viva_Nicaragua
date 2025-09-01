@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../entities/evento_cultural.dart';
 import '../../entities/user.dart';
@@ -13,6 +12,9 @@ import '../../validators/contenido_validator.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
 import '../../enums/tipos_evento.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para crear un nuevo evento cultural (solo admin)
 class CrearEventoUseCase {
@@ -39,7 +41,7 @@ class CrearEventoUseCase {
   /// - [EventoDuplicadoException] si ya existe un evento similar
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [EventoException] para otros errores
-  Future<EventoCultural> execute({
+  UseCaseResult<EventoCultural> execute({
     required String adminId,
     required String nombre,
     required String descripcion,
@@ -140,6 +142,7 @@ class CrearEventoUseCase {
         contacto: contacto,
         imagenes: imagenes,
         creadoPorId: adminId,
+        creadoPorNombre: admin.nombre,
       );
 
       // Validar usando el validator
@@ -155,18 +158,9 @@ class CrearEventoUseCase {
       // Guardar el evento
       await _eventoRepository.guardarEvento(evento);
 
-      return evento;
+      return Success<EventoCultural, Failure>(evento);
     } catch (e) {
-      if (e is EventoPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is EventoInvalidContentException ||
-          e is EventoInvalidDateException ||
-          e is EventoDuplicadoException ||
-          e is EventoLocationException ||
-          e is EventoMediaException) {
-        rethrow;
-      }
-      throw EventoException('Error al crear evento: $e');
+      return FailureResult<EventoCultural, Failure>(mapExceptionToFailure(e));
     }
   }
 }

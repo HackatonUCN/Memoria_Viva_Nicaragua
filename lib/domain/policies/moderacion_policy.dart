@@ -83,7 +83,7 @@ class ModeracionPolicy {
 
   /// Verifica si un evento cultural contiene contenido prohibido
   static bool eventoContienePalabrasProhibidas(EventoCultural evento) {
-    return contienePalabrasProhibidas(evento.nombre) ||
+    return contienePalabrasProhibidas(evento.titulo) ||
            contienePalabrasProhibidas(evento.descripcion);
   }
 

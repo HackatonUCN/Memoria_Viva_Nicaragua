@@ -5,6 +5,9 @@ import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';
 import '../../repositories/relato_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para reportar un relato
 class ReportarRelatoUseCase {
@@ -26,7 +29,7 @@ class ReportarRelatoUseCase {
   /// - [RelatoNotFoundException] si el relato no existe
   /// - [RelatoAlreadyReportedException] si ya fue reportado por este usuario
   /// - [RelatoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String usuarioId,
     required String relatoId,
     required String razon,
@@ -56,13 +59,10 @@ class ReportarRelatoUseCase {
       }
 
       // TODO: Notificar a moderadores
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is UserNotFoundException || 
-          e is RelatoNotFoundException ||
-          e is RelatoAlreadyReportedException) {
-        rethrow;
-      }
-      throw RelatoException('Error al reportar relato: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<void, Failure>(failure);
     }
   }
 }

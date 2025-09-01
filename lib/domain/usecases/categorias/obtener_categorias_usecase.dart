@@ -1,6 +1,9 @@
 import '../../entities/categoria.dart';
 import '../../exceptions/categoria_exception.dart';
 import '../../repositories/categoria_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener todas las categorías
 class ObtenerCategoriasUseCase {
@@ -12,11 +15,12 @@ class ObtenerCategoriasUseCase {
   /// 
   /// Throws:
   /// - [CategoriaException] si hay algún error durante el proceso
-  Future<List<Categoria>> execute() async {
+  UseCaseResult<List<Categoria>> execute() async {
     try {
-      return await _categoriaRepository.obtenerCategorias();
+      final data = await _categoriaRepository.obtenerCategorias();
+      return Success<List<Categoria>, Failure>(data);
     } catch (e) {
-      throw CategoriaException('Error al obtener categorías: $e');
+      return FailureResult<List<Categoria>, Failure>(mapExceptionToFailure(CategoriaException('Error al obtener categorías: $e')));
     }
   }
 

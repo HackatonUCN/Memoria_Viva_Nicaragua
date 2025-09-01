@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../enums/tipos_notificacion.dart';
 
 /// Entidad para manejar notificaciones
@@ -67,7 +66,7 @@ class Notificacion {
       mensaje: map['mensaje'] as String,
       tipo: TipoNotificacion.fromString(map['tipo'] as String),
       datos: Map<String, dynamic>.from(map['datos'] as Map),
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
       leida: map['leida'] as bool? ?? false,
       eliminada: map['eliminada'] as bool? ?? false,
     );
@@ -80,7 +79,7 @@ class Notificacion {
     required String eventoId,
   }) {
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: '¡Sugerencia de Evento Aprobada!',
       mensaje: 'Tu sugerencia para el evento "$nombreEvento" ha sido aprobada.',
@@ -89,7 +88,7 @@ class Notificacion {
         'eventoId': eventoId,
         'nombreEvento': nombreEvento,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -99,7 +98,7 @@ class Notificacion {
     required String razonRechazo,
   }) {
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: 'Sugerencia de Evento No Aprobada',
       mensaje: 'Tu sugerencia para "$nombreEvento" no fue aprobada: $razonRechazo',
@@ -108,7 +107,7 @@ class Notificacion {
         'nombreEvento': nombreEvento,
         'razonRechazo': razonRechazo,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -120,7 +119,7 @@ class Notificacion {
     required String autorNombre,
   }) {
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: 'Nuevo Relato en tu Área',
       mensaje: '$autorNombre compartió: "$titulo"',
@@ -130,7 +129,7 @@ class Notificacion {
         'titulo': titulo,
         'autorNombre': autorNombre,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -147,7 +146,7 @@ class Notificacion {
         : 'Tu relato "$titulo" ha sido ocultado: $razon';
 
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: 'Relato $estado',
       mensaje: mensaje,
@@ -158,7 +157,7 @@ class Notificacion {
         'aprobado': aprobado,
         'razon': razon,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -171,7 +170,7 @@ class Notificacion {
     required String categoria,
   }) {
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: 'Nuevo Saber Popular',
       mensaje: '$autorNombre compartió el $categoria: "$titulo"',
@@ -182,7 +181,7 @@ class Notificacion {
         'autorNombre': autorNombre,
         'categoria': categoria,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -199,7 +198,7 @@ class Notificacion {
         : 'Tu saber popular "$titulo" ha sido ocultado: $razon';
 
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: 'Saber Popular $estado',
       mensaje: mensaje,
@@ -210,7 +209,7 @@ class Notificacion {
         'aprobado': aprobado,
         'razon': razon,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
 
@@ -223,7 +222,7 @@ class Notificacion {
     required int interacciones,
   }) {
     return Notificacion(
-      id: FirebaseFirestore.instance.collection('notificaciones').doc().id,
+      id: _generateId(),
       usuarioId: usuarioId,
       titulo: '¡Tu Contenido es Popular!',
       mensaje: 'Tu $tipo "$titulo" está siendo muy compartido (${interacciones} interacciones)',
@@ -234,7 +233,45 @@ class Notificacion {
         'tipo': tipo,
         'interacciones': interacciones,
       },
-      fechaCreacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
     );
   }
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+}
+
+String _generateId({int length = 20}) {
+  const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  final StringBuffer buffer = StringBuffer();
+  final int max = chars.length;
+  int seed = DateTime.now().microsecondsSinceEpoch;
+  for (int i = 0; i < length; i++) {
+    seed = 1664525 * seed + 1013904223;
+    final int index = (seed & 0x7FFFFFFF) % max;
+    buffer.write(chars[index]);
+  }
+  return buffer.toString();
 }

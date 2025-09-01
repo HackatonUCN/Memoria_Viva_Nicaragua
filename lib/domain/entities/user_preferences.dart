@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Entidad para manejar las preferencias del usuario
 class UserPreferences {
@@ -28,7 +27,7 @@ class UserPreferences {
   // Timestamps
   final DateTime fechaActualizacion;
 
-  const UserPreferences({
+  UserPreferences({
     required this.userId,
     this.isDarkMode = false,
     this.language = 'es',
@@ -44,7 +43,9 @@ class UserPreferences {
     this.mostrarUbicacion = true,
     this.permitirComentarios = true,
     required this.fechaActualizacion,
-  });
+  }) : assert(userId != ''),
+       assert(radioNotificaciones >= 0),
+       assert(language == 'es' || language == 'en');
 
   /// Crea una copia con campos actualizados
   UserPreferences copyWith({
@@ -77,9 +78,18 @@ class UserPreferences {
       perfilPublico: perfilPublico ?? this.perfilPublico,
       mostrarUbicacion: mostrarUbicacion ?? this.mostrarUbicacion,
       permitirComentarios: permitirComentarios ?? this.permitirComentarios,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is UserPreferences && other.userId == userId;
+  }
+
+  @override
+  int get hashCode => userId.hashCode;
 
   /// Convierte a Map para Firestore
   Map<String, dynamic> toMap() {
@@ -119,7 +129,7 @@ class UserPreferences {
       perfilPublico: map['perfilPublico'] as bool? ?? true,
       mostrarUbicacion: map['mostrarUbicacion'] as bool? ?? true,
       permitirComentarios: map['permitirComentarios'] as bool? ?? true,
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
     );
   }
 
@@ -127,7 +137,32 @@ class UserPreferences {
   factory UserPreferences.defaults(String userId) {
     return UserPreferences(
       userId: userId,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
+  }
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }

@@ -1,6 +1,5 @@
 import '../../entities/evento_cultural.dart';
 import '../../entities/user.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
@@ -12,6 +11,9 @@ import '../../repositories/user_repository.dart';
 import '../../enums/tipos_evento.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar un evento cultural existente (solo admin)
 class ActualizarEventoUseCase {
@@ -36,7 +38,7 @@ class ActualizarEventoUseCase {
   /// - [EventoInvalidDateException] si las fechas son inválidas
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [EventoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String eventoId,
     String? nombre,
@@ -133,7 +135,7 @@ class ActualizarEventoUseCase {
       // Actualizar el evento
       final eventoActualizado = EventoCultural(
         id: evento.id,
-        nombre: nombre ?? evento.nombre,
+        titulo: nombre ?? evento.titulo,
         descripcion: descripcion ?? evento.descripcion,
         tipo: tipo ?? evento.tipo,
         categoriaId: nuevaCategoriaId,
@@ -151,20 +153,13 @@ class ActualizarEventoUseCase {
         fechaActualizacion: DateTime.now(),
         eliminado: evento.eliminado,
         fechaEliminacion: evento.fechaEliminacion,
+        creadoPorNombre: '',
       );
 
       await _eventoRepository.actualizarEvento(eventoActualizado);
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is EventoNotFoundException ||
-          e is EventoPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is EventoInvalidContentException ||
-          e is EventoInvalidDateException ||
-          e is EventoLocationException ||
-          e is EventoMediaException) {
-        rethrow;
-      }
-      throw EventoException('Error al actualizar evento: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

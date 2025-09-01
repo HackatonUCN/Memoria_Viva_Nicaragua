@@ -2,6 +2,7 @@ import '../entities/saber_popular.dart';
 import '../value_objects/ubicacion.dart';
 import '../value_objects/multimedia.dart';
 import '../events/saber_popular_events.dart';
+import '../events/domain_event.dart';
 import '../enums/estado_moderacion.dart';
 
 /// Comentario en un saber popular
@@ -95,8 +96,8 @@ class SaberPopularAggregate {
   List<VerificacionSaber> get verificaciones => List.unmodifiable(_verificaciones);
 
   // Eventos generados por este agregado
-  List<SaberPopularCreado> _eventos = [];
-  List<SaberPopularCreado> get eventos => List.unmodifiable(_eventos);
+  List<DomainEvent> _eventos = [];
+  List<DomainEvent> get eventos => List.unmodifiable(_eventos);
   void _limpiarEventos() => _eventos = [];
 
   // Métodos para manipular el agregado
@@ -178,7 +179,7 @@ class SaberPopularAggregate {
       titulo: _saber.titulo,
       esAutentico: esAutentico,
       comentario: comentario,
-    ) as SaberPopularCreado);
+    ));
 
     return SaberPopularAggregate(_saber, _comentarios, nuevasVerificaciones);
   }
@@ -243,7 +244,7 @@ class SaberPopularAggregate {
       saberId: _saber.id,
       titulo: _saber.titulo,
       cambios: cambios,
-    ) as SaberPopularCreado);
+    ));
     
     return SaberPopularAggregate(saberActualizado, _comentarios, _verificaciones);
   }
@@ -265,7 +266,7 @@ class SaberPopularAggregate {
       saberId: _saber.id,
       titulo: _saber.titulo,
       eliminacionPermanente: eliminacionPermanente,
-    ) as SaberPopularCreado);
+    ));
     
     return SaberPopularAggregate(saberEliminado, _comentarios, _verificaciones);
   }
@@ -289,7 +290,7 @@ class SaberPopularAggregate {
       userId: usuarioId,
       saberId: _saber.id,
       titulo: _saber.titulo,
-    ) as SaberPopularCreado);
+    ));
     
     return SaberPopularAggregate(saberRestaurado, _comentarios, _verificaciones);
   }
@@ -322,7 +323,7 @@ class SaberPopularAggregate {
       estadoAnterior: estadoAnterior,
       estadoNuevo: estadoNuevo,
       razon: razon,
-    ) as SaberPopularCreado);
+    ));
     
     return SaberPopularAggregate(saberModerado, _comentarios, _verificaciones);
   }
@@ -346,7 +347,7 @@ class SaberPopularAggregate {
       razon: razon,
       reportadoPorId: reportadorId,
       reportesActuales: saberReportado.reportes,
-    ) as SaberPopularCreado);
+    ));
     
     return SaberPopularAggregate(saberReportado, _comentarios, _verificaciones);
   }
@@ -368,7 +369,7 @@ class SaberPopularAggregate {
       saberId: _saber.id,
       titulo: _saber.titulo,
       razon: razon,
-    ) as SaberPopularCreado);
+    ));
     
     return this;
   }
@@ -396,7 +397,7 @@ class SaberPopularAggregate {
       saberId: _saber.id,
       titulo: _saber.titulo,
       valoracion: valoracion,
-    ) as SaberPopularCreado);
+    ));
     
     return this;
   }
@@ -411,13 +412,13 @@ class SaberPopularAggregate {
       saberId: _saber.id,
       titulo: _saber.titulo,
       plataforma: plataforma,
-    ) as SaberPopularCreado);
+    ));
     
     return this;
   }
 
   /// Obtiene y limpia los eventos generados
-  List<SaberPopularCreado> obtenerYLimpiarEventos() {
+  List<DomainEvent> obtenerYLimpiarEventos() {
     final eventosActuales = [..._eventos];
     _limpiarEventos();
     return eventosActuales;

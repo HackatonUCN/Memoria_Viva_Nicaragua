@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../value_objects/ubicacion.dart';
 import '../value_objects/multimedia.dart';
 import '../enums/estado_moderacion.dart';
@@ -33,11 +32,15 @@ class SaberPopular {
   final int reportes;
   final bool procesado;
   
+  // Métricas
+  final int likes;
+  final int compartidos;
+  
   // Soft delete
   final bool eliminado;
   final DateTime? fechaEliminacion;
 
-  const SaberPopular({
+  SaberPopular({
     required this.id,
     required this.titulo,
     required this.contenido,
@@ -53,9 +56,20 @@ class SaberPopular {
     this.estado = EstadoModeracion.activo,
     this.reportes = 0,
     this.procesado = false,
+    this.likes = 0,
+    this.compartidos = 0,
     this.eliminado = false,
     this.fechaEliminacion,
-  });
+  }) : assert(id != ''),
+       assert(titulo.trim() != ''),
+       assert(contenido.trim() != ''),
+       assert(autorId != ''),
+       assert(autorNombre.trim() != ''),
+       assert(categoriaId != ''),
+       assert(categoriaNombre.trim() != ''),
+       assert(reportes >= 0),
+       assert(likes >= 0),
+       assert(compartidos >= 0);
 
   /// Crea una copia con campos actualizados
   SaberPopular copyWith({
@@ -69,6 +83,8 @@ class SaberPopular {
     EstadoModeracion? estado,
     int? reportes,
     bool? procesado,
+    int? likes,
+    int? compartidos,
     bool? eliminado,
     DateTime? fechaEliminacion,
     DateTime? fechaActualizacion,
@@ -85,10 +101,12 @@ class SaberPopular {
       imagenes: imagenes ?? this.imagenes,
       etiquetas: etiquetas ?? this.etiquetas,
       fechaCreacion: this.fechaCreacion,
-      fechaActualizacion: fechaActualizacion ?? DateTime.now(),
+      fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
       estado: estado ?? this.estado,
       reportes: reportes ?? this.reportes,
       procesado: procesado ?? this.procesado,
+      likes: likes ?? this.likes,
+      compartidos: compartidos ?? this.compartidos,
       eliminado: eliminado ?? this.eliminado,
       fechaEliminacion: fechaEliminacion ?? this.fechaEliminacion,
     );
@@ -112,6 +130,8 @@ class SaberPopular {
       'estado': estado.value,
       'reportes': reportes,
       'procesado': procesado,
+      'likes': likes,
+      'compartidos': compartidos,
       'eliminado': eliminado,
       'fechaEliminacion': fechaEliminacion,
     };
@@ -134,14 +154,16 @@ class SaberPopular {
           ?.map((i) => Multimedia.fromMap(i as Map<String, dynamic>))
           .toList() ?? [],
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
       estado: EstadoModeracion.fromString(map['estado'] as String),
       reportes: map['reportes'] as int? ?? 0,
       procesado: map['procesado'] as bool? ?? false,
+      likes: map['likes'] as int? ?? 0,
+      compartidos: map['compartidos'] as int? ?? 0,
       eliminado: map['eliminado'] as bool? ?? false,
       fechaEliminacion: map['fechaEliminacion'] != null 
-          ? (map['fechaEliminacion'] as Timestamp).toDate()
+          ? _parseDateTime(map['fechaEliminacion'])
           : null,
     );
   }
@@ -159,7 +181,7 @@ class SaberPopular {
     List<String> etiquetas = const [],
   }) {
     return SaberPopular(
-      id: FirebaseFirestore.instance.collection('saberes').doc().id,
+      id: _generateId(),
       titulo: titulo,
       contenido: contenido,
       autorId: autorId,
@@ -169,8 +191,10 @@ class SaberPopular {
       ubicacion: ubicacion,
       imagenes: imagenes,
       etiquetas: etiquetas,
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
+      likes: 0,
+      compartidos: 0,
     );
   }
 
@@ -178,17 +202,26 @@ class SaberPopular {
   SaberPopular marcarEliminado() {
     return copyWith(
       eliminado: true,
-      fechaEliminacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaEliminacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SaberPopular && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 
   /// Restaura un saber eliminado
   SaberPopular restaurar() {
     return copyWith(
       eliminado: false,
       fechaEliminacion: null,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -197,7 +230,7 @@ class SaberPopular {
     return copyWith(
       estado: EstadoModeracion.reportado,
       reportes: reportes + 1,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
 
@@ -206,7 +239,46 @@ class SaberPopular {
     return copyWith(
       estado: aprobar ? EstadoModeracion.activo : EstadoModeracion.oculto,
       procesado: true,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+    if (value is DateTime) {
+      return value.isUtc ? value : value.toUtc();
+    }
+    if (value is int) {
+      // Assume milliseconds since epoch
+      return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+    }
+    if (value is double) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+    }
+    if (value is String) {
+      return DateTime.parse(value).toUtc();
+    }
+    try {
+      final dynamic dyn = value;
+      final DateTime dt = dyn.toDate();
+      return dt.isUtc ? dt : dt.toUtc();
+    } catch (_) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+  }
+
+  static String _generateId({int length = 20}) {
+    const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    final StringBuffer buffer = StringBuffer();
+    final int max = chars.length;
+    int seed = DateTime.now().microsecondsSinceEpoch;
+    for (int i = 0; i < length; i++) {
+      seed = 1664525 * seed + 1013904223;
+      final int index = (seed & 0x7FFFFFFF) % max;
+      buffer.write(chars[index]);
+    }
+    return buffer.toString();
   }
 }

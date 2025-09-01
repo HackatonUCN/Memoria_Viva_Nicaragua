@@ -1,6 +1,9 @@
 import '../../entities/user.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar las estadísticas de un usuario
 class ActualizarEstadisticasUseCase {
@@ -13,7 +16,7 @@ class ActualizarEstadisticasUseCase {
   /// Throws:
   /// - [UserNotFoundException] si el usuario no existe
   /// - [AuthException] si hay algún error durante el proceso
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String userId,
     int? relatosPublicados,
     int? saberesCompartidos,
@@ -32,11 +35,9 @@ class ActualizarEstadisticasUseCase {
         saberesCompartidos: saberesCompartidos,
         puntajeTotal: puntajeTotal,
       );
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is UserNotFoundException) {
-        rethrow;
-      }
-      throw AuthException('Error al actualizar estadísticas: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

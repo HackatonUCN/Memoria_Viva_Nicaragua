@@ -4,6 +4,9 @@ import '../../exceptions/auth_exception.dart';
 import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para eliminar un evento cultural (soft delete)
 class EliminarEventoUseCase {
@@ -25,7 +28,7 @@ class EliminarEventoUseCase {
   /// - [EventoPermissionException] si no es admin
   /// - [EventoAlreadyDeletedException] si ya está eliminado
   /// - [EventoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String eventoId,
   }) async {
@@ -51,13 +54,9 @@ class EliminarEventoUseCase {
 
       // Eliminar el evento (soft delete)
       await _eventoRepository.eliminarEvento(eventoId);
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is EventoNotFoundException ||
-          e is EventoPermissionException ||
-          e is EventoAlreadyDeletedException) {
-        rethrow;
-      }
-      throw EventoException('Error al eliminar evento: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

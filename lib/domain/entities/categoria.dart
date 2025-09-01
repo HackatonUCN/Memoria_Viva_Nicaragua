@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../enums/tipos_contenido.dart';
 
 /// Entidad para categorizar el contenido de la aplicación
@@ -21,7 +20,7 @@ class Categoria {
   final DateTime fechaCreacion;
   final DateTime fechaActualizacion;
 
-  const Categoria({
+  Categoria({
     required this.id,
     required this.nombre,
     required this.descripcion,
@@ -33,7 +32,13 @@ class Categoria {
     required this.fechaActualizacion,
     this.categoriaPadreId,
     this.activa = true,
-  });
+  }) : assert(id != ''),
+       assert(nombre.trim() != ''),
+       assert(descripcion.trim() != ''),
+       assert(icono.trim() != ''),
+       assert(color.trim() != ''),
+       assert(orden >= 0),
+       assert(color.startsWith('#') ? (color.length == 7 || color.length == 9) : true);
 
   /// Crea una copia con campos actualizados
   Categoria copyWith({
@@ -57,9 +62,18 @@ class Categoria {
       orden: orden ?? this.orden,
       activa: activa ?? this.activa,
       fechaCreacion: this.fechaCreacion,
-      fechaActualizacion: DateTime.now(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Categoria && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 
   /// Convierte a Map para Firestore
   Map<String, dynamic> toMap() {
@@ -90,8 +104,8 @@ class Categoria {
       color: map['color'] as String,
       orden: map['orden'] as int,
       activa: map['activa'] as bool? ?? true,
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
     );
   }
 
@@ -106,7 +120,7 @@ class Categoria {
     String? categoriaPadreId,
   }) {
     return Categoria(
-      id: FirebaseFirestore.instance.collection('categorias').doc().id,
+      id: _generateId(),
       nombre: nombre,
       descripcion: descripcion,
       tipo: tipo,
@@ -114,8 +128,46 @@ class Categoria {
       icono: icono,
       color: color,
       orden: orden,
-      fechaCreacion: DateTime.now(),
-      fechaActualizacion: DateTime.now(),
+      fechaCreacion: DateTime.now().toUtc(),
+      fechaActualizacion: DateTime.now().toUtc(),
     );
   }
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+}
+
+String _generateId({int length = 20}) {
+  const String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  final StringBuffer buffer = StringBuffer();
+  final int max = chars.length;
+  int seed = DateTime.now().microsecondsSinceEpoch;
+  for (int i = 0; i < length; i++) {
+    seed = 1664525 * seed + 1013904223;
+    final int index = (seed & 0x7FFFFFFF) % max;
+    buffer.write(chars[index]);
+  }
+  return buffer.toString();
 }

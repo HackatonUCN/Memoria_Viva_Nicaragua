@@ -1,6 +1,9 @@
 import '../../entities/user.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener el usuario actual
 class GetCurrentUserUseCase {
@@ -14,11 +17,12 @@ class GetCurrentUserUseCase {
   /// 
   /// Throws:
   /// - [AuthException] si hay algún error durante el proceso
-  Future<User?> execute() async {
+  UseCaseResult<User?> execute() async {
     try {
-      return await _userRepository.obtenerUsuarioActual();
+      final user = await _userRepository.obtenerUsuarioActual();
+      return Success<User?, Failure>(user);
     } catch (e) {
-      throw AuthException('Error al obtener usuario actual: $e');
+      return FailureResult<User?, Failure>(mapExceptionToFailure(AuthException('Error al obtener usuario actual: $e')));
     }
   }
 

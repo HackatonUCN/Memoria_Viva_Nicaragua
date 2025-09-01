@@ -4,6 +4,9 @@ import '../../exceptions/auth_exception.dart';
 import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../repositories/user_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para restaurar un evento cultural eliminado
 class RestaurarEventoUseCase {
@@ -25,7 +28,7 @@ class RestaurarEventoUseCase {
   /// - [EventoPermissionException] si no es admin
   /// - [EventoNotDeletedException] si el evento no está eliminado
   /// - [EventoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String eventoId,
   }) async {
@@ -51,13 +54,9 @@ class RestaurarEventoUseCase {
 
       // Restaurar el evento
       await _eventoRepository.restaurarEvento(eventoId);
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is EventoNotFoundException ||
-          e is EventoPermissionException ||
-          e is EventoNotDeletedException) {
-        rethrow;
-      }
-      throw EventoException('Error al restaurar evento: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

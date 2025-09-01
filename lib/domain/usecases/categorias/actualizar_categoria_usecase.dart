@@ -1,6 +1,9 @@
 import '../../entities/categoria.dart';
 import '../../exceptions/categoria_exception.dart';
 import '../../repositories/categoria_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar una categoría existente
 class ActualizarCategoriaUseCase {
@@ -14,7 +17,7 @@ class ActualizarCategoriaUseCase {
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [CategoriaDuplicadaException] si el nuevo nombre ya existe
   /// - [CategoriaException] si hay algún error durante el proceso
-  Future<void> execute(Categoria categoria) async {
+  UseCaseResult<void> execute(Categoria categoria) async {
     try {
       // Verificar si la categoría existe
       final categoriaExistente = await _categoriaRepository.obtenerCategoriaPorId(categoria.id);
@@ -36,11 +39,9 @@ class ActualizarCategoriaUseCase {
       }
 
       await _categoriaRepository.actualizarCategoria(categoria);
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is CategoriaNotFoundException || e is CategoriaDuplicadaException) {
-        rethrow;
-      }
-      throw CategoriaException('Error al actualizar categoría: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

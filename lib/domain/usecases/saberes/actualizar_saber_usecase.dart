@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../entities/saber_popular.dart';
 import '../../entities/user.dart';
@@ -14,6 +13,9 @@ import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
 import '../../events/saber_popular_events.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para actualizar un saber popular existente
 class ActualizarSaberUseCase {
@@ -39,7 +41,7 @@ class ActualizarSaberUseCase {
   /// - [SaberInvalidContentException] si el contenido es inválido
   /// - [CategoriaNotFoundException] si la categoría no existe
   /// - [SaberException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String saberId,
     required String usuarioId,
     String? titulo,
@@ -156,18 +158,9 @@ class ActualizarSaberUseCase {
       // for (final evento in eventos) {
       //   eventBus.publish(evento);
       // }
-
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is SaberNotFoundException || 
-          e is UserNotFoundException ||
-          e is SaberPermissionException ||
-          e is CategoriaNotFoundException ||
-          e is SaberInvalidContentException ||
-          e is SaberLocationException ||
-          e is SaberMediaException) {
-        rethrow;
-      }
-      throw SaberException('Error al actualizar saber popular: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

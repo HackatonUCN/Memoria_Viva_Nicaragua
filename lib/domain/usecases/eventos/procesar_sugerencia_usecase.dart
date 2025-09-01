@@ -7,6 +7,9 @@ import '../../repositories/evento_cultural_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../enums/estado_moderacion.dart';
 import '../../enums/tipos_evento.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para procesar (aprobar/rechazar) una sugerencia de evento
 class ProcesarSugerenciaUseCase {
@@ -30,7 +33,7 @@ class ProcesarSugerenciaUseCase {
   /// - [EventoPermissionException] si no es admin
   /// - [SugerenciaProcessException] si ya fue procesada
   /// - [EventoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String sugerenciaId,
     required bool aprobar,
@@ -75,6 +78,7 @@ class ProcesarSugerenciaUseCase {
           contacto: sugerencia.contacto,
           imagenes: sugerencia.imagenes,
           creadoPorId: adminId,
+          creadoPorNombre: admin!.nombre,
         );
 
         // Guardar evento y actualizar sugerencia
@@ -102,14 +106,9 @@ class ProcesarSugerenciaUseCase {
 
         // TODO: Notificar al usuario que su sugerencia fue rechazada
       }
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is SugerenciaNotFoundException ||
-          e is EventoPermissionException ||
-          e is SugerenciaProcessException ||
-          e is EventoInvalidContentException) {
-        rethrow;
-      }
-      throw EventoException('Error al procesar sugerencia: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

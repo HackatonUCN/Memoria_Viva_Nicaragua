@@ -8,6 +8,9 @@ import '../../repositories/user_repository.dart';
 import '../../enums/estado_moderacion.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
 import '../../events/saber_popular_events.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para moderar un saber popular
 class ModerarSaberUseCase {
@@ -30,7 +33,7 @@ class ModerarSaberUseCase {
   /// - [SaberNotFoundException] si el saber no existe
   /// - [SaberPermissionException] si no es admin
   /// - [SaberException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String saberId,
     required bool aprobar,
@@ -84,11 +87,9 @@ class ModerarSaberUseCase {
       // }
       
       // TODO: Enviar notificación al autor
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is SaberNotFoundException || e is SaberPermissionException) {
-        rethrow;
-      }
-      throw SaberException('Error al moderar saber: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }

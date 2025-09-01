@@ -1,7 +1,9 @@
 import '../../entities/evento_cultural.dart';
-import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../enums/tipos_evento.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para obtener eventos culturales con diferentes filtros
 class ObtenerEventosUseCase {
@@ -10,94 +12,102 @@ class ObtenerEventosUseCase {
   ObtenerEventosUseCase(this._eventoRepository);
 
   /// Obtiene todos los eventos activos
-  Future<List<EventoCultural>> execute() async {
+  UseCaseResult<List<EventoCultural>> execute() async {
     try {
-      return await _eventoRepository.obtenerEventos();
+      final data = await _eventoRepository.obtenerEventos();
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos por categoría
-  Future<List<EventoCultural>> porCategoria(String categoriaId) async {
+  UseCaseResult<List<EventoCultural>> porCategoria(String categoriaId) async {
     try {
-      return await _eventoRepository.obtenerEventosPorCategoria(categoriaId);
+      final data = await _eventoRepository.obtenerEventosPorCategoria(categoriaId);
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos por categoría: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos por tipo
-  Future<List<EventoCultural>> porTipo(TipoEvento tipo) async {
+  UseCaseResult<List<EventoCultural>> porTipo(TipoEvento tipo) async {
     try {
-      return await _eventoRepository.obtenerEventosPorTipo(tipo);
+      final data = await _eventoRepository.obtenerEventosPorTipo(tipo);
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos por tipo: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos por fecha
-  Future<List<EventoCultural>> porFecha(DateTime fecha) async {
+  UseCaseResult<List<EventoCultural>> porFecha(DateTime fecha) async {
     try {
-      return await _eventoRepository.obtenerEventosPorFecha(fecha);
+      final data = await _eventoRepository.obtenerEventosPorFecha(fecha);
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos por fecha: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos por rango de fechas
-  Future<List<EventoCultural>> porRangoFecha({
+  UseCaseResult<List<EventoCultural>> porRangoFecha({
     required DateTime inicio,
     required DateTime fin,
   }) async {
     try {
-      return await _eventoRepository.obtenerEventosPorRangoFecha(
+      final data = await _eventoRepository.obtenerEventosPorRangoFecha(
         inicio: inicio,
         fin: fin,
       );
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos por rango de fechas: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos por ubicación
-  Future<List<EventoCultural>> porUbicacion({
+  UseCaseResult<List<EventoCultural>> porUbicacion({
     String? departamento,
     String? municipio,
   }) async {
     try {
-      return await _eventoRepository.obtenerEventosPorUbicacion(
+      final data = await _eventoRepository.obtenerEventosPorUbicacion(
         departamento: departamento,
         municipio: municipio,
       );
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos por ubicación: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Obtiene eventos cercanos a una ubicación
-  Future<List<EventoCultural>> cercanos({
+  UseCaseResult<List<EventoCultural>> cercanos({
     required double latitud,
     required double longitud,
     required double radioKm,
   }) async {
     try {
-      return await _eventoRepository.obtenerEventosCercanos(
+      final data = await _eventoRepository.obtenerEventosCercanos(
         latitud: latitud,
         longitud: longitud,
         radioKm: radioKm,
       );
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al obtener eventos cercanos: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 
   /// Busca eventos por texto
-  Future<List<EventoCultural>> buscar(String texto) async {
+  UseCaseResult<List<EventoCultural>> buscar(String texto) async {
     try {
-      return await _eventoRepository.buscarEventos(texto);
+      final data = await _eventoRepository.buscarEventos(texto);
+      return Success<List<EventoCultural>, Failure>(data);
     } catch (e) {
-      throw EventoException('Error al buscar eventos: $e');
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
     }
   }
 

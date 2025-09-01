@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'juego_base.dart';
 import '../../enums/tipos_juego.dart';
 
@@ -65,8 +64,8 @@ class CompletarFrase extends JuegoBase {
       categoriaId: map['categoriaId'] as String?,
       categoriaNombre: map['categoriaNombre'] as String?,
       activo: map['activo'] as bool? ?? true,
-      fechaCreacion: (map['fechaCreacion'] as Timestamp).toDate(),
-      fechaActualizacion: (map['fechaActualizacion'] as Timestamp).toDate(),
+      fechaCreacion: _parseDateTime(map['fechaCreacion']),
+      fechaActualizacion: _parseDateTime(map['fechaActualizacion']),
     );
   }
 
@@ -97,5 +96,30 @@ class CompletarFrase extends JuegoBase {
   /// Obtiene la frase completa con la respuesta correcta
   String getFraseCompleta() {
     return fraseIncompleta.replaceAll('___', parteCorrecta);
+  }
+}
+
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  if (value is DateTime) {
+    return value.isUtc ? value : value.toUtc();
+  }
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is double) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
+  if (value is String) {
+    return DateTime.parse(value).toUtc();
+  }
+  try {
+    final dynamic dyn = value;
+    final DateTime dt = dyn.toDate();
+    return dt.isUtc ? dt : dt.toUtc();
+  } catch (_) {
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }

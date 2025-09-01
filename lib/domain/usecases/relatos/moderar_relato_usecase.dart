@@ -4,6 +4,9 @@ import '../../exceptions/relato_exception.dart';
 import '../../repositories/relato_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../enums/estado_moderacion.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para moderar un relato
 class ModerarRelatoUseCase {
@@ -25,7 +28,7 @@ class ModerarRelatoUseCase {
   /// - [RelatoNotFoundException] si el relato no existe
   /// - [RelatoPermissionException] si no es admin
   /// - [RelatoException] para otros errores
-  Future<void> execute({
+  UseCaseResult<void> execute({
     required String adminId,
     required String relatoId,
     required EstadoModeracion estado,
@@ -49,11 +52,10 @@ class ModerarRelatoUseCase {
       await _relatoRepository.moderarRelato(relatoId, estado);
 
       // TODO: Enviar notificación al autor
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is RelatoNotFoundException || e is RelatoPermissionException) {
-        rethrow;
-      }
-      throw RelatoException('Error al moderar relato: $e');
+      final failure = mapExceptionToFailure(e);
+      return FailureResult<void, Failure>(failure);
     }
   }
 }

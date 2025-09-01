@@ -1,6 +1,9 @@
 import '../../entities/categoria.dart';
 import '../../exceptions/categoria_exception.dart';
 import '../../repositories/categoria_repository.dart';
+import '../../failures/result.dart';
+import '../../failures/failures.dart';
+import '../../failures/exception_mapper.dart';
 
 /// Caso de uso para crear una nueva categoría
 class CrearCategoriaUseCase {
@@ -13,7 +16,7 @@ class CrearCategoriaUseCase {
   /// Throws:
   /// - [CategoriaDuplicadaException] si ya existe una categoría con el mismo nombre
   /// - [CategoriaException] si hay algún error durante el proceso
-  Future<void> execute(Categoria categoria) async {
+  UseCaseResult<void> execute(Categoria categoria) async {
     try {
       // Obtener categorías existentes para verificar duplicados
       final categorias = await _categoriaRepository.obtenerCategoriasPorTipo(categoria.tipo);
@@ -27,11 +30,9 @@ class CrearCategoriaUseCase {
       }
 
       await _categoriaRepository.guardarCategoria(categoria);
+      return Success<void, Failure>(null);
     } catch (e) {
-      if (e is CategoriaDuplicadaException) {
-        rethrow;
-      }
-      throw CategoriaException('Error al crear categoría: $e');
+      return FailureResult<void, Failure>(mapExceptionToFailure(e));
     }
   }
 }
