@@ -1,87 +1,103 @@
----
-alwaysApply: false
----
 # Plan de desarrollo: Memoria Viva Nicaragua (1 mes)
 
 ## Semana 1: Configuración y autenticación
 ### Días 1-2: Configuración inicial
-- Crear proyecto Flutter
-- Configurar Firebase (Authentication, Firestore, Storage)
-- Instalar dependencias principales
-- Configurar estructura de carpetas (Clean Architecture)
+- Crear proyecto Flutter con estructura Clean Architecture
+- Configurar Firebase (Authentication, Firestore, Storage, Analytics)
+- **Crear estructura de base de datos en Firestore Console**
+  - Colección 'usuarios' con reglas de seguridad
+  - Colección 'relatos' para historias y publicaciones
+  - Colección 'eventos' para calendario cultural
+  - Colección 'saberes' para biblioteca de conocimientos
+  - Colección 'puntajes' para juegos didácticos
+- Instalar dependencias principales según pubspec.yaml
+- Configurar estructura de carpetas (lib/config, lib/core, lib/data, lib/domain, lib/presentation)
+- Configurar tema con paleta de colores nicaragüense (#4A6192, #A3B18A, #F8F8F5)
 
 ### Días 3-5: Autenticación y navegación
-- Implementar splash screen
-- Crear pantallas de registro/login
-- Integrar autenticación con Google
-- Configurar navegación principal (bottom bar/drawer)
-- Implementar gestión de estado con BLoC
+- Implementar splash screen con animaciones
+- Crear pantallas de registro/login con Firebase UI Auth
+- Integrar autenticación con Google Sign-In
+- **Conectar AuthProvider con Firestore para guardar usuarios**
+- Configurar navegación responsive (bottom bar para móvil, drawer para web)
+- Implementar gestión de estado con Provider (más simple para principiantes)
 
 ### Días 6-7: Tema y diseño base
-- Crear sistema de tema (colores, tipografía)
-- Implementar componentes UI reutilizables
-- Configurar responsive design para todas las plataformas
-- Probar en Android, iOS y web
+- Crear sistema de tema con Montserrat y Playfair Display
+- Implementar componentes UI reutilizables (tarjetas, botones, campos)
+- Configurar responsive design con MediaQuery y LayoutBuilder
+- Probar en Android, iOS y web con device_preview
 
 ## Semana 2: Funcionalidades de relatos
 ### Días 8-9: Publicación de relatos
-- Crear formulario para publicar relatos
-- Implementar subida de imágenes a Firebase Storage
+- Crear formulario para publicar relatos con flutter_form_builder
+- Implementar subida de imágenes con image_picker y Firebase Storage
 - Desarrollar grabación/subida de audio y video
-- Integrar selección de ubicación
+- Integrar selección de ubicación con Google Maps
 
 ### Días 10-12: Feed y visualización
-- Desarrollar feed principal (estilo Instagram)
-- Implementar carga paginada de relatos
-- Crear vista detallada de relatos
-- Añadir sección "Mis Relatos"
+- Desarrollar feed principal estilo Instagram con cached_network_image
+- Implementar carga paginada de relatos desde Firestore
+- Crear vista detallada de relatos con multimedia
+- Añadir sección "Mis Relatos" filtrada por usuario
 
 ### Días 13-14: Mapa interactivo
-- Integrar Google Maps
-- Implementar marcadores geolocalizados
-- Crear filtros para el mapa
-- Desarrollar tarjetas de detalles para puntos
+- Integrar google_maps_flutter con marcadores personalizados
+- Implementar marcadores geolocalizados por categoría
+- Crear filtros para el mapa (relatos, eventos, saberes)
+- Desarrollar tarjetas de detalles para puntos del mapa
 
 ## Semana 3: Calendario y biblioteca
 ### Días 15-17: Calendario cultural
-- Implementar vista de calendario
-- Crear sistema para mostrar eventos por día
-- Desarrollar formulario para sugerir eventos
-- Implementar sistema de aprobación de eventos
+- Implementar vista de calendario con table_calendar
+- Crear sistema para mostrar eventos culturales por día
+- Desarrollar formulario para sugerir eventos (requiere aprobación)
+- Implementar sistema de moderación de eventos
 
 ### Días 18-20: Biblioteca de saberes
-- Crear estructura de categorías
-- Implementar navegación por categorías
-- Desarrollar sistema de búsqueda
-- Crear formulario para añadir saberes
+- Crear estructura de categorías (dichos, refranes, recetas, artesanías)
+- Implementar navegación por categorías con filtros
+- Desarrollar sistema de búsqueda en Firestore
+- Crear formulario para añadir saberes colaborativos
 
 ### Día 21: Perfil de usuario
-- Implementar pantalla de perfil
-- Crear funcionalidad para editar información
-- Añadir gestión de sesión
-- Desarrollar sistema de permisos
+- Implementar pantalla de perfil con información personal
+- Crear funcionalidad para editar información del usuario
+- Añadir gestión de sesión y logout
+- Desarrollar sistema de permisos (admin, registrado, invitado)
 
 ## Semana 4: Juegos y finalización
 ### Días 22-24: Juegos didácticos
-- Implementar juego de trivia
-- Crear juego de adivinanzas
-- Desarrollar juego de emparejar cartas
-- Implementar sistema de puntajes
+- Implementar juego de trivia sobre cultura nicaragüense
+- Crear juego de adivinanzas con saberes populares
+- Desarrollar juego de emparejar cartas con elementos culturales
+- Implementar sistema de puntajes en Firestore
 
-### Días 25-26: Optimización
-- Optimizar rendimiento
-- Implementar caché offline
-- Ajustar diseño responsive
-- Corregir bugs identificados
+### Días 25-26: Optimización y responsive
+- Optimizar rendimiento con flutter_screenutil
+- Implementar caché offline para mejor experiencia
+- Ajustar diseño responsive para todas las plataformas
+- Corregir bugs y mejorar UX
 
-### Días 27-28: Pruebas
-- Realizar pruebas en múltiples dispositivos
-- Probar funcionalidades offline
-- Verificar responsive design
-- Comprobar rendimiento
+### Días 27-28: Pruebas multiplataforma
+- Realizar pruebas en Android, iOS y web
+- Probar funcionalidades offline y sincronización
+- Verificar responsive design en diferentes tamaños
+- Comprobar rendimiento y optimización
 
-### Días 29-30: Finalización
-- Preparar versión final
+### Días 29-30: Finalización y documentación
+- Preparar versión final para hackathon
+- Crear material de presentación del proyecto
+- Documentar código con comentarios en español
+- Preparar demostración completa de funcionalidades
+
+## Consideraciones técnicas específicas
+- Usar Provider para gestión de estado (más simple que BLoC)
+- Implementar Firestore Rules para proteger datos
+- Configurar Firebase Analytics para seguimiento
+- Usar url_strategy para URLs limpias en web
+- Implementar auto_size_text para textos adaptables
+- Configurar flutter_screenutil para escalado responsive
 - Crear material para presentación
 - Documentar código y funcionalidades
 - Preparar demostración para hackathon
