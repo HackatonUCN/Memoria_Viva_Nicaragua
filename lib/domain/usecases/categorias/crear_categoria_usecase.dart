@@ -26,7 +26,9 @@ class CrearCategoriaUseCase {
         c.nombre.toLowerCase() == categoria.nombre.toLowerCase());
       
       if (existeNombre) {
-        throw CategoriaDuplicadaException();
+        throw CategoriaDuplicadaException(
+          'Ya existe una categoría con el nombre "${categoria.nombre}"',
+        );
       }
 
       await _categoriaRepository.guardarCategoria(categoria);

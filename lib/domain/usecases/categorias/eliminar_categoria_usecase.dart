@@ -23,7 +23,9 @@ class EliminarCategoriaUseCase {
       // Verificar si la categoría existe
       final categoria = await _categoriaRepository.obtenerCategoriaPorId(categoriaId);
       if (categoria == null) {
-        throw CategoriaNotFoundException();
+        throw CategoriaNotFoundException('No se encontró la categoría con ID $categoriaId', );
+
+
       }
 
       // TODO: Verificar si la categoría está siendo utilizada en relatos, saberes o eventos

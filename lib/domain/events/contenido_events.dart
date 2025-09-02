@@ -10,14 +10,14 @@ class ContenidoCreado extends DomainEvent {
   final String? municipio;
 
   ContenidoCreado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.titulo,
     this.departamento,
     this.municipio,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -39,14 +39,14 @@ class ContenidoModerado extends DomainEvent {
   final String? razon;
 
   ContenidoModerado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.estadoAnterior,
     required this.estadoNuevo,
     this.razon,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -67,13 +67,13 @@ class ContenidoReportado extends DomainEvent {
   final String reportadoPorId;
 
   ContenidoReportado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.razon,
     required this.reportadoPorId,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -92,12 +92,12 @@ class ContenidoDestacado extends DomainEvent {
   final String razon;
 
   ContenidoDestacado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.razon,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -115,12 +115,12 @@ class ContenidoActualizado extends DomainEvent {
   final Map<String, dynamic> cambios;
 
   ContenidoActualizado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.cambios,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -139,13 +139,13 @@ class ContenidoEliminado extends DomainEvent {
   final bool eliminacionPermanente;
 
   ContenidoEliminado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.titulo,
     this.eliminacionPermanente = false,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -164,12 +164,12 @@ class ContenidoRestaurado extends DomainEvent {
   final String titulo;
 
   ContenidoRestaurado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.titulo,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -188,13 +188,13 @@ class ContenidoComentado extends DomainEvent {
   final String texto;
 
   ContenidoComentado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.comentarioId,
     required this.texto,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -213,12 +213,12 @@ class ContenidoCompartido extends DomainEvent {
   final String plataforma;
 
   ContenidoCompartido({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.plataforma,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -236,12 +236,12 @@ class ContenidoValorado extends DomainEvent {
   final int valoracion; // 1-5 estrellas
 
   ContenidoValorado({
-    required String userId,
+    required super.userId,
     required this.contenidoId,
     required this.tipo,
     required this.valoracion,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {

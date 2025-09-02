@@ -12,26 +12,26 @@ class AuthException implements Exception {
 
 /// Email/contraseña inválidos
 class InvalidCredentialsException extends AuthException {
-  InvalidCredentialsException([String message = 'Credenciales inválidas'])
-      : super(message, code: 'INVALID_CREDENTIALS');
+  InvalidCredentialsException([super.message = 'Credenciales inválidas'])
+      : super(code: 'INVALID_CREDENTIALS');
 }
 
 /// Email ya existe
 class EmailAlreadyInUseException extends AuthException {
-  EmailAlreadyInUseException([String message = 'El email ya está registrado'])
-      : super(message, code: 'EMAIL_ALREADY_IN_USE');
+  EmailAlreadyInUseException([super.message = 'El email ya está registrado'])
+      : super(code: 'EMAIL_ALREADY_IN_USE');
 }
 
 /// Email no verificado
 class EmailNotVerifiedException extends AuthException {
-  EmailNotVerifiedException([String message = 'Email no verificado'])
-      : super(message, code: 'EMAIL_NOT_VERIFIED');
+  EmailNotVerifiedException([super.message = 'Email no verificado'])
+      : super(code: 'EMAIL_NOT_VERIFIED');
 }
 
 /// Usuario no encontrado
 class UserNotFoundException extends AuthException {
-  UserNotFoundException([String message = 'Usuario no encontrado'])
-      : super(message, code: 'USER_NOT_FOUND');
+  UserNotFoundException([super.message = 'Usuario no encontrado'])
+      : super(code: 'USER_NOT_FOUND');
       
   factory UserNotFoundException.withId(String userId) {
     return UserNotFoundException('Usuario con ID $userId no encontrado');
@@ -44,8 +44,8 @@ class UserNotFoundException extends AuthException {
 
 /// Contraseña débil
 class WeakPasswordException extends AuthException {
-  WeakPasswordException([String message = 'La contraseña es muy débil'])
-      : super(message, code: 'WEAK_PASSWORD');
+  WeakPasswordException([super.message = 'La contraseña es muy débil'])
+      : super(code: 'WEAK_PASSWORD');
       
   factory WeakPasswordException.withReason(String reason) {
     return WeakPasswordException(
@@ -57,20 +57,20 @@ class WeakPasswordException extends AuthException {
 
 /// Error de red
 class NetworkException extends AuthException {
-  NetworkException([String message = 'Error de conexión'])
-      : super(message, code: 'NETWORK_ERROR');
+  NetworkException([super.message = 'Error de conexión'])
+      : super(code: 'NETWORK_ERROR');
 }
 
 /// Sesión expirada
 class SessionExpiredException extends AuthException {
-  SessionExpiredException([String message = 'La sesión ha expirado'])
-      : super(message, code: 'SESSION_EXPIRED');
+  SessionExpiredException([super.message = 'La sesión ha expirado'])
+      : super(code: 'SESSION_EXPIRED');
 }
 
 /// Error de permisos
 class InsufficientPermissionsException extends AuthException {
-  InsufficientPermissionsException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'INSUFFICIENT_PERMISSIONS', value: value);
+  InsufficientPermissionsException(super.message, {String? code, super.value})
+      : super(code: code ?? 'INSUFFICIENT_PERMISSIONS');
       
   factory InsufficientPermissionsException.requiredRole(String requiredRole) {
     return InsufficientPermissionsException(
@@ -83,12 +83,12 @@ class InsufficientPermissionsException extends AuthException {
 
 /// Cuenta desactivada
 class AccountDisabledException extends AuthException {
-  AccountDisabledException([String message = 'La cuenta ha sido desactivada'])
-      : super(message, code: 'ACCOUNT_DISABLED');
+  AccountDisabledException([super.message = 'La cuenta ha sido desactivada'])
+      : super(code: 'ACCOUNT_DISABLED');
 }
 
 /// Error de autenticación con Google
 class GoogleAuthException extends AuthException {
-  GoogleAuthException([String message = 'Error en la autenticación con Google'])
-      : super(message, code: 'GOOGLE_AUTH_ERROR');
+  GoogleAuthException([super.message = 'Error en la autenticación con Google'])
+      : super(code: 'GOOGLE_AUTH_ERROR');
 }

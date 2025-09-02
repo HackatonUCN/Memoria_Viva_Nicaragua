@@ -22,7 +22,7 @@ class ActualizarCategoriaUseCase {
       // Verificar si la categoría existe
       final categoriaExistente = await _categoriaRepository.obtenerCategoriaPorId(categoria.id);
       if (categoriaExistente == null) {
-        throw CategoriaNotFoundException();
+        throw CategoriaNotFoundException("No se encontró la categoría con ID '${categoria.id}'");
       }
 
       // Si el nombre cambió, verificar que no exista otro igual
@@ -34,7 +34,7 @@ class ActualizarCategoriaUseCase {
         );
         
         if (existeNombre) {
-          throw CategoriaDuplicadaException();
+          throw CategoriaDuplicadaException( "Ya existe una categoría con el nombre '${categoria.nombre}'" );
         }
       }
 

@@ -2,11 +2,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_icons.dart';
-import '../common/cultural_icon.dart';
 import 'cultural_particle.dart';
 
 class CulturalBackground extends StatefulWidget {
-  const CulturalBackground({Key? key}) : super(key: key);
+  const CulturalBackground({super.key});
 
   @override
   State<CulturalBackground> createState() => _CulturalBackgroundState();

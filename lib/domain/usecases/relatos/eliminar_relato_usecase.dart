@@ -1,4 +1,3 @@
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';

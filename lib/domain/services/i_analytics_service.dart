@@ -1,7 +1,4 @@
 import '../entities/user.dart';
-import '../entities/relato.dart';
-import '../entities/saber_popular.dart';
-import '../entities/evento_cultural.dart';
 
 /// Interfaz para el servicio de analítica
 abstract class IAnalyticsService {

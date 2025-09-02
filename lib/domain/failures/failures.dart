@@ -14,32 +14,32 @@ abstract class Failure implements Exception {
 
 /// Validation error (invalid input, value objects, constraints)
 class ValidationFailure extends Failure {
-  const ValidationFailure(String message, {String? code, Object? details})
-      : super(message, code: code ?? 'VALIDATION_ERROR', details: details);
+  const ValidationFailure(super.message, {String? code, super.details})
+      : super(code: code ?? 'VALIDATION_ERROR');
 }
 
 /// Resource not found
 class NotFoundFailure extends Failure {
-  const NotFoundFailure(String message, {String? code, Object? details})
-      : super(message, code: code ?? 'NOT_FOUND', details: details);
+  const NotFoundFailure(super.message, {String? code, super.details})
+      : super(code: code ?? 'NOT_FOUND');
 }
 
 /// Permission denied or unauthorized action
 class PermissionDeniedFailure extends Failure {
-  const PermissionDeniedFailure(String message, {String? code, Object? details})
-      : super(message, code: code ?? 'PERMISSION_DENIED', details: details);
+  const PermissionDeniedFailure(super.message, {String? code, super.details})
+      : super(code: code ?? 'PERMISSION_DENIED');
 }
 
 /// Network/connectivity issues, timeouts
 class NetworkFailure extends Failure {
-  const NetworkFailure(String message, {String? code, Object? details})
-      : super(message, code: code ?? 'NETWORK_ERROR', details: details);
+  const NetworkFailure(super.message, {String? code, super.details})
+      : super(code: code ?? 'NETWORK_ERROR');
 }
 
 /// Any unexpected/unknown error
 class UnexpectedFailure extends Failure {
-  const UnexpectedFailure(String message, {String? code, Object? details})
-      : super(message, code: code ?? 'UNEXPECTED_ERROR', details: details);
+  const UnexpectedFailure(super.message, {String? code, super.details})
+      : super(code: code ?? 'UNEXPECTED_ERROR');
 }
 
 

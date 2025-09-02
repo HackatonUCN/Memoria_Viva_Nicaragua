@@ -17,13 +17,11 @@ class ValueObjectException implements Exception {
 /// Excepciones para Ubicacion
 class UbicacionInvalidaException extends ValueObjectException {
   UbicacionInvalidaException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic value,
+    super.value,
   }) : super(
-    message: message,
     code: code ?? 'UBICACION_INVALIDA',
-    value: value,
   );
 
   factory UbicacionInvalidaException.coordenadasInvalidas() => 
@@ -62,13 +60,11 @@ class UbicacionInvalidaException extends ValueObjectException {
 /// Excepciones para Multimedia
 class MultimediaInvalidaException extends ValueObjectException {
   MultimediaInvalidaException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic value,
+    super.value,
   }) : super(
-    message: message,
     code: code ?? 'MULTIMEDIA_INVALIDA',
-    value: value,
   );
 
   factory MultimediaInvalidaException.urlInvalida({
@@ -128,13 +124,11 @@ class MultimediaInvalidaException extends ValueObjectException {
 /// Excepciones para validación de contenido
 class ContenidoInvalidoException extends ValueObjectException {
   ContenidoInvalidoException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic value,
+    super.value,
   }) : super(
-    message: message,
     code: code ?? 'CONTENIDO_INVALIDO',
-    value: value,
   );
 
   factory ContenidoInvalidoException.longitudInvalida({

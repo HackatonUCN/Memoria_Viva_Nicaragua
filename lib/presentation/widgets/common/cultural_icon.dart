@@ -7,11 +7,11 @@ class CulturalIcon extends StatelessWidget {
   final Color? color;
 
   const CulturalIcon({
-    Key? key,
+    super.key,
     required this.svgPath,
     this.size = 24.0,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

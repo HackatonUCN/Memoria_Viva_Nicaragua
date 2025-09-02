@@ -12,8 +12,8 @@ class JuegoException implements Exception {
 
 /// Juego no encontrado
 class JuegoNotFoundException extends JuegoException {
-  JuegoNotFoundException([String message = 'Juego no encontrado'])
-      : super(message, code: 'JUEGO_NOT_FOUND');
+  JuegoNotFoundException([super.message = 'Juego no encontrado'])
+      : super(code: 'JUEGO_NOT_FOUND');
       
   factory JuegoNotFoundException.withId(String id) {
     return JuegoNotFoundException('Juego con ID $id no encontrado');
@@ -26,8 +26,8 @@ class JuegoNotFoundException extends JuegoException {
 
 /// Error de validación
 class JuegoValidationException extends JuegoException {
-  JuegoValidationException([String message = 'Datos del juego inválidos'])
-      : super(message, code: 'JUEGO_VALIDATION_ERROR');
+  JuegoValidationException([super.message = 'Datos del juego inválidos'])
+      : super(code: 'JUEGO_VALIDATION_ERROR');
       
   factory JuegoValidationException.respuestaInvalida() {
     return JuegoValidationException('La respuesta proporcionada es inválida');
@@ -40,8 +40,8 @@ class JuegoValidationException extends JuegoException {
 
 /// Error de estado
 class JuegoEstadoException extends JuegoException {
-  JuegoEstadoException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'JUEGO_ESTADO_ERROR', value: value);
+  JuegoEstadoException(super.message, {String? code, super.value})
+      : super(code: code ?? 'JUEGO_ESTADO_ERROR');
       
   factory JuegoEstadoException.estadoIncorrecto(String estadoActual, String estadoEsperado) {
     return JuegoEstadoException(
@@ -68,8 +68,8 @@ class JuegoEstadoException extends JuegoException {
 
 /// Error de puntaje
 class JuegoPuntajeException extends JuegoException {
-  JuegoPuntajeException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'JUEGO_PUNTAJE_ERROR', value: value);
+  JuegoPuntajeException(super.message, {String? code, super.value})
+      : super(code: code ?? 'JUEGO_PUNTAJE_ERROR');
       
   factory JuegoPuntajeException.puntajeInvalido(int puntaje, int maximo) {
     return JuegoPuntajeException(
@@ -82,8 +82,8 @@ class JuegoPuntajeException extends JuegoException {
 
 /// Error de tiempo
 class JuegoTiempoException extends JuegoException {
-  JuegoTiempoException(String message, {String? code})
-      : super(message, code: code ?? 'JUEGO_TIEMPO_ERROR');
+  JuegoTiempoException(super.message, {String? code})
+      : super(code: code ?? 'JUEGO_TIEMPO_ERROR');
       
   factory JuegoTiempoException.tiempoExpirado() {
     return JuegoTiempoException(
@@ -95,8 +95,8 @@ class JuegoTiempoException extends JuegoException {
 
 /// Error de dificultad
 class JuegoDificultadException extends JuegoException {
-  JuegoDificultadException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'JUEGO_DIFICULTAD_ERROR', value: value);
+  JuegoDificultadException(super.message, {String? code, super.value})
+      : super(code: code ?? 'JUEGO_DIFICULTAD_ERROR');
       
   factory JuegoDificultadException.dificultadInvalida(String dificultad) {
     return JuegoDificultadException(

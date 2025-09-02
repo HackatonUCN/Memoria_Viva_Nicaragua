@@ -58,6 +58,7 @@ dependencies:
   curved_labeled_navigation_bar: ^2.0.6
   flutter_side_menu: ^0.5.41
   sidebarx: ^0.17.2
+  mime: ^2.0.0
 
 dev_dependencies:
   flutter_test:

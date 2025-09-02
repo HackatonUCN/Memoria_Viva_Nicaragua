@@ -1,4 +1,3 @@
-import '../../entities/user_preferences.dart';
 import '../../repositories/user_preferences_repository.dart';
 
 /// Caso de uso para actualizar las preferencias del usuario

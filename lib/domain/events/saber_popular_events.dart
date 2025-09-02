@@ -13,15 +13,15 @@ class SaberPopularCreado extends DomainEvent {
   final List<String> etiquetas;
 
   SaberPopularCreado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.categoriaId,
     required this.categoriaNombre,
     this.ubicacion,
     this.etiquetas = const [],
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -44,12 +44,12 @@ class SaberPopularActualizado extends DomainEvent {
   final Map<String, dynamic> cambios;
 
   SaberPopularActualizado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.cambios,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -72,15 +72,15 @@ class SaberPopularModerado extends DomainEvent {
   final bool procesado;
 
   SaberPopularModerado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.estadoAnterior,
     required this.estadoNuevo,
     this.razon,
     this.procesado = true,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -105,14 +105,14 @@ class SaberPopularReportado extends DomainEvent {
   final int reportesActuales;
 
   SaberPopularReportado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.razon,
     required this.reportadoPorId,
     required this.reportesActuales,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -134,12 +134,12 @@ class SaberPopularEliminado extends DomainEvent {
   final bool eliminacionPermanente;
 
   SaberPopularEliminado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     this.eliminacionPermanente = false,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -158,11 +158,11 @@ class SaberPopularRestaurado extends DomainEvent {
   final String titulo;
 
   SaberPopularRestaurado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -181,12 +181,12 @@ class SaberPopularDestacado extends DomainEvent {
   final String razon;
 
   SaberPopularDestacado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.razon,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -206,12 +206,12 @@ class SaberPopularValorado extends DomainEvent {
   final int valoracion; // 1-5 estrellas
 
   SaberPopularValorado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.valoracion,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -231,12 +231,12 @@ class SaberPopularCompartido extends DomainEvent {
   final String plataforma;
 
   SaberPopularCompartido({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.plataforma,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -257,13 +257,13 @@ class SaberPopularVerificado extends DomainEvent {
   final String? comentario;
 
   SaberPopularVerificado({
-    required String userId,
+    required super.userId,
     required this.saberId,
     required this.titulo,
     required this.esAutentico,
     this.comentario,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {

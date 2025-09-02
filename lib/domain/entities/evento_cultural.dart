@@ -89,8 +89,8 @@ class EventoCultural {
     DateTime? fechaActualizacion,
   }) {
     return EventoCultural(
-      id: this.id,
-      titulo: nombre ?? this.titulo,
+      id: id,
+      titulo: nombre ?? titulo,
       descripcion: descripcion ?? this.descripcion,
       tipo: tipo ?? this.tipo,
       categoriaId: categoriaId ?? this.categoriaId,
@@ -103,9 +103,9 @@ class EventoCultural {
       frecuencia: frecuencia ?? this.frecuencia,
       organizador: organizador ?? this.organizador,
       contacto: contacto ?? this.contacto,
-      creadoPorId: this.creadoPorId,
-      creadoPorNombre: this.creadoPorNombre,
-      fechaCreacion: this.fechaCreacion,
+      creadoPorId: creadoPorId,
+      creadoPorNombre: creadoPorNombre,
+      fechaCreacion: fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
       eliminado: eliminado ?? this.eliminado,
       fechaEliminacion: fechaEliminacion ?? this.fechaEliminacion,
@@ -326,7 +326,7 @@ class SugerenciaEvento {
     DateTime? fechaActualizacion,
   }) {
     return SugerenciaEvento(
-      id: this.id,
+      id: id,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       tipo: tipo ?? this.tipo,
@@ -343,9 +343,9 @@ class SugerenciaEvento {
       estado: estado ?? this.estado,
       razonRechazo: razonRechazo ?? this.razonRechazo,
       eventoId: eventoId ?? this.eventoId,
-      sugeridoPorId: this.sugeridoPorId,
-      sugeridoPorNombre: this.sugeridoPorNombre,
-      fechaCreacion: this.fechaCreacion,
+      sugeridoPorId: sugeridoPorId,
+      sugeridoPorNombre: sugeridoPorNombre,
+      fechaCreacion: fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
     );
   }

@@ -1,4 +1,3 @@
-import '../entities/user.dart';
 
 /// Interfaz para el servicio de gamificación
 abstract class IGamificationService {

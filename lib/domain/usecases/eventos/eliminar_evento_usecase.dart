@@ -1,6 +1,4 @@
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
-import '../../exceptions/auth_exception.dart';
 import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../repositories/user_repository.dart';

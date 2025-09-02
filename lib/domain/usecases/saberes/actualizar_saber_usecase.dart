@@ -1,6 +1,4 @@
 
-import '../../entities/saber_popular.dart';
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/saber_exception.dart';
@@ -12,7 +10,6 @@ import '../../validators/contenido_validator.dart';
 import '../../value_objects/ubicacion.dart';
 import '../../value_objects/multimedia.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
-import '../../events/saber_popular_events.dart';
 import '../../failures/result.dart';
 import '../../failures/failures.dart';
 import '../../failures/exception_mapper.dart';

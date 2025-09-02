@@ -1,6 +1,5 @@
 import 'package:memoria_viva_nicaragua/domain/enums/estado_moderacion.dart';
 
-import '../../entities/relato.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';
 import '../../repositories/relato_repository.dart';

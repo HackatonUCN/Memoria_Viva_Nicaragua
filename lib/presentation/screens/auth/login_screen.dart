@@ -14,7 +14,7 @@ import '../../widgets/auth/animated_button.dart';
 import '../../widgets/auth/fade_animation.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();

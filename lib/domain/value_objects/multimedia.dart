@@ -46,6 +46,7 @@ class Multimedia {
   final String? descripcion;
   final DateTime fechaSubida;
   final int? tamanoBytes;
+  final int orden;
 
   const Multimedia._({
     required this.url,
@@ -53,6 +54,7 @@ class Multimedia {
     this.descripcion,
     required this.fechaSubida,
     this.tamanoBytes,
+    this.orden = 0,
   });
 
   factory Multimedia({
@@ -61,6 +63,7 @@ class Multimedia {
     String? descripcion,
     DateTime? fechaSubida,
     int? tamanoBytes,
+    int orden = 0,
   }) {
     // Validar URL
     if (!url.startsWith('https://')) {
@@ -93,6 +96,7 @@ class Multimedia {
       descripcion: descripcion,
       fechaSubida: fechaSubida ?? DateTime.now(),
       tamanoBytes: tamanoBytes,
+      orden: orden,
     );
   }
 
@@ -118,6 +122,7 @@ class Multimedia {
     'descripcion': descripcion,
     'fechaSubida': fechaSubida.toIso8601String(),
     'tamanoBytes': tamanoBytes,
+    'orden': orden,
   };
 
   factory Multimedia.fromMap(Map<String, dynamic> map) {
@@ -128,6 +133,7 @@ class Multimedia {
       descripcion: map['descripcion'] as String?,
       fechaSubida: DateTime.parse(map['fechaSubida'] as String),
       tamanoBytes: map['tamanoBytes'] as int?,
+      orden: map['orden'] as int? ?? 0,
     );
   }
 
@@ -140,7 +146,8 @@ class Multimedia {
     tipo == other.tipo &&
     descripcion == other.descripcion &&
     fechaSubida == other.fechaSubida &&
-    tamanoBytes == other.tamanoBytes;
+    tamanoBytes == other.tamanoBytes &&
+    orden == other.orden;
 
   @override
   int get hashCode =>
@@ -148,9 +155,10 @@ class Multimedia {
     tipo.hashCode ^
     descripcion.hashCode ^
     fechaSubida.hashCode ^
-    (tamanoBytes?.hashCode ?? 0);
+    (tamanoBytes?.hashCode ?? 0) ^
+    orden.hashCode;
 
   @override
   String toString() =>
-    'Multimedia(url: $url, tipo: ${tipo.value}, descripcion: $descripcion, fechaSubida: $fechaSubida, tamanoBytes: $tamanoBytes)';
+    'Multimedia(url: $url, tipo: ${tipo.value}, descripcion: $descripcion, fechaSubida: $fechaSubida, tamanoBytes: $tamanoBytes, orden: $orden)';
 }

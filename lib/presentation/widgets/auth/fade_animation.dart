@@ -7,11 +7,11 @@ class FadeAnimation extends StatefulWidget {
   final bool slideUp;
 
   const FadeAnimation({
-    Key? key,
+    super.key,
     required this.delay,
     required this.child,
     this.slideUp = true,
-  }) : super(key: key);
+  });
 
   @override
   State<FadeAnimation> createState() => _FadeAnimationState();

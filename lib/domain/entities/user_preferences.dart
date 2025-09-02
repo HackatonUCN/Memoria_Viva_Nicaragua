@@ -64,7 +64,7 @@ class UserPreferences {
     bool? permitirComentarios,
   }) {
     return UserPreferences(
-      userId: this.userId,
+      userId: userId,
       isDarkMode: isDarkMode ?? this.isDarkMode,
       language: language ?? this.language,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,

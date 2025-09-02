@@ -10,10 +10,10 @@ class AppDrawer extends StatefulWidget {
   final ValueChanged<int>? onItemSelected;
 
   const AppDrawer({
-    Key? key,
+    super.key,
     required this.controller,
     this.onItemSelected,
-  }) : super(key: key);
+  });
 
   @override
   State<AppDrawer> createState() => _AppDrawerState();

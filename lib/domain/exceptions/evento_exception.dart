@@ -12,20 +12,20 @@ class EventoException implements Exception {
 
 /// Evento no encontrado
 class EventoNotFoundException extends EventoException {
-  EventoNotFoundException([String message = 'Evento no encontrado'])
-      : super(message, code: 'EVENTO_NOT_FOUND');
+  EventoNotFoundException([super.message = 'Evento no encontrado'])
+      : super(code: 'EVENTO_NOT_FOUND');
 }
 
 /// Error de permisos
 class EventoPermissionException extends EventoException {
-  EventoPermissionException([String message = 'No tienes permisos para esta acción'])
-      : super(message, code: 'EVENTO_PERMISSION_DENIED');
+  EventoPermissionException([super.message = 'No tienes permisos para esta acción'])
+      : super(code: 'EVENTO_PERMISSION_DENIED');
 }
 
 /// Contenido inválido
 class EventoInvalidContentException extends EventoException {
-  EventoInvalidContentException([String message = 'El contenido del evento es inválido'])
-      : super(message, code: 'EVENTO_INVALID_CONTENT');
+  EventoInvalidContentException([super.message = 'El contenido del evento es inválido'])
+      : super(code: 'EVENTO_INVALID_CONTENT');
 
   factory EventoInvalidContentException.fromValidation(String validationError) {
     return EventoInvalidContentException('Contenido inválido: $validationError');
@@ -34,8 +34,8 @@ class EventoInvalidContentException extends EventoException {
 
 /// Error de fechas
 class EventoInvalidDateException extends EventoException {
-  EventoInvalidDateException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'EVENTO_INVALID_DATE', value: value);
+  EventoInvalidDateException(super.message, {String? code, super.value})
+      : super(code: code ?? 'EVENTO_INVALID_DATE');
       
   factory EventoInvalidDateException.fechaInicioMayorQueFin() {
     return EventoInvalidDateException(
@@ -54,38 +54,38 @@ class EventoInvalidDateException extends EventoException {
 
 /// Evento duplicado
 class EventoDuplicadoException extends EventoException {
-  EventoDuplicadoException([String message = 'Ya existe un evento similar en esas fechas'])
-      : super(message, code: 'EVENTO_DUPLICADO');
+  EventoDuplicadoException([super.message = 'Ya existe un evento similar en esas fechas'])
+      : super(code: 'EVENTO_DUPLICADO');
 }
 
 /// Evento ya eliminado
 class EventoAlreadyDeletedException extends EventoException {
-  EventoAlreadyDeletedException([String message = 'El evento ya fue eliminado'])
-      : super(message, code: 'EVENTO_ALREADY_DELETED');
+  EventoAlreadyDeletedException([super.message = 'El evento ya fue eliminado'])
+      : super(code: 'EVENTO_ALREADY_DELETED');
 }
 
 /// Evento no eliminado (para restaurar)
 class EventoNotDeletedException extends EventoException {
-  EventoNotDeletedException([String message = 'El evento no está eliminado'])
-      : super(message, code: 'EVENTO_NOT_DELETED');
+  EventoNotDeletedException([super.message = 'El evento no está eliminado'])
+      : super(code: 'EVENTO_NOT_DELETED');
 }
 
 /// Sugerencia no encontrada
 class SugerenciaNotFoundException extends EventoException {
-  SugerenciaNotFoundException([String message = 'Sugerencia de evento no encontrada'])
-      : super(message, code: 'SUGERENCIA_NOT_FOUND');
+  SugerenciaNotFoundException([super.message = 'Sugerencia de evento no encontrada'])
+      : super(code: 'SUGERENCIA_NOT_FOUND');
 }
 
 /// Error al procesar la sugerencia
 class SugerenciaProcessException extends EventoException {
-  SugerenciaProcessException([String message = 'Error al procesar la sugerencia'])
-      : super(message, code: 'SUGERENCIA_PROCESS_ERROR');
+  SugerenciaProcessException([super.message = 'Error al procesar la sugerencia'])
+      : super(code: 'SUGERENCIA_PROCESS_ERROR');
 }
 
 /// Error de ubicación en evento
 class EventoLocationException extends EventoException {
-  EventoLocationException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'EVENTO_LOCATION_ERROR', value: value);
+  EventoLocationException(super.message, {String? code, super.value})
+      : super(code: code ?? 'EVENTO_LOCATION_ERROR');
       
   factory EventoLocationException.ubicacionRequerida() {
     return EventoLocationException(
@@ -112,8 +112,8 @@ class EventoLocationException extends EventoException {
 
 /// Error de multimedia en evento
 class EventoMediaException extends EventoException {
-  EventoMediaException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'EVENTO_MEDIA_ERROR', value: value);
+  EventoMediaException(super.message, {String? code, super.value})
+      : super(code: code ?? 'EVENTO_MEDIA_ERROR');
       
   factory EventoMediaException.formatoInvalido(String url) {
     return EventoMediaException(

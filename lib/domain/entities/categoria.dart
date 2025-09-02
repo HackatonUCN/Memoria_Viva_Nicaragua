@@ -52,7 +52,7 @@ class Categoria {
     bool? activa,
   }) {
     return Categoria(
-      id: this.id,
+      id: id,
       nombre: nombre ?? this.nombre,
       descripcion: descripcion ?? this.descripcion,
       tipo: tipo ?? this.tipo,
@@ -61,7 +61,7 @@ class Categoria {
       color: color ?? this.color,
       orden: orden ?? this.orden,
       activa: activa ?? this.activa,
-      fechaCreacion: this.fechaCreacion,
+      fechaCreacion: fechaCreacion,
       fechaActualizacion: DateTime.now().toUtc(),
     );
   }

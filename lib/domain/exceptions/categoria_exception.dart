@@ -2,103 +2,106 @@
 class CategoriaException implements Exception {
   final String message;
   final String? code;
-  final dynamic value;
+  final dynamic data;
 
-  CategoriaException(this.message, {this.code, this.value});
+  CategoriaException(this.message, {this.code, this.data});
 
   @override
   String toString() => 'CategoriaException: $message${code != null ? ' (Code: $code)' : ''}';
 }
 
-/// Categoría no encontrada
+/// Excepción para cuando no se encuentra una categoría
 class CategoriaNotFoundException extends CategoriaException {
-  CategoriaNotFoundException([String message = 'Categoría no encontrada'])
-      : super(message, code: 'CATEGORIA_NOT_FOUND');
-      
+  final dynamic value;
+
+  CategoriaNotFoundException(String message, {String? code, this.value}) 
+      : super(message, code: code ?? 'categoria-not-found', data: value);
+
   factory CategoriaNotFoundException.withId(String id) {
-    return CategoriaNotFoundException('Categoría con ID $id no encontrada');
+    return CategoriaNotFoundException(
+      'Categoría no encontrada (ID: $id)',
+      value: {'id': id},
+    );
+  }
+
+  factory CategoriaNotFoundException.withName(String nombre) {
+    return CategoriaNotFoundException(
+      'Categoría no encontrada (Nombre: $nombre)',
+      value: {'nombre': nombre},
+    );
   }
 }
 
-/// Categoría duplicada
+/// Excepción para cuando ya existe una categoría con el mismo nombre y tipo
 class CategoriaDuplicadaException extends CategoriaException {
-  CategoriaDuplicadaException([String message = 'Ya existe una categoría con este nombre'])
-      : super(message, code: 'CATEGORIA_DUPLICADA');
-      
-  factory CategoriaDuplicadaException.withName(String nombre) {
-    return CategoriaDuplicadaException('Ya existe una categoría con el nombre: $nombre');
+  final dynamic value;
+
+  CategoriaDuplicadaException(String message, {String? code, this.value}) 
+      : super(message, code: code ?? 'categoria-duplicate', data: value);
+
+  factory CategoriaDuplicadaException.withName({required String nombre, String? tipo}) {
+    return CategoriaDuplicadaException(
+      'Ya existe una categoría con el nombre: $nombre${tipo != null ? ' (Tipo: $tipo)' : ''}',
+      value: {'nombre': nombre, 'tipo': tipo},
+    );
   }
 }
 
-/// Categoría en uso
+/// Excepción para cuando una categoría está en uso y no se puede eliminar
 class CategoriaEnUsoException extends CategoriaException {
-  CategoriaEnUsoException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'CATEGORIA_EN_USO', value: value);
-      
-  factory CategoriaEnUsoException.withDetails(String id, String nombre, int usos) {
+  final dynamic value;
+
+  CategoriaEnUsoException(String message, {String? code, this.value}) 
+      : super(message, code: code ?? 'categoria-in-use', data: value);
+
+  factory CategoriaEnUsoException.withContent({
+    required String id,
+    required String tipo,
+    required int cantidad,
+  }) {
     return CategoriaEnUsoException(
-      'La categoría "$nombre" está siendo utilizada en $usos elementos',
-      code: 'CATEGORIA_EN_USO_DETALLES',
-      value: {'id': id, 'nombre': nombre, 'usos': usos}
+      'No se puede eliminar la categoría porque tiene $cantidad elementos de tipo $tipo asociados',
+      value: {'id': id, 'tipo': tipo, 'cantidad': cantidad},
     );
   }
 }
 
-/// Error de validación de categoría
+/// Excepción para errores de validación en categorías
 class CategoriaValidationException extends CategoriaException {
-  CategoriaValidationException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'CATEGORIA_VALIDATION_ERROR', value: value);
-      
-  factory CategoriaValidationException.nombreInvalido(String razon) {
+  final dynamic value;
+
+  CategoriaValidationException(String message, {String? code, this.value}) 
+      : super(message, code: code ?? 'categoria-validation', data: value);
+
+  factory CategoriaValidationException.field({required String campo, required String razon}) {
     return CategoriaValidationException(
-      'Nombre inválido: $razon',
-      code: 'CATEGORIA_NOMBRE_INVALIDO',
-      value: {'razon': razon}
-    );
-  }
-  
-  factory CategoriaValidationException.descripcionInvalida(String razon) {
-    return CategoriaValidationException(
-      'Descripción inválida: $razon',
-      code: 'CATEGORIA_DESCRIPCION_INVALIDA',
-      value: {'razon': razon}
-    );
-  }
-  
-  factory CategoriaValidationException.iconoInvalido(String razon) {
-    return CategoriaValidationException(
-      'Icono inválido: $razon',
-      code: 'CATEGORIA_ICONO_INVALIDO',
-      value: {'razon': razon}
-    );
-  }
-  
-  factory CategoriaValidationException.colorInvalido(String razon) {
-    return CategoriaValidationException(
-      'Color inválido: $razon',
-      code: 'CATEGORIA_COLOR_INVALIDO',
-      value: {'razon': razon}
+      'Error de validación en campo $campo: $razon',
+      value: {'campo': campo, 'razon': razon},
     );
   }
 }
 
-/// Error de jerarquía de categoría
+/// Excepción para problemas con la jerarquía de categorías
 class CategoriaHierarchyException extends CategoriaException {
-  CategoriaHierarchyException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'CATEGORIA_HIERARCHY_ERROR', value: value);
-      
-  factory CategoriaHierarchyException.cicloDetectado() {
+  final dynamic value;
+
+  CategoriaHierarchyException(String message, {String? code, this.value}) 
+      : super(message, code: code ?? 'categoria-hierarchy', data: value);
+
+  factory CategoriaHierarchyException.withSubcategories({required String id, required int cantidad}) {
     return CategoriaHierarchyException(
-      'Se ha detectado un ciclo en la jerarquía de categorías',
-      code: 'CATEGORIA_CICLO_DETECTADO'
+      'No se puede eliminar la categoría porque tiene $cantidad subcategorías',
+      value: {'id': id, 'cantidad': cantidad},
     );
   }
-  
-  factory CategoriaHierarchyException.padreNoEncontrado(String padreId) {
+
+  factory CategoriaHierarchyException.circularReference({
+    required String categoriaId,
+    required String padreId,
+  }) {
     return CategoriaHierarchyException(
-      'La categoría padre con ID $padreId no existe',
-      code: 'CATEGORIA_PADRE_NO_ENCONTRADO',
-      value: {'padreId': padreId}
+      'Referencia circular detectada: la categoría $categoriaId no puede tener como padre a $padreId',
+      value: {'categoriaId': categoriaId, 'padreId': padreId},
     );
   }
 }

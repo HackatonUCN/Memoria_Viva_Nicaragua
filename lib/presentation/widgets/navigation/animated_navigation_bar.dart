@@ -9,11 +9,11 @@ class AnimatedNavigationBar extends StatefulWidget {
   final ValueChanged<int> onTap;
 
   const AnimatedNavigationBar({
-    Key? key,
+    super.key,
     required this.currentIndex,
     required this.items,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedNavigationBar> createState() => _AnimatedNavigationBarState();

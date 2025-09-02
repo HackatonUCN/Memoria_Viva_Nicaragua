@@ -1,4 +1,3 @@
-import '../../entities/user.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../repositories/user_repository.dart';
 import '../../failures/result.dart';

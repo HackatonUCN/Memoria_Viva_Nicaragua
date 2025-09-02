@@ -1,4 +1,3 @@
-import '../entities/user.dart';
 import '../enums/roles_usuario.dart';
 import 'domain_event.dart';
 
@@ -7,11 +6,11 @@ class UserRegistrado extends DomainEvent {
   final UserRole rol;
 
   UserRegistrado({
-    required String userId,
+    required super.userId,
     required this.nombre,
     required this.rol,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -28,12 +27,12 @@ class UserRolActualizado extends DomainEvent {
   final String actualizadoPorId;
 
   UserRolActualizado({
-    required String userId,
+    required super.userId,
     required this.rolAnterior,
     required this.rolNuevo,
     required this.actualizadoPorId,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -49,10 +48,10 @@ class UserPerfilActualizado extends DomainEvent {
   final Map<String, dynamic> cambios;
 
   UserPerfilActualizado({
-    required String userId,
+    required super.userId,
     required this.cambios,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -68,12 +67,12 @@ class UserLogueado extends DomainEvent {
   final String? ubicacion;
 
   UserLogueado({
-    required String userId,
+    required super.userId,
     required this.metodo,
     this.dispositivo,
     this.ubicacion,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -90,11 +89,11 @@ class UserCerroSesion extends DomainEvent {
   final int duracionSesionMinutos;
 
   UserCerroSesion({
-    required String userId,
+    required super.userId,
     this.razon,
     required this.duracionSesionMinutos,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -109,10 +108,10 @@ class UserPreferenciasActualizadas extends DomainEvent {
   final Map<String, dynamic> preferencias;
 
   UserPreferenciasActualizadas({
-    required String userId,
+    required super.userId,
     required this.preferencias,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -128,12 +127,12 @@ class UserBloqueado extends DomainEvent {
   final DateTime? hasta;
 
   UserBloqueado({
-    required String userId,
+    required super.userId,
     required this.razon,
     required this.bloqueadoPorId,
     this.hasta,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -150,11 +149,11 @@ class UserDesbloqueado extends DomainEvent {
   final String desbloqueadoPorId;
 
   UserDesbloqueado({
-    required String userId,
+    required super.userId,
     required this.razon,
     required this.desbloqueadoPorId,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -171,12 +170,12 @@ class UserLogroObtenido extends DomainEvent {
   final int puntos;
 
   UserLogroObtenido({
-    required String userId,
+    required super.userId,
     required this.logroId,
     required this.nombreLogro,
     required this.puntos,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -194,12 +193,12 @@ class UserNivelSubido extends DomainEvent {
   final int puntosActuales;
 
   UserNivelSubido({
-    required String userId,
+    required super.userId,
     required this.nivelAnterior,
     required this.nivelNuevo,
     required this.puntosActuales,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {

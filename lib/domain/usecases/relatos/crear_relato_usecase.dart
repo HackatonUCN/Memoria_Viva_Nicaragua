@@ -1,6 +1,5 @@
 
 import '../../entities/relato.dart';
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';
@@ -69,7 +68,7 @@ class CrearRelatoUseCase {
       // Validar categoría
       final categoria = await _categoriaRepository.obtenerCategoriaPorId(categoriaId);
       if (categoria == null) {
-        throw CategoriaNotFoundException();
+        throw CategoriaNotFoundException.withId(categoriaId);
       }
 
       // Crear ubicación si se proporcionaron coordenadas

@@ -6,9 +6,9 @@ class AnimatedLogo extends StatefulWidget {
   final VoidCallback onAnimationComplete;
 
   const AnimatedLogo({
-    Key? key,
+    super.key,
     required this.onAnimationComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedLogo> createState() => _AnimatedLogoState();

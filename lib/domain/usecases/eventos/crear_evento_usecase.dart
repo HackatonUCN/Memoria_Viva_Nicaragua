@@ -1,6 +1,5 @@
 
 import '../../entities/evento_cultural.dart';
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/evento_exception.dart';

@@ -1,5 +1,4 @@
 import 'dart:math' show cos, sin, asin, sqrt, pi;
-import '../exceptions/value_object_exception.dart';
 import '../validators/ubicacion_validator.dart';
 
 class Ubicacion {

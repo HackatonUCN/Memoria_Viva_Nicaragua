@@ -12,20 +12,20 @@ class SaberException implements Exception {
 
 /// Saber popular no encontrado
 class SaberNotFoundException extends SaberException {
-  SaberNotFoundException([String message = 'Saber popular no encontrado'])
-      : super(message, code: 'SABER_NOT_FOUND');
+  SaberNotFoundException([super.message = 'Saber popular no encontrado'])
+      : super(code: 'SABER_NOT_FOUND');
 }
 
 /// Error de permisos
 class SaberPermissionException extends SaberException {
-  SaberPermissionException([String message = 'No tienes permisos para esta acción'])
-      : super(message, code: 'SABER_PERMISSION_DENIED');
+  SaberPermissionException([super.message = 'No tienes permisos para esta acción'])
+      : super(code: 'SABER_PERMISSION_DENIED');
 }
 
 /// Contenido inválido
 class SaberInvalidContentException extends SaberException {
-  SaberInvalidContentException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'SABER_INVALID_CONTENT', value: value);
+  SaberInvalidContentException(super.message, {String? code, super.value})
+      : super(code: code ?? 'SABER_INVALID_CONTENT');
       
   factory SaberInvalidContentException.fromValidation(String validationError) {
     return SaberInvalidContentException(
@@ -54,8 +54,8 @@ class SaberInvalidContentException extends SaberException {
 
 /// Error de multimedia
 class SaberMediaException extends SaberException {
-  SaberMediaException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'SABER_MEDIA_ERROR', value: value);
+  SaberMediaException(super.message, {String? code, super.value})
+      : super(code: code ?? 'SABER_MEDIA_ERROR');
       
   factory SaberMediaException.formatoInvalido(String url) {
     return SaberMediaException(
@@ -91,8 +91,8 @@ class SaberMediaException extends SaberException {
 
 /// Error de ubicación
 class SaberLocationException extends SaberException {
-  SaberLocationException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'SABER_LOCATION_ERROR', value: value);
+  SaberLocationException(super.message, {String? code, super.value})
+      : super(code: code ?? 'SABER_LOCATION_ERROR');
       
   factory SaberLocationException.coordenadasInvalidas() {
     return SaberLocationException(
@@ -112,36 +112,36 @@ class SaberLocationException extends SaberException {
 
 /// Error de moderación
 class SaberModerationException extends SaberException {
-  SaberModerationException([String message = 'Error en la moderación del saber'])
-      : super(message, code: 'SABER_MODERATION_ERROR');
+  SaberModerationException([super.message = 'Error en la moderación del saber'])
+      : super(code: 'SABER_MODERATION_ERROR');
 }
 
 /// Saber ya reportado
 class SaberAlreadyReportedException extends SaberException {
-  SaberAlreadyReportedException([String message = 'Ya has reportado este saber'])
-      : super(message, code: 'SABER_ALREADY_REPORTED');
+  SaberAlreadyReportedException([super.message = 'Ya has reportado este saber'])
+      : super(code: 'SABER_ALREADY_REPORTED');
 }
 
 /// Saber duplicado
 class SaberDuplicadoException extends SaberException {
-  SaberDuplicadoException([String message = 'Ya existe un saber similar'])
-      : super(message, code: 'SABER_DUPLICADO');
+  SaberDuplicadoException([super.message = 'Ya existe un saber similar'])
+      : super(code: 'SABER_DUPLICADO');
 }
 
 /// Saber ya eliminado
 class SaberAlreadyDeletedException extends SaberException {
-  SaberAlreadyDeletedException([String message = 'El saber ya fue eliminado'])
-      : super(message, code: 'SABER_ALREADY_DELETED');
+  SaberAlreadyDeletedException([super.message = 'El saber ya fue eliminado'])
+      : super(code: 'SABER_ALREADY_DELETED');
 }
 
 /// Saber no eliminado (para restaurar)
 class SaberNotDeletedException extends SaberException {
-  SaberNotDeletedException([String message = 'El saber no está eliminado'])
-      : super(message, code: 'SABER_NOT_DELETED');
+  SaberNotDeletedException([super.message = 'El saber no está eliminado'])
+      : super(code: 'SABER_NOT_DELETED');
 }
 
 /// Saber popular exception
 class SaberPopularException extends SaberException {
-  SaberPopularException(String message, {String? code, dynamic value})
-      : super(message, code: code ?? 'SABER_POPULAR_ERROR', value: value);
+  SaberPopularException(super.message, {String? code, super.value})
+      : super(code: code ?? 'SABER_POPULAR_ERROR');
 }

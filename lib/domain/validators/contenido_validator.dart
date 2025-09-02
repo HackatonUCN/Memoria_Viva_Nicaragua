@@ -1,7 +1,6 @@
 import '../entities/evento_cultural.dart';
 import '../entities/relato.dart';
 import '../entities/saber_popular.dart';
-import '../enums/tipos_contenido.dart';
 import '../enums/estado_moderacion.dart';
 import '../value_objects/multimedia.dart';
 import '../value_objects/ubicacion.dart';

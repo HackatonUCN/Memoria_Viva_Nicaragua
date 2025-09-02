@@ -12,20 +12,20 @@ class RelatoException implements Exception {
 
 /// Relato no encontrado
 class RelatoNotFoundException extends RelatoException {
-  RelatoNotFoundException([String message = 'Relato no encontrado'])
-      : super(message, code: 'RELATO_NOT_FOUND');
+  RelatoNotFoundException([super.message = 'Relato no encontrado'])
+      : super(code: 'RELATO_NOT_FOUND');
 }
 
 /// Error de permisos
 class RelatoPermissionException extends RelatoException {
-  RelatoPermissionException([String message = 'No tienes permisos para esta acción'])
-      : super(message, code: 'RELATO_PERMISSION_DENIED');
+  RelatoPermissionException([super.message = 'No tienes permisos para esta acción'])
+      : super(code: 'RELATO_PERMISSION_DENIED');
 }
 
 /// Contenido inválido
 class RelatoInvalidContentException extends RelatoException {
-  RelatoInvalidContentException([String message = 'El contenido del relato es inválido'])
-      : super(message, code: 'RELATO_INVALID_CONTENT');
+  RelatoInvalidContentException([super.message = 'El contenido del relato es inválido'])
+      : super(code: 'RELATO_INVALID_CONTENT');
       
   factory RelatoInvalidContentException.fromValidation(String validationError) {
     return RelatoInvalidContentException('Contenido inválido: $validationError');
@@ -46,8 +46,8 @@ class RelatoInvalidContentException extends RelatoException {
 
 /// Error de multimedia
 class RelatoMediaException extends RelatoException {
-  RelatoMediaException([String message = 'Error al procesar archivos multimedia'])
-      : super(message, code: 'RELATO_MEDIA_ERROR');
+  RelatoMediaException([super.message = 'Error al procesar archivos multimedia'])
+      : super(code: 'RELATO_MEDIA_ERROR');
       
   factory RelatoMediaException.formatoInvalido(String url) {
     return RelatoMediaException('Formato de archivo inválido: $url');
@@ -68,8 +68,8 @@ class RelatoMediaException extends RelatoException {
 
 /// Error de ubicación
 class RelatoLocationException extends RelatoException {
-  RelatoLocationException([String message = 'Error con la ubicación del relato'])
-      : super(message, code: 'RELATO_LOCATION_ERROR');
+  RelatoLocationException([super.message = 'Error con la ubicación del relato'])
+      : super(code: 'RELATO_LOCATION_ERROR');
       
   factory RelatoLocationException.coordenadasInvalidas() {
     return RelatoLocationException('Las coordenadas proporcionadas son inválidas');
@@ -82,8 +82,8 @@ class RelatoLocationException extends RelatoException {
 
 /// Error de moderación
 class RelatoModerationException extends RelatoException {
-  RelatoModerationException([String message = 'Error en la moderación del relato'])
-      : super(message, code: 'RELATO_MODERATION_ERROR');
+  RelatoModerationException([super.message = 'Error en la moderación del relato'])
+      : super(code: 'RELATO_MODERATION_ERROR');
       
   factory RelatoModerationException.estadoInvalido(String estado) {
     return RelatoModerationException('Estado de moderación inválido: $estado');
@@ -92,12 +92,12 @@ class RelatoModerationException extends RelatoException {
 
 /// Relato ya reportado
 class RelatoAlreadyReportedException extends RelatoException {
-  RelatoAlreadyReportedException([String message = 'Ya has reportado este relato'])
-      : super(message, code: 'RELATO_ALREADY_REPORTED');
+  RelatoAlreadyReportedException([super.message = 'Ya has reportado este relato'])
+      : super(code: 'RELATO_ALREADY_REPORTED');
 }
 
 /// Relato ya eliminado
 class RelatoAlreadyDeletedException extends RelatoException {
-  RelatoAlreadyDeletedException([String message = 'El relato ya fue eliminado'])
-      : super(message, code: 'RELATO_ALREADY_DELETED');
+  RelatoAlreadyDeletedException([super.message = 'El relato ya fue eliminado'])
+      : super(code: 'RELATO_ALREADY_DELETED');
 }

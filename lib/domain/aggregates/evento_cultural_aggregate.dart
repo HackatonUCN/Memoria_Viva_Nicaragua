@@ -1,8 +1,6 @@
 import '../entities/evento_cultural.dart';
 import '../value_objects/ubicacion.dart';
 import '../value_objects/multimedia.dart';
-import '../events/evento_cultural_events.dart';
-import '../enums/estado_moderacion.dart';
 import '../enums/tipos_evento.dart';
 
 /// Sugerencia para un evento cultural

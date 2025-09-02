@@ -1,4 +1,3 @@
-import '../entities/juegos/juego_base.dart';
 import '../enums/tipos_juego.dart';
 import 'domain_event.dart';
 
@@ -9,13 +8,13 @@ class JuegoIniciado extends DomainEvent {
   final String? categoriaId;
 
   JuegoIniciado({
-    required String userId,
+    required super.userId,
     required this.juegoId,
     required this.tipo,
     required this.dificultad,
     this.categoriaId,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -38,7 +37,7 @@ class JuegoCompletado extends DomainEvent {
   final int estrellas; // 0-3 estrellas
 
   JuegoCompletado({
-    required String userId,
+    required super.userId,
     required this.juegoId,
     required this.tipo,
     required this.dificultad,
@@ -46,8 +45,8 @@ class JuegoCompletado extends DomainEvent {
     required this.duracionSegundos,
     required this.completado,
     required this.estrellas,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -71,14 +70,14 @@ class JuegoAbandonado extends DomainEvent {
   final int progresoPocentaje;
 
   JuegoAbandonado({
-    required String userId,
+    required super.userId,
     required this.juegoId,
     required this.tipo,
     required this.dificultad,
     required this.duracionSegundos,
     required this.progresoPocentaje,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -98,12 +97,12 @@ class JuegoReiniciadoEvent extends DomainEvent {
   final String razon;
 
   JuegoReiniciadoEvent({
-    required String userId,
+    required super.userId,
     required this.juegoId,
     required this.tipo,
     required this.razon,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -123,14 +122,14 @@ class JuegoNuevoRecordEvent extends DomainEvent {
   final int nuevoRecord;
 
   JuegoNuevoRecordEvent({
-    required String userId,
+    required super.userId,
     required this.juegoId,
     required this.tipo,
     required this.dificultad,
     required this.puntajeAnterior,
     required this.nuevoRecord,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {
@@ -151,13 +150,13 @@ class JuegoDesafioCompletadoEvent extends DomainEvent {
   final String? recompensa;
 
   JuegoDesafioCompletadoEvent({
-    required String userId,
+    required super.userId,
     required this.desafioId,
     required this.titulo,
     required this.puntos,
     this.recompensa,
-    DateTime? timestamp,
-  }) : super(userId: userId, timestamp: timestamp);
+    super.timestamp,
+  });
 
   @override
   Map<String, dynamic> toMap() => {

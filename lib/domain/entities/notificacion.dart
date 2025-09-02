@@ -30,13 +30,13 @@ class Notificacion {
     bool? eliminada,
   }) {
     return Notificacion(
-      id: this.id,
-      usuarioId: this.usuarioId,
-      titulo: this.titulo,
-      mensaje: this.mensaje,
-      tipo: this.tipo,
-      datos: this.datos,
-      fechaCreacion: this.fechaCreacion,
+      id: id,
+      usuarioId: usuarioId,
+      titulo: titulo,
+      mensaje: mensaje,
+      tipo: tipo,
+      datos: datos,
+      fechaCreacion: fechaCreacion,
       leida: leida ?? this.leida,
       eliminada: eliminada ?? this.eliminada,
     );
@@ -225,7 +225,7 @@ class Notificacion {
       id: _generateId(),
       usuarioId: usuarioId,
       titulo: '¡Tu Contenido es Popular!',
-      mensaje: 'Tu $tipo "$titulo" está siendo muy compartido (${interacciones} interacciones)',
+      mensaje: 'Tu $tipo "$titulo" está siendo muy compartido ($interacciones interacciones)',
       tipo: TipoNotificacion.contenido_viral,
       datos: {
         'id': id,

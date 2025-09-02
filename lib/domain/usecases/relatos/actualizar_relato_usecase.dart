@@ -1,6 +1,4 @@
 
-import '../../entities/relato.dart';
-import '../../entities/user.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/relato_exception.dart';
@@ -81,7 +79,7 @@ class ActualizarRelatoUseCase {
       if (categoriaId != null && categoriaId != relato.categoriaId) {
         final categoria = await _categoriaRepository.obtenerCategoriaPorId(categoriaId);
         if (categoria == null) {
-          throw CategoriaNotFoundException();
+          throw CategoriaNotFoundException.withId(categoriaId);
         }
         nuevaCategoriaNombre = categoria.nombre;
       }

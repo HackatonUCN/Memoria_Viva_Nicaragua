@@ -11,24 +11,23 @@ class CulturalParticle extends StatelessWidget {
   final double opacity;
 
   const CulturalParticle({
-    Key? key,
+    super.key,
     required this.size,
     required this.color,
     required this.icon,
     this.svgPath,
     this.rotation = 0.0,
     this.opacity = 1.0,
-  }) : super(key: key);
+  });
 
   const CulturalParticle.svg({
-    Key? key,
+    super.key,
     required this.size,
     required this.color,
     required this.svgPath,
     this.rotation = 0.0,
     this.opacity = 1.0,
-  }) : icon = null,
-       super(key: key);
+  }) : icon = null;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +64,7 @@ class AnimatedCulturalParticle extends StatefulWidget {
   final double endOpacity;
 
   const AnimatedCulturalParticle({
-    Key? key,
+    super.key,
     required this.initialSize,
     required this.color,
     required this.icon,
@@ -76,10 +75,10 @@ class AnimatedCulturalParticle extends StatefulWidget {
     this.endRotation = 360.0,
     this.startOpacity = 0.0,
     this.endOpacity = 1.0,
-  }) : super(key: key);
+  });
 
   const AnimatedCulturalParticle.withSvg({
-    Key? key,
+    super.key,
     required this.initialSize,
     required this.color,
     required this.svgPath,
@@ -89,8 +88,7 @@ class AnimatedCulturalParticle extends StatefulWidget {
     this.endRotation = 360.0,
     this.startOpacity = 0.0,
     this.endOpacity = 1.0,
-  }) : icon = null,
-       super(key: key);
+  }) : icon = null;
 
   @override
   State<AnimatedCulturalParticle> createState() => _AnimatedCulturalParticleState();

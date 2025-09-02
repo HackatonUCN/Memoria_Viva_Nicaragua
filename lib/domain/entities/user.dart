@@ -63,12 +63,12 @@ class User {
     int? puntajeTotal,
   }) {
     return User(
-      id: this.id,
-      email: this.email,
+      id: id,
+      email: email,
       nombre: nombre ?? this.nombre,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       rol: rol ?? this.rol,
-      fechaRegistro: this.fechaRegistro,
+      fechaRegistro: fechaRegistro,
       ultimaModificacion: DateTime.now().toUtc(),
       departamento: departamento ?? this.departamento,
       municipio: municipio ?? this.municipio,

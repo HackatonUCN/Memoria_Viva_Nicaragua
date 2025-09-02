@@ -12,14 +12,14 @@ class AnimatedButton extends StatefulWidget {
   final bool isLoading;
 
   const AnimatedButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     this.backgroundColor,
     this.textColor,
     this.isSecondary = false,
     this.isLoading = false,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedButton> createState() => _AnimatedButtonState();

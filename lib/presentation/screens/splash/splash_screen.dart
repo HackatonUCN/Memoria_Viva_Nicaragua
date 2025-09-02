@@ -6,15 +6,14 @@ import '../../bloc/splash/splash_state.dart';
 import '../../widgets/splash/animated_logo.dart';
 import '../../widgets/splash/cultural_background.dart';
 import '../../../core/theme/app_typography.dart';
-import '../auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
   const SplashScreen({
-    Key? key,
+    super.key,
     required this.onComplete,
-  }) : super(key: key);
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();

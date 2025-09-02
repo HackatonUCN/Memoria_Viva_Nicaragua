@@ -1,12 +1,9 @@
-import '../../entities/user.dart';
-import '../../entities/saber_popular.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/auth_exception.dart';
 import '../../exceptions/saber_exception.dart';
 import '../../repositories/saber_popular_repository.dart';
 import '../../repositories/user_repository.dart';
 import '../../aggregates/saber_popular_aggregate.dart';
-import '../../events/saber_popular_events.dart';
 import '../../failures/result.dart';
 import '../../failures/failures.dart';
 import '../../failures/exception_mapper.dart';

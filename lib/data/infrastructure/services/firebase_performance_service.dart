@@ -53,7 +53,7 @@ class FirebasePerformanceService {
 
   // Iniciar medición de operaciones de base de datos
   void startDatabaseOperationTrace(String operation) {
-    _databaseOperationTrace = _performance.newTrace('database_${operation}');
+    _databaseOperationTrace = _performance.newTrace('database_$operation');
     _databaseOperationTrace?.start();
   }
 
