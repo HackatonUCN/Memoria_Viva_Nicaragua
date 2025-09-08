@@ -52,6 +52,8 @@ class CrearRelatoUseCase {
     List<String> etiquetas = const [],
   }) async {
     try {
+      // ignore: avoid_print
+      print('[USECASE_CREAR_RELATO][BEGIN] autor=$autorId categoria=$categoriaId');
       // Validar usuario
       final autor = await _userRepository.obtenerUsuarioPorId(autorId);
       if (autor == null) {
@@ -150,6 +152,8 @@ class CrearRelatoUseCase {
 
       // Guardar el relato
       await _relatoRepository.guardarRelato(relato);
+      // ignore: avoid_print
+      print('[USECASE_CREAR_RELATO][REPOSITORY_OK] id=${relato.id}');
 
       // Actualizar estadísticas del usuario
       await _userRepository.actualizarEstadisticas(
@@ -157,9 +161,13 @@ class CrearRelatoUseCase {
         relatosPublicados: autor.relatosPublicados + 1,
       );
 
+      // ignore: avoid_print
+      print('[USECASE_CREAR_RELATO][DONE] id=${relato.id}');
       return Success<Relato, Failure>(relato);
     } catch (e) {
       final failure = mapExceptionToFailure(e);
+      // ignore: avoid_print
+      print('[USECASE_CREAR_RELATO][ERROR] $failure');
       return FailureResult<Relato, Failure>(failure);
     }
   }
