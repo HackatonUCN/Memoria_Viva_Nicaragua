@@ -196,7 +196,10 @@ class FirestoreDataSourceImpl<T> implements FirestoreDataSource<T> {
     try {
       final id = _getId(data);
       final map = _toMap(data);
-      
+      // Logs mínimos para diagnosticar colección y payload
+      // Evitar logs verbosos en producción: debugPrint no está disponible aquí sin importar flutter/foundation
+      // ignore: avoid_print
+      print('[FIRESTORE_SAVE] path=$_collectionPath id=$id keys=${map.keys.length}');
       await _firestore.collection(_collectionPath).doc(id).set(map);
     } on FirebaseException catch (e) {
       throw DatabaseException(
@@ -351,11 +354,83 @@ class FirestoreDataSourceImpl<T> implements FirestoreDataSource<T> {
   }
 
   @override
+  Stream<List<T>> watchQuery({
+    required Map<String, dynamic> filters,
+    int? limit,
+    String? orderBy,
+    bool descending = false,
+  }) {
+    try {
+      Query query = _firestore.collection(_collectionPath);
+
+      filters.forEach((key, value) {
+        if (value is List && value.length >= 3) {
+          final field = value[0] as String;
+          final operator = value[1] as String;
+          final filterValue = value[2];
+          switch (operator) {
+            case '==':
+              query = query.where(field, isEqualTo: filterValue);
+              break;
+            case '>':
+              query = query.where(field, isGreaterThan: filterValue);
+              break;
+            case '>=':
+              query = query.where(field, isGreaterThanOrEqualTo: filterValue);
+              break;
+            case '<':
+              query = query.where(field, isLessThan: filterValue);
+              break;
+            case '<=':
+              query = query.where(field, isLessThanOrEqualTo: filterValue);
+              break;
+            case 'array-contains':
+              query = query.where(field, arrayContains: filterValue);
+              break;
+            case 'in':
+              query = query.where(field, whereIn: filterValue as List<dynamic>);
+              break;
+            case 'array-contains-any':
+              query = query.where(field, arrayContainsAny: filterValue as List<dynamic>);
+              break;
+          }
+        } else {
+          query = query.where(key, isEqualTo: value);
+        }
+      });
+
+      if (orderBy != null) {
+        query = query.orderBy(orderBy, descending: descending);
+      }
+      if (limit != null) {
+        query = query.limit(limit);
+      }
+
+      return query.snapshots().map((snapshot) {
+        return snapshot.docs
+            .where((doc) => doc.data() != null)
+            .map((doc) => _fromMap(doc.data() as Map<String, dynamic>))
+            .toList();
+      });
+    } on FirebaseException catch (e) {
+      throw DatabaseException(
+        message: 'Error al observar consulta: ${e.message}',
+        code: e.code,
+      );
+    } catch (e) {
+      throw DatabaseException(
+        message: 'Error inesperado al observar consulta: $e',
+      );
+    }
+  }
+
+  @override
   Future<void> runTransaction(Future<void> Function(FirestoreTransactionHandler) action) async {
     try {
       await _firestore.runTransaction((transaction) async {
         final handler = _FirestoreTransactionHandlerImpl(
           transaction: transaction,
+          firestore: _firestore,
           fromMap: _fromMap,
           typeKey: T.toString(),
         );
@@ -399,10 +474,12 @@ class FirestoreDataSourceImpl<T> implements FirestoreDataSource<T> {
 /// Implementación del handler de transacciones de Firestore
 class _FirestoreTransactionHandlerImpl implements FirestoreTransactionHandler {
   final Transaction transaction;
+  final FirebaseFirestore firestore;
   final Map<String, dynamic Function(Map<String, dynamic>)> _fromMapFunctions = {};
 
   _FirestoreTransactionHandlerImpl({
     required this.transaction,
+    required this.firestore,
     required dynamic Function(Map<String, dynamic>) fromMap,
     required String typeKey,
   }) {
@@ -417,7 +494,7 @@ class _FirestoreTransactionHandlerImpl implements FirestoreTransactionHandler {
 
   @override
   Future<R?> get<R>(String collectionPath, String id) async {
-    final docRef = FirebaseFirestore.instance.collection(collectionPath).doc(id);
+    final docRef = firestore.collection(collectionPath).doc(id);
     final docSnapshot = await transaction.get(docRef);
     
     if (!docSnapshot.exists || docSnapshot.data() == null) {
@@ -436,19 +513,19 @@ class _FirestoreTransactionHandlerImpl implements FirestoreTransactionHandler {
 
   @override
   void set<R>(String collectionPath, String id, R data) {
-    final docRef = FirebaseFirestore.instance.collection(collectionPath).doc(id);
+    final docRef = firestore.collection(collectionPath).doc(id);
     transaction.set(docRef, data as Map<String, dynamic>);
   }
 
   @override
   void update(String collectionPath, String id, Map<String, dynamic> data) {
-    final docRef = FirebaseFirestore.instance.collection(collectionPath).doc(id);
+    final docRef = firestore.collection(collectionPath).doc(id);
     transaction.update(docRef, data);
   }
 
   @override
   void delete(String collectionPath, String id) {
-    final docRef = FirebaseFirestore.instance.collection(collectionPath).doc(id);
+    final docRef = firestore.collection(collectionPath).doc(id);
     transaction.delete(docRef);
   }
 }

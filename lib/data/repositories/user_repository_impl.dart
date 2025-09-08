@@ -360,7 +360,16 @@ class UserRepositoryImpl implements IUserRepository {
 
   @override
   Future<void> enviarEmailVerificacion() {
-    throw UnimplementedError('Envío de email de verificación no implementado');
+    return _handleExceptions(() async {
+      final user = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw domain_exceptions.AuthException(
+          'No hay usuario autenticado para enviar verificación',
+          code: 'no-current-user',
+        );
+      }
+      await user.sendEmailVerification();
+    });
   }
 
   @override
@@ -372,7 +381,16 @@ class UserRepositoryImpl implements IUserRepository {
 
   @override
   Future<bool> verificarEmailExiste(String email) {
-    throw UnimplementedError('Verificación de email existente no implementada');
+    return _handleExceptions(() async {
+      // Consulta Firestore para evitar usar APIs removidas en firebase_auth v6
+      final results = await _firestoreDataSource.getWhere(
+        field: 'email',
+        isEqualTo: email,
+        limit: 1,
+        orderBy: null,
+      );
+      return results.isNotEmpty;
+    });
   }
 
   @override

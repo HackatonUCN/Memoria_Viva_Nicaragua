@@ -62,6 +62,14 @@ abstract class FirestoreDataSource<T> {
     bool descending = false,
   });
 
+  /// Stream de cambios con múltiples filtros (equivalente a query pero en tiempo real)
+  Stream<List<T>> watchQuery({
+    required Map<String, dynamic> filters,
+    int? limit,
+    String? orderBy,
+    bool descending = false,
+  });
+
   /// Ejecuta una transacción con varios documentos
   Future<void> runTransaction(
     Future<void> Function(FirestoreTransactionHandler) action);

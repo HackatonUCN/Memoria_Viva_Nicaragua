@@ -172,7 +172,12 @@ class RelatoRepositoryImpl implements IRelatoRepository {
       // Validar el relato antes de guardarlo
       _validarRelato(relato);
       
+      // Log de entrada
+      // ignore: avoid_print
+      print('[REPO_RELATO][SAVE_BEGIN] id=${relato.id} titulo="${relato.titulo}" autor=${relato.autorId}');
+
       // Verificar si ya existe un relato similar (título similar del mismo autor)
+      // La verificación consulta solo documentos visibles según reglas: activos y no eliminados
       final similares = await buscarRelatosSimilares(
         titulo: relato.titulo,
         autorId: relato.autorId,
@@ -207,6 +212,8 @@ class RelatoRepositoryImpl implements IRelatoRepository {
       // Convertir a modelo y guardar en Firestore
       final relatoModel = RelatoModel.fromDomain(relatoConMultimedia);
       await _firestoreDataSource.save(relatoModel);
+      // ignore: avoid_print
+      print('[REPO_RELATO][SAVE_OK] id=${relato.id}');
     });
   }
 
@@ -245,18 +252,21 @@ class RelatoRepositoryImpl implements IRelatoRepository {
       if (relatoModel == null) {
         throw RelatoNotFoundException('No se encontró el relato con ID $id');
       }
-      
+
       // Si ya está eliminado, lanzar excepción
       if (relatoModel.eliminado) {
         throw RelatoAlreadyDeletedException();
       }
-      
-      // Convertir a entidad, marcar como eliminado y volver a convertir a modelo
-      final relato = relatoModel.toDomain().marcarEliminado();
-      final actualizadoModel = RelatoModel.fromDomain(relato);
-      
-      // Guardar cambios
-      await _firestoreDataSource.save(actualizadoModel);
+
+      // Soft delete mediante update de campos permitidos por reglas
+      await _firestoreDataSource.update(
+        id: id,
+        data: {
+          'eliminado': true,
+          'fechaEliminacion': DateTime.now().toUtc(),
+          'fechaActualizacion': DateTime.now().toUtc(),
+        },
+      );
     });
   }
 
@@ -375,19 +385,15 @@ class RelatoRepositoryImpl implements IRelatoRepository {
   @override
   Stream<List<Relato>> observarRelatos() {
     try {
-      // Filtrar solo relatos activos y no eliminados
-      return _firestoreDataSource.watchWhere(
-        field: 'eliminado',
-        isEqualTo: false,
+      // Filtrar solo relatos activos y no eliminados en la consulta (alineado a reglas)
+      return _firestoreDataSource.watchQuery(
+        filters: {
+          'eliminado': false,
+          'estado': EstadoModeracion.activo.value,
+        },
         orderBy: 'fechaCreacion',
         descending: true,
-      ).map((relatos) {
-        // Filtrar por estado activo en memoria
-        return relatos
-            .where((r) => r.estado == EstadoModeracion.activo.value)
-            .map((model) => model.toDomain())
-            .toList();
-      });
+      ).map((relatos) => relatos.map((model) => model.toDomain()).toList());
     } catch (e) {
       throw RelatoException('Error al observar relatos: $e');
     }
@@ -406,18 +412,15 @@ class RelatoRepositoryImpl implements IRelatoRepository {
   @override
   Stream<List<Relato>> observarRelatosPorCategoria(String categoriaId) {
     try {
-      return _firestoreDataSource.watchWhere(
-        field: 'categoriaId',
-        isEqualTo: categoriaId,
+      return _firestoreDataSource.watchQuery(
+        filters: {
+          'categoriaId': categoriaId,
+          'eliminado': false,
+          'estado': EstadoModeracion.activo.value,
+        },
         orderBy: 'fechaCreacion',
         descending: true,
-      ).map((relatos) {
-        // Filtrar en memoria los relatos activos y no eliminados
-        return relatos
-            .where((r) => !r.eliminado && r.estado == EstadoModeracion.activo.value)
-            .map((model) => model.toDomain())
-            .toList();
-      });
+      ).map((relatos) => relatos.map((model) => model.toDomain()).toList());
     } catch (e) {
       throw RelatoException('Error al observar relatos por categoría: $e');
     }
@@ -530,10 +533,13 @@ class RelatoRepositoryImpl implements IRelatoRepository {
     required String autorId,
   }) async {
     return await _handleExceptions(() async {
-      // Buscar por autor
-      final relatosAutor = await _firestoreDataSource.getWhere(
-        field: 'autorId',
-        isEqualTo: autorId,
+      // Buscar por autor, alineado con reglas de lectura: solo activos y no eliminados
+      final relatosAutor = await _firestoreDataSource.query(
+        filters: {
+          'autorId': autorId,
+          'eliminado': false,
+          'estado': EstadoModeracion.activo.value,
+        },
       );
       
       // Filtrar por similitud de título en memoria

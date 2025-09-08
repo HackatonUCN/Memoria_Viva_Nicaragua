@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email']);
+  final GoogleSignIn? _googleSignIn;
+
+  AuthService({GoogleSignIn? googleSignIn})
+      : _googleSignIn = kIsWeb ? null : (googleSignIn ?? GoogleSignIn(scopes: ['email']));
 
   // Obtener el usuario actual
   User? get currentUser => _auth.currentUser;
@@ -58,7 +61,7 @@ class AuthService {
       } 
       // Proceso de autenticación para dispositivos móviles
       else {
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        final GoogleSignInAccount? googleUser = await _googleSignIn?.signIn();
         if (googleUser == null) {
           throw FirebaseAuthException(
             code: 'ERROR_ABORTED_BY_USER',
@@ -100,7 +103,9 @@ class AuthService {
   // Cerrar sesión
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      if (!kIsWeb) {
+        try { await _googleSignIn?.signOut(); } catch (_) {}
+      }
       await _auth.signOut();
     } catch (e) {
       rethrow;

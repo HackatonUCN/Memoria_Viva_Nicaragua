@@ -37,8 +37,11 @@ class CategoriaRepositoryImpl implements ICategoriaRepository {
   @override
   Future<List<Categoria>> obtenerCategorias() async {
     return await _handleExceptions(() async {
-      final categorias = await _dataSource.getAll(
-        // Ordenar por orden ascendente y luego por nombre
+      // Alinear con reglas: sólo categorías activas
+      final categorias = await _dataSource.query(
+        filters: {
+          'activa': true,
+        },
         orderBy: 'orden',
       );
       
@@ -49,9 +52,12 @@ class CategoriaRepositoryImpl implements ICategoriaRepository {
   @override
   Future<List<Categoria>> obtenerCategoriasPorTipo(TipoContenido tipo) async {
     return await _handleExceptions(() async {
-      final categorias = await _dataSource.getWhere(
-        field: 'tipo',
-        isEqualTo: tipo.value,
+      // Alinear con reglas: sólo categorías activas del tipo indicado
+      final categorias = await _dataSource.query(
+        filters: {
+          'tipo': tipo.value,
+          'activa': true,
+        },
         orderBy: 'orden',
       );
       
@@ -168,9 +174,11 @@ class CategoriaRepositoryImpl implements ICategoriaRepository {
   @override
   Future<List<Categoria>> obtenerSubcategorias(String categoriaPadreId) async {
     return await _handleExceptions(() async {
-      final subcategorias = await _dataSource.getWhere(
-        field: 'categoriaPadreId',
-        isEqualTo: categoriaPadreId,
+      final subcategorias = await _dataSource.query(
+        filters: {
+          'categoriaPadreId': categoriaPadreId,
+          'activa': true,
+        },
         orderBy: 'orden',
       );
       
@@ -181,7 +189,11 @@ class CategoriaRepositoryImpl implements ICategoriaRepository {
   @override
   Stream<List<Categoria>> observarCategorias() {
     try {
-      return _dataSource.watchCollection(
+      // Alinear con reglas: observar sólo activas
+      return _dataSource.watchQuery(
+        filters: {
+          'activa': true,
+        },
         orderBy: 'orden',
       ).map((list) => list.map((model) => model.toDomain()).toList());
     } catch (e) {

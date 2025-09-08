@@ -10,13 +10,13 @@ import '../firebase_auth_datasource.dart';
 /// Implementación de la fuente de datos de autenticación con Firebase
 class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
   final firebase_auth.FirebaseAuth _auth;
-  final GoogleSignIn _googleSignIn;
+  final GoogleSignIn? _googleSignIn;
 
   FirebaseAuthDataSourceImpl({
     firebase_auth.FirebaseAuth? auth,
     GoogleSignIn? googleSignIn,
   }) : _auth = auth ?? firebase_auth.FirebaseAuth.instance,
-       _googleSignIn = googleSignIn ?? GoogleSignIn(scopes: ['email']);
+       _googleSignIn = kIsWeb ? null : (googleSignIn ?? GoogleSignIn(scopes: ['email']));
 
   @override
   domain.User? getCurrentUser() {
@@ -105,7 +105,7 @@ class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
       } 
       // Proceso de autenticación para dispositivos móviles
       else {
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        final GoogleSignInAccount? googleUser = await _googleSignIn?.signIn();
         if (googleUser == null) {
                   throw AuthException('Inicio de sesión con Google cancelado por el usuario',
           code: 'google-sign-in-canceled',
@@ -163,7 +163,9 @@ class FirebaseAuthDataSourceImpl implements FirebaseAuthDataSource {
   @override
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut().catchError((_) {});
+      if (!kIsWeb) {
+        try { await _googleSignIn?.signOut(); } catch (_) {}
+      }
       await _auth.signOut();
     } catch (e) {
       throw AuthException('Error al cerrar sesión: ${e.toString()}',

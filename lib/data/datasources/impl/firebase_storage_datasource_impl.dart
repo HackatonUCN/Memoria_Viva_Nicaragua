@@ -28,6 +28,10 @@ class FirebaseStorageDataSourceImpl implements FirebaseStorageDataSource {
     if (path.startsWith('/')) {
       path = path.substring(1);
     }
+    // Evitar duplicación si ya incluye el basePath
+    if (path == _basePath || path.startsWith('$_basePath/')) {
+      return path.replaceAll(RegExp(r'\/+'), '/');
+    }
     return '$_basePath/$path'.replaceAll(RegExp(r'\/+'), '/');
   }
   
