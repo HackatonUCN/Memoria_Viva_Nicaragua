@@ -1,0 +1,169 @@
+[
+  {
+    "id": "relato_tradiciones",
+    "nombre": "Tradiciones",
+    "descripcion": "Relatos sobre tradiciones locales",
+    "tipo": "relato",
+    "icono": "relato",
+    "color": "#177245",
+    "orden": 1,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "relato_costumbres",
+    "nombre": "Costumbres",
+    "descripcion": "Relatos de costumbres y vida cotidiana",
+    "tipo": "relato",
+    "icono": "relato",
+    "color": "#4A6192",
+    "orden": 2,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_recetas",
+    "nombre": "Recetas",
+    "descripcion": "Saberes de cocina tradicional",
+    "tipo": "saber",
+    "icono": "guitarra",
+    "color": "#B85C3C",
+    "orden": 1,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "evento_festividades",
+    "nombre": "Festividades",
+    "descripcion": "Eventos y ferias culturales",
+    "tipo": "evento",
+    "icono": "iglesia",
+    "color": "#2E3A59",
+    "orden": 1,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "relato_leyendas_mitos",
+    "nombre": "Leyendas y Mitos",
+    "descripcion": "Relatos sobre leyendas, mitos y tradiciones orales",
+    "tipo": "relato",
+    "icono": "volcan",
+    "color": "#6D4C41",
+    "orden": 3,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "relato_historia_oral",
+    "nombre": "Historia Oral",
+    "descripcion": "Memorias y testimonios de la comunidad",
+    "tipo": "relato",
+    "icono": "relato",
+    "color": "#3E2723",
+    "orden": 4,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "relato_personajes",
+    "nombre": "Personajes y Protagonistas",
+    "descripcion": "Historias de personas destacadas de la comunidad",
+    "tipo": "relato",
+    "icono": "guardabarranco",
+    "color": "#2E3A59",
+    "orden": 5,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "relato_memorias_comunitarias",
+    "nombre": "Memorias Comunitarias",
+    "descripcion": "Relatos de identidad y vida comunitaria",
+    "tipo": "relato",
+    "icono": "nicaragua",
+    "color": "#A3B18A",
+    "orden": 6,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_dichos_refranes",
+    "nombre": "Dichos y Refranes",
+    "descripcion": "Sabiduría popular expresada en frases",
+    "tipo": "saber",
+    "icono": "nicaragua",
+    "color": "#6D4C41",
+    "orden": 2,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_artesanias",
+    "nombre": "Artesanías",
+    "descripcion": "Técnicas y oficios artesanales",
+    "tipo": "saber",
+    "icono": "artesania",
+    "color": "#BC8F8F",
+    "orden": 3,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_medicina_tradicional",
+    "nombre": "Medicina Tradicional",
+    "descripcion": "Prácticas curativas y uso de plantas",
+    "tipo": "saber",
+    "icono": "cacao",
+    "color": "#177245",
+    "orden": 4,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_gastronomia",
+    "nombre": "Gastronomía",
+    "descripcion": "Preparaciones y saberes culinarios",
+    "tipo": "saber",
+    "icono": "apple",
+    "color": "#B85C3C",
+    "orden": 5,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_agricultura",
+    "nombre": "Agricultura y Cultivo",
+    "descripcion": "Prácticas agrícolas y manejo del campo",
+    "tipo": "saber",
+    "icono": "nicaragua",
+    "color": "#177245",
+    "orden": 6,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_musica_danza",
+    "nombre": "Música y Danza",
+    "descripcion": "Bailes, ritmos e instrumentos tradicionales",
+    "tipo": "saber",
+    "icono": "marimba",
+    "color": "#1E88E5",
+    "orden": 7,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "saber_juegos_tradicionales",
+    "nombre": "Juegos Tradicionales",
+    "descripcion": "Juegos y dinámicas populares",
+    "tipo": "saber",
+    "icono": "guitarra",
+    "color": "#A3B18A",
+    "orden": 8,
+    "activa": true,
+    "categoriaPadreId": null
+  }
+]
+
+
