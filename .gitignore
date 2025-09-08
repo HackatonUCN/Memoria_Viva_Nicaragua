@@ -44,7 +44,6 @@ firebase_options_prod.dart
 pubspec.lock
 
 # Web related
-lib/generated_plugin_registrant.dart
 
 # Symbolication related
 app.*.symbols
@@ -112,3 +111,10 @@ GoogleService-Info.plist
 
 # Local configuration
 local.properties
+
+# Firebase emulator and local artifacts
+.firebase/
+.firebase_emulator.out
+firebase-debug.log
+pglite-debug.log
+.firebaserc

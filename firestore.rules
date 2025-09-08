@@ -1,0 +1,208 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =============================
+    // Helper functions
+    // =============================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userId() {
+      return request.auth != null ? request.auth.uid : null;
+    }
+
+    // Role checks use custom auth claims to avoid recursive reads.
+    // Supported formats:
+    // - request.auth.token.admin == true
+    // - request.auth.token.role == 'admin'
+    // - request.auth.token.roles.admin == true
+    function hasRole(role) {
+      return isSignedIn() && (
+        request.auth.token[role] == true ||
+        (request.auth.token.roles != null && request.auth.token.roles[role] == true) ||
+        request.auth.token.role == role
+      );
+    }
+
+    function isAdmin() { return hasRole('admin'); }
+    function isVerificador() { return hasRole('verificador'); }
+
+    function isOwnerBy(field, data) {
+      return isSignedIn() && data[field] == userId();
+    }
+
+    // Validate that data only contains the allowed keys
+    function validateFields(data, allowedKeys) {
+      return data.keys().hasOnly(allowedKeys);
+    }
+
+    // Common status checks
+    function isAprobado(data) {
+      return data.status == 'aprobado';
+    }
+    function isPendiente(data) {
+      return data.status == 'pendiente';
+    }
+    function isReportado(data) {
+      return data.status == 'reportado';
+    }
+
+    // =============================
+    // usuarios collection (legacy)
+    // =============================
+    match /usuarios/{uid} {
+      allow read: if isAdmin() || (isSignedIn() && uid == userId());
+
+      // Users can create their own document on first sign in
+      allow create: if isSignedIn() && uid == userId();
+
+      // Users can update their own profile, but cannot elevate roles or modify restricted fields
+      allow update: if isSignedIn() && uid == userId() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['displayName','photoURL','bio','settings']) &&
+        // roles can only be modified by admins
+        request.resource.data.roles == resource.data.roles;
+
+      // Admins can read all and update certain admin-managed fields
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // =============================
+    // users collection (actual)
+    // =============================
+    match /users/{uid} {
+      // El usuario puede leer/crear/actualizar su propio documento básico
+      allow read: if isSignedIn() && uid == userId();
+      allow create: if isSignedIn() && uid == userId();
+      allow update: if isSignedIn() && uid == userId();
+      allow delete: if false;
+
+      // Subcolección de tokens FCM
+      match /fcmTokens/{tokenId} {
+        allow create, update: if isSignedIn() && uid == userId();
+        allow read, delete: if false;
+      }
+    }
+
+    // =============================
+    // relatos collection (usa campos autorId/estado/...)
+    // =============================
+    match /relatos/{relatoId} {
+      // Lectura pública de activos y no eliminados
+      allow read: if resource.data != null &&
+                  resource.data.eliminado == false &&
+                  resource.data.estado == 'activo';
+
+      // Crear por el autor autenticado
+      allow create: if isSignedIn() && request.resource.data.autorId == userId();
+
+      // Editar propio (contenido/ubicación/etiquetas/multimedia)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion']
+        );
+
+      // Soft delete (propietario puede marcar como eliminado)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['eliminado','fechaEliminacion','fechaActualizacion']
+        ) &&
+        request.resource.data.eliminado == true;
+
+      // Likes
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes','fechaActualizacion']) &&
+        request.resource.data.likes == resource.data.likes + 1;
+
+      // Compartidos (permitido para no auth también si lo deseas)
+      allow update: if request.time != null &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['compartidos','fechaActualizacion']) &&
+        request.resource.data.compartidos == resource.data.compartidos + 1;
+
+      // Reportar
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['estado','reportes','fechaActualizacion']) &&
+        request.resource.data.estado == 'reportado' &&
+        request.resource.data.reportes == resource.data.reportes + 1;
+
+      // Moderación admin (cambiar estado)
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['estado','fechaActualizacion']);
+
+      // Borrar propio
+      allow delete: if isSignedIn() && isOwnerBy('autorId', resource.data);
+
+      // Subcolección reportes
+      match /reportes/{reporteId} {
+        allow create: if isSignedIn();
+        allow read, update, delete: if isAdmin();
+      }
+    }
+
+    // =============================
+    // saberes_populares collection (usa campos autorId/estado/...)
+    // =============================
+    match /saberes_populares/{saberId} {
+      allow read: if resource.data != null &&
+                  resource.data.eliminado == false &&
+                  resource.data.estado == 'activo';
+
+      allow create: if isSignedIn() && request.resource.data.autorId == userId();
+
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['titulo','contenido','etiquetas','ubicacion','imagenes','fechaActualizacion']
+        );
+
+      // Likes/Compartidos
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes','fechaActualizacion']) &&
+        request.resource.data.likes == resource.data.likes + 1;
+
+      allow update: if request.time != null &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['compartidos','fechaActualizacion']) &&
+        request.resource.data.compartidos == resource.data.compartidos + 1;
+
+      // Reporte
+      allow update: if isSignedIn() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['estado','fechaActualizacion']) &&
+        request.resource.data.estado == 'reportado';
+    }
+
+    // =============================
+    // eventos_culturales collection (lectura pública; admin gestiona)
+    // =============================
+    match /eventos_culturales/{eventoId} {
+      allow read: if resource.data != null && resource.data.eliminado == false;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // =============================
+    // categorias collection (lectura pública)
+    // =============================
+    match /categorias/{categoriaId} {
+      // Permite lectura pública de categorías activas
+      allow read: if resource.data != null && (resource.data.activa == true || resource.data.activa == null);
+      // Escrituras solo para administradores
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Sugerencias de eventos (sugerencias_eventos)
+    match /sugerencias_eventos/{sugId} {
+      allow create: if isSignedIn() && request.resource.data.sugeridoPorId == userId();
+      allow read: if isAdmin() || (isSignedIn() && resource.data.sugeridoPorId == userId());
+      allow update, delete: if isAdmin();
+    }
+
+    // =============================
+    // Default deny
+    // =============================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+
