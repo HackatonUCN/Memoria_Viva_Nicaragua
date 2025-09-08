@@ -1,6 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fa;
 import '../../data/infrastructure/services/auth_service.dart';
+import '../../data/infrastructure/services/firebase_services_manager.dart';
+import 'package:memoria_viva_nicaragua/domain/entities/user.dart' as domain;
+import 'package:memoria_viva_nicaragua/domain/factories/usecases.dart';
 
 enum AuthStatus {
   initial,
@@ -12,31 +15,57 @@ enum AuthStatus {
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final _useCases = UseCases.resolve().auth;
   AuthStatus _status = AuthStatus.initial;
-  User? _user;
+  domain.User? _user;
   String? _errorMessage;
   bool _isAnonymous = false;
 
   // Getters
   AuthStatus get status => _status;
-  User? get user => _user;
+  domain.User? get user => _user;
   String? get errorMessage => _errorMessage;
   bool get isAnonymous => _isAnonymous;
 
   AuthProvider() {
-    // Inicializar escuchando cambios en el estado de autenticación
-    _authService.authStateChanges.listen((User? user) {
+    // Escuchar cambios desde la capa de dominio (UserRepository -> FirebaseAuth)
+    _useCases.getCurrentUser.observe().listen((domain.User? user) {
       _user = user;
-      _isAnonymous = user?.isAnonymous ?? false;
-      
+      _isAnonymous = user?.esInvitado ?? false;
+
+      final manager = FirebaseServicesManager.instance;
       if (user == null) {
         _status = AuthStatus.unauthenticated;
+        manager.logEvent('auth_state_changed', parameters: {'state': 'unauthenticated'});
       } else {
         _status = AuthStatus.authenticated;
+        final role = _isAnonymous ? 'guest' : 'registered';
+        manager.setUserContext(
+          userId: user.id,
+          userRole: role,
+          properties: {
+            'isAnonymous': _isAnonymous.toString(),
+            'hasEmail': (user.email.isNotEmpty).toString(),
+          },
+        );
+        // Guardar token del dispositivo para envíos futuros
+        manager.saveDeviceToken(userId: user.id);
+        manager.logEvent('auth_state_changed', parameters: {'state': 'authenticated', 'role': role});
       }
-      
+
       notifyListeners();
     });
+  }
+
+  // Consentimiento de privacidad para Analytics/Performance (y opcionalmente Crashlytics)
+  Future<void> updatePrivacyConsent(bool granted) async {
+    try {
+      await FirebaseServicesManager.instance.setPrivacyConsent(granted: granted);
+      notifyListeners();
+    } catch (e) {
+      // No propagamos error a UI; dejamos log
+      FirebaseServicesManager.instance.logError('privacy_consent_update_failed', error: e);
+    }
   }
 
   // Iniciar sesión con correo y contraseña
@@ -48,13 +77,15 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.authenticating;
       _errorMessage = null;
       notifyListeners();
-      
-      await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
-      // No necesitamos actualizar _status o _user aquí porque el listener lo hará
+      final result = await _useCases.loginWithEmail.execute(email: email, password: password);
+      if (result.isFailure) {
+        _status = AuthStatus.error;
+        _errorMessage = result.errorOrNull?.message;
+        notifyListeners();
+        return;
+      }
+      // El listener actualizará el estado
+      FirebaseServicesManager.instance.logEvent('auth_login', parameters: {'method': 'password'});
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = _handleAuthError(e);
@@ -72,14 +103,18 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.authenticating;
       _errorMessage = null;
       notifyListeners();
-      
-      await _authService.registerWithEmailAndPassword(
+      final result = await _useCases.registerUser.execute(
         email: email,
         password: password,
-        displayName: displayName,
+        nombre: displayName,
       );
-      
-      // No necesitamos actualizar _status o _user aquí porque el listener lo hará
+      if (result.isFailure) {
+        _status = AuthStatus.error;
+        _errorMessage = result.errorOrNull?.message;
+        notifyListeners();
+        return;
+      }
+      FirebaseServicesManager.instance.logEvent('auth_register', parameters: {'method': 'password'});
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = _handleAuthError(e);
@@ -93,10 +128,14 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.authenticating;
       _errorMessage = null;
       notifyListeners();
-      
-      await _authService.signInWithGoogle();
-      
-      // No necesitamos actualizar _status o _user aquí porque el listener lo hará
+      final result = await _useCases.loginWithGoogle.execute();
+      if (result.isFailure) {
+        _status = AuthStatus.error;
+        _errorMessage = result.errorOrNull?.message;
+        notifyListeners();
+        return;
+      }
+      FirebaseServicesManager.instance.logEvent('auth_login', parameters: {'method': 'google'});
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = _handleAuthError(e);
@@ -131,8 +170,10 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       
       await _authService.signInAnonymously();
-      
-      // No necesitamos actualizar _status o _user aquí porque el listener lo hará
+      // Notificar éxito inmediato para que la UI pueda navegar sin esperar al stream
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      FirebaseServicesManager.instance.logEvent('auth_login', parameters: {'method': 'anonymous'});
     } catch (e) {
       _status = AuthStatus.error;
       _errorMessage = _handleAuthError(e);
@@ -143,8 +184,14 @@ class AuthProvider extends ChangeNotifier {
   // Cerrar sesión
   Future<void> signOut() async {
     try {
-      await _authService.signOut();
-      
+      final result = await _useCases.logout.execute();
+      if (result.isFailure) {
+        _status = AuthStatus.error;
+        _errorMessage = result.errorOrNull?.message;
+        notifyListeners();
+        return;
+      }
+      FirebaseServicesManager.instance.logEvent('auth_logout');
       // No necesitamos actualizar _status o _user aquí porque el listener lo hará
     } catch (e) {
       _status = AuthStatus.error;
@@ -155,7 +202,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Manejar errores de autenticación
   String _handleAuthError(dynamic error) {
-    if (error is FirebaseAuthException) {
+    if (error is fa.FirebaseAuthException) {
       switch (error.code) {
         case 'user-not-found':
           return 'No existe una cuenta con este correo electrónico.';

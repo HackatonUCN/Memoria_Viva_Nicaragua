@@ -27,6 +27,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _passwordObscured = true;
+  bool _confirmObscured = true;
 
   @override
   void dispose() {
@@ -285,6 +287,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       hintText: 'Correo electrónico',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       validator: _validateEmail,
                     ),
                   ),
@@ -297,7 +300,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _passwordController,
                       hintText: 'Contraseña',
                       prefixIcon: Icons.lock_outline,
-                      obscureText: true,
+                      obscureText: _passwordObscured,
+                      textInputAction: TextInputAction.next,
+                      suffixIcon: Semantics(
+                        label: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                        button: true,
+                        child: IconButton(
+                          tooltip: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                          icon: Icon(_passwordObscured ? Icons.visibility_off : Icons.visibility),
+                          color: AppColors.textSecondary,
+                          onPressed: () {
+                            setState(() {
+                              _passwordObscured = !_passwordObscured;
+                            });
+                          },
+                        ),
+                      ),
                       validator: _validatePassword,
                     ),
                   ),
@@ -310,7 +328,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _confirmPasswordController,
                       hintText: 'Confirmar contraseña',
                       prefixIcon: Icons.lock_outline,
-                      obscureText: true,
+                      obscureText: _confirmObscured,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _registerWithEmailAndPassword(),
+                      suffixIcon: Semantics(
+                        label: _confirmObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                        button: true,
+                        child: IconButton(
+                          tooltip: _confirmObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                          icon: Icon(_confirmObscured ? Icons.visibility_off : Icons.visibility),
+                          color: AppColors.textSecondary,
+                          onPressed: () {
+                            setState(() {
+                              _confirmObscured = !_confirmObscured;
+                            });
+                          },
+                        ),
+                      ),
                       validator: _validateConfirmPassword,
                     ),
                   ),

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import 'package:provider/provider.dart';
+import '../../providers/navigation_provider.dart';
+import '../../../config/app_router.dart';
+import '../../providers/auth_provider.dart';
 
 enum DrawerCategory { personal, games }
 
@@ -22,6 +26,7 @@ class AppDrawer extends StatefulWidget {
 class _AppDrawerState extends State<AppDrawer> {
   DrawerCategory _selectedCategory = DrawerCategory.personal;
   int _selectedIndex = 0;
+  bool _loggingOut = false;
 
   final Map<int, int> _personalIndexMap = {
     0: 0, // Inicio
@@ -31,13 +36,26 @@ class _AppDrawerState extends State<AppDrawer> {
   };
 
   final Map<int, int> _accountIndexMap = {
-    0: 200, // Perfil -> índice 200
-    1: 201, // Ayuda -> índice 201
-    2: 202, // Configuración -> índice 202
+    0: 201, // Ayuda
+    1: 202, // Configuración
   };
 
   @override
   Widget build(BuildContext context) {
+    // Sincronizar selección con NavigationProvider (dos vías)
+    final navIndex = context.watch<NavigationProvider>().selectedIndex;
+    if (_selectedCategory == DrawerCategory.personal) {
+      int? desiredLogical;
+      if (navIndex == 0 || navIndex == 1 || navIndex == 3 || navIndex == 4) {
+        desiredLogical = navIndex;
+      }
+      if (desiredLogical != null) {
+        final sidebarIndex = _getSidebarIndex(desiredLogical);
+        if (sidebarIndex >= 0) {
+          widget.controller.selectIndex(sidebarIndex);
+        }
+      }
+    }
     return SidebarX(
       controller: widget.controller,
       theme: SidebarXTheme(
@@ -294,14 +312,19 @@ class _AppDrawerState extends State<AppDrawer> {
           onTap: () => _handleItemTap(1),
         ),
         SidebarXItem(
-          icon: Icons.add_circle_outline,
-          label: 'Crear Post',
-          onTap: () => _handleItemTap(2),
-        ),
-        SidebarXItem(
           icon: Icons.calendar_month_outlined,
           label: 'Calendario Cultural',
           onTap: () => _handleItemTap(3),
+        ),
+        SidebarXItem(
+          icon: Icons.menu_book_outlined,
+          label: 'Biblioteca de Saberes',
+          onTap: () => _handleItemTap(4),
+        ),
+        SidebarXItem(
+          icon: Icons.smart_toy_outlined,
+          label: 'Chatbot',
+          onTap: () => _handleItemTap(5),
         ),
       ]);
     } else {
@@ -378,6 +401,8 @@ class _AppDrawerState extends State<AppDrawer> {
             index: 202,
             extended: extended,
           ),
+          const SizedBox(height: 8),
+          _buildLogoutButton(extended: extended),
         ],
       ),
     );
@@ -446,22 +471,106 @@ class _AppDrawerState extends State<AppDrawer> {
       _selectedIndex = index;
       widget.controller.selectIndex(_getSidebarIndex(index));
     });
+    if (index == 200) {
+      Navigator.of(context).pop();
+      Navigator.of(context).pushNamed(AppRoutes.perfil);
+      return;
+    }
+    if (index == 4) {
+      context.read<NavigationProvider>().setIndex(4);
+      Navigator.of(context).pop();
+      widget.onItemSelected?.call(index);
+      return;
+    }
+    if (index == 5) {
+      Navigator.of(context).pop();
+      Navigator.of(context).pushNamed(AppRoutes.chatbot);
+      return;
+    }
     widget.onItemSelected?.call(index);
   }
 
   int _getSidebarIndex(int logicalIndex) {
     // Mapear índices lógicos a índices del SidebarX
     if (_selectedCategory == DrawerCategory.personal) {
-      if (logicalIndex >= 0 && logicalIndex <= 3) {
-        return logicalIndex; // 0-3 para items principales
-      } else if (logicalIndex >= 200 && logicalIndex <= 202) {
-        return 5 + (logicalIndex - 200); // 5-7 para items de cuenta
-      }
+      // Orden visual de los items personales en el SidebarX
+      // [Inicio(0), Mapa(1), Calendario(3), Biblioteca(4), Chatbot(5)]
+      final List<int> order = [0, 1, 3, 4, 5];
+      final int idx = order.indexOf(logicalIndex);
+      return idx >= 0 ? idx : 0;
     } else {
       if (logicalIndex >= 100 && logicalIndex <= 105) {
         return logicalIndex - 100; // 0-5 para juegos
       }
     }
     return 0;
+  }
+
+  Widget _buildLogoutButton({required bool extended}) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: _loggingOut
+          ? null
+          : () async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cerrar sesión'),
+            content: const Text('¿Quieres cerrar la sesión actual?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+              ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Cerrar sesión')),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+
+        setState(() {
+          _loggingOut = true;
+        });
+        try {
+          await context.read<AuthProvider>().signOut();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Sesión cerrada')),
+          );
+          Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al cerrar sesión: $e')),
+          );
+          setState(() {
+            _loggingOut = false;
+          });
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        child: Row(
+          children: [
+            if (_loggingOut)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(Icons.logout, color: AppColors.textPrimary, size: 20),
+            if (extended) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _loggingOut ? 'Cerrando sesión...' : 'Cerrar sesión',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.textTheme.titleMedium,
+                ),
+              ),
+            ]
+          ],
+        ),
+      ),
+    );
   }
 }

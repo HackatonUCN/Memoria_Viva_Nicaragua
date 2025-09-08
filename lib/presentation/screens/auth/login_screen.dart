@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:memoria_viva_nicaragua/presentation/screens/auth/register_screen.dart';
-import 'package:memoria_viva_nicaragua/presentation/screens/home/home_screen.dart';
+import 'package:memoria_viva_nicaragua/config/app_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -12,6 +12,7 @@ import '../../widgets/auth/custom_text_field.dart';
 import '../../widgets/auth/auth_background.dart';
 import '../../widgets/auth/animated_button.dart';
 import '../../widgets/auth/fade_animation.dart';
+import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _passwordObscured = true;
   
   // Clave para forzar la reconstrucción de las animaciones (fade y background)
   Key _animationKey = UniqueKey();
@@ -108,11 +110,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
 
         if (authProvider.status == AuthStatus.authenticated) {
           if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => const HomeScreen(title: '',),
-              ),
-            );
+            Navigator.of(context).pushReplacementNamed(AppRoutes.home);
           }
         } else if (authProvider.status == AuthStatus.error) {
           setState(() {
@@ -146,11 +144,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
 
       if (authProvider.status == AuthStatus.authenticated) {
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const HomeScreen(title: '',),
-            ),
-          );
+          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
         }
       } else if (authProvider.status == AuthStatus.error) {
         setState(() {
@@ -223,11 +217,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
 
       if (authProvider.status == AuthStatus.authenticated) {
         if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const HomeScreen(title: '',),
-            ),
-          );
+          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
         }
       } else if (authProvider.status == AuthStatus.error) {
         setState(() {
@@ -363,6 +353,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
                       hintText: 'Correo electrónico',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       validator: _validateEmail,
                     ),
                   ),
@@ -376,7 +367,23 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
                       controller: _passwordController,
                       hintText: 'Contraseña',
                       prefixIcon: Icons.lock_outline,
-                      obscureText: true,
+                      obscureText: _passwordObscured,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _signInWithEmailAndPassword(),
+                      suffixIcon: Semantics(
+                        label: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                        button: true,
+                        child: IconButton(
+                          tooltip: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                          icon: Icon(_passwordObscured ? Icons.visibility_off : Icons.visibility),
+                          color: AppColors.textSecondary,
+                          onPressed: () {
+                            setState(() {
+                              _passwordObscured = !_passwordObscured;
+                            });
+                          },
+                        ),
+                      ),
                       validator: _validatePassword,
                     ),
                   ),

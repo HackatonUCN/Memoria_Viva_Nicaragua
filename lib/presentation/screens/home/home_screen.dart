@@ -7,13 +7,19 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../widgets/drawer/app_drawer.dart';
 import '../../widgets/responsive/responsive_layout.dart';
+import '../relatos/feed_screen.dart';
+import '../relatos/publicar_relato_sheet.dart';
+import 'package:provider/provider.dart';
+import '../../providers/navigation_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   final String title;
+  final int initialIndex;
 
   const HomeScreen({
     super.key,
     required this.title,
+    this.initialIndex = 0,
   });
 
   @override
@@ -32,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _controller = SidebarXController(selectedIndex: 0, extended: true);
     _initNavigationItems();
+    _pageIndex = widget.initialIndex;
   }
 
   void _initNavigationItems() {
@@ -40,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _buildNavItem(Icons.map_outlined, 'Mapa', 1),
       _buildNavItem(Icons.add_circle_outline, '', 2),
       _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3),
-      _buildNavItem(Icons.person_outline, 'Perfil', 4),
+      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4),
     ]);
   }
 
@@ -49,17 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (drawerIndex) {
       case 0: return 0; // Inicio
       case 1: return 1; // Mapa
-      case 2: return 2; // Crear Post
       case 3: return 3; // Calendario Cultural
-      case 200: return 4; // Perfil
+      case 4: return 4; // Biblioteca
+      case 5: return -1; // Chatbot abre ruta propia
       default: return -1; // No mapeado
     }
   }
 
   void _handleNavigationBarTap(int index) {
     if (_isHandlingNavigation) return;
+    if (index == 2) {
+      // Abrir overlay de publicación sin cambiar la pestaña
+      PublicarRelatoSheet.open(context).then((published) {
+        if (published == true) {
+          // No-op: FeedProvider ya observa cambios y se actualizará
+        }
+      });
+      return;
+    }
     
     _isHandlingNavigation = true;
+    final nav = context.read<NavigationProvider>();
+    nav.setIndex(index);
     setState(() {
       _pageIndex = index;
       _updateNavigationItems();
@@ -74,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _buildNavItem(Icons.map_outlined, 'Mapa', 1),
       _buildNavItem(Icons.add_circle_outline, '', 2),
       _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3),
-      _buildNavItem(Icons.person_outline, 'Perfil', 4),
+      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4),
     ]);
   }
 
@@ -127,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 elevation: 0,
               ),
               bottomNavigationBar: AnimatedNavigationBar(
-                currentIndex: _pageIndex,
+                currentIndex: context.watch<NavigationProvider>().selectedIndex,
                 items: _navigationItems,
                 onTap: _handleNavigationBarTap,
               ),
@@ -161,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
       ),
       bottomNavigationBar: AnimatedNavigationBar(
-        currentIndex: _pageIndex,
+        currentIndex: context.watch<NavigationProvider>().selectedIndex,
         items: _navigationItems,
         onTap: _handleNavigationBarTap,
       ),
@@ -170,67 +188,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMainContent() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Logo o imagen principal
-          Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppColors.nicaraguaGradient,
-            ),
-            child: Center(
-              child: Text(
-                'MV',
-                style: AppTypography.textTheme.displayMedium?.copyWith(
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Título de bienvenida
-          Text(
-            '¡Bienvenido a Memoria Viva!',
-            style: AppTypography.textTheme.headlineMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-
-          // Subtítulo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              'Preservando y compartiendo la cultura nicaragüense',
-              style: AppTypography.textTheme.titleMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Información de plataforma (solo para desarrollo)
-          if (kDebugMode)
-            Text(
-              'Plataforma: ${kIsWeb ? 'Web' : 'Mobile'}',
-              style: AppTypography.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-
-          const SizedBox(height: 16),
-          Text(
-            'Sección actual: $_pageIndex',
-            style: AppTypography.textTheme.titleMedium,
-          ),
-        ],
-      ),
+    final currentIndex = context.watch<NavigationProvider>().selectedIndex;
+    return IndexedStack(
+      index: currentIndex,
+      children: const [
+        FeedScreen(),
+        _MapaTab(),
+        _PublicarTab(),
+        _EventosTab(),
+        _BibliotecaTab(),
+      ],
     );
   }
 
@@ -240,6 +207,51 @@ class _HomeScreenState extends State<HomeScreen> {
       mobileBody: _buildMobileLayout(),
       webBody: _buildWebLayout(),
       breakpoint: 800,
+    );
+  }
+}
+
+
+class _MapaTab extends StatelessWidget {
+  const _MapaTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text('Mapa', style: AppTypography.textTheme.headlineMedium),
+    );
+  }
+}
+
+class _PublicarTab extends StatelessWidget {
+  const _PublicarTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text('Publicar', style: AppTypography.textTheme.headlineMedium),
+    );
+  }
+}
+
+class _EventosTab extends StatelessWidget {
+  const _EventosTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text('Eventos', style: AppTypography.textTheme.headlineMedium),
+    );
+  }
+}
+
+class _BibliotecaTab extends StatelessWidget {
+  const _BibliotecaTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text('Biblioteca de Saberes', style: AppTypography.textTheme.headlineMedium),
     );
   }
 }

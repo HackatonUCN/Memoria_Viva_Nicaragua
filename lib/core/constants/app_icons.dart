@@ -14,4 +14,5 @@ class AppIcons {
   static const String guardabarranco = '${iconPath}guardabarranco.svg';
   static const String nicaragua = '${iconPath}nicaragua.svg';
   static const String relato = '${iconPath}relato.svg';
+  static const String apple = '${iconPath}apple.svg';
 }

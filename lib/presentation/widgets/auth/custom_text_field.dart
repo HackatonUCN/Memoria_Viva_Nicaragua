@@ -10,6 +10,9 @@ class CustomTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextEditingController? controller;
   final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
+  final Widget? suffixIcon;
 
   const CustomTextField({
     super.key,
@@ -19,6 +22,9 @@ class CustomTextField extends StatelessWidget {
     this.keyboardType,
     this.controller,
     this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.suffixIcon,
   });
 
   @override
@@ -44,6 +50,8 @@ class CustomTextField extends StatelessWidget {
         obscureText: obscureText,
         keyboardType: keyboardType,
         validator: validator,
+        textInputAction: textInputAction,
+        onFieldSubmitted: onFieldSubmitted,
         style: AppTypography.textTheme.bodyLarge?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w500,
@@ -72,6 +80,7 @@ class CustomTextField extends StatelessWidget {
             minWidth: 60,
             minHeight: 40,
           ),
+          suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             borderSide: BorderSide.none,

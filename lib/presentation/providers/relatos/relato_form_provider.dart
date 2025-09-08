@@ -1,0 +1,469 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
+import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../domain/entities/categoria.dart';
+import '../../../domain/entities/relato.dart';
+import '../../../domain/factories/usecases.dart';
+import '../../../domain/usecases/categorias/obtener_categorias_por_tipo_usecase.dart';
+import '../../../domain/usecases/relatos/crear_relato_usecase.dart';
+import '../../../domain/validators/contenido_validator.dart';
+import '../../../domain/enums/tipos_contenido.dart';
+import '../../../domain/value_objects/multimedia.dart';
+import '../../../domain/failures/failures.dart';
+import '../../../domain/services/i_connectivity_service.dart';
+import '../../../domain/services/i_geolocation_service.dart';
+import '../../../data/datasources/impl/cloudinary_storage_datasource_impl.dart';
+
+enum UploadStatus { queued, uploading, done, error, cancelled }
+
+class MediaUploadItem {
+  final String id;
+  final TipoMultimedia tipo;
+  final File? file;
+  final Uint8List? bytes; // usado en Web
+  String? url;
+  UploadStatus status;
+  double progress; // 0..100 (best-effort)
+  String? error;
+
+  MediaUploadItem({
+    required this.id,
+    required this.tipo,
+    this.file,
+    this.bytes,
+    this.url,
+    this.status = UploadStatus.queued,
+    this.progress = 0,
+    this.error,
+  });
+}
+
+class RelatoFormProvider extends ChangeNotifier {
+  final _useCases = UseCases.resolve();
+  final GetIt _getIt = GetIt.I;
+
+  // Campos del formulario
+  String titulo = '';
+  String contenido = '';
+  final List<String> etiquetas = [];
+  String? categoriaId;
+
+  // Categorías
+  List<Categoria> categorias = [];
+  bool categoriasLoading = false;
+  String? categoriasError;
+
+  // Ubicación elegida o null
+  String? departamento;
+  String? municipio;
+  double? latitud;
+  double? longitud;
+
+  // Multimedia
+  final List<MediaUploadItem> uploads = [];
+
+  // Estado general
+  bool isPublishing = false;
+  String? errorMessage;
+  bool get hasPendingUploads => uploads.any((u) => u.status == UploadStatus.queued || u.status == UploadStatus.uploading);
+  bool lastPublishOffline = false;
+
+  // Modo edición
+  bool isEditing = false;
+  String? relatoId;
+
+  // Herramientas
+  final ImagePicker _picker = ImagePicker();
+  final AudioRecorder _recorder = AudioRecorder();
+
+  // Internos
+  String? _currentUserId;
+  StreamSubscription<List<Categoria>>? _catsSub;
+  final Map<String, http.Client> _clientsByUpload = {};
+
+  Future<void> init() async {
+    // Cargar usuario actual
+    final current = await _useCases.auth.getCurrentUser.execute();
+    _currentUserId = current.valueOrNull?.id;
+
+    // Cargar categorías de tipo relato
+    categoriasLoading = true;
+    categoriasError = null;
+    notifyListeners();
+    try {
+      final uc = _getIt<ObtenerCategoriasPorTipoUseCase>();
+      final res = await uc.execute(TipoContenido.relato);
+      categorias = res.valueOrNull ?? [];
+      categorias.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      _catsSub?.cancel();
+      _catsSub = uc.observe(TipoContenido.relato).listen((data) {
+        categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+        notifyListeners();
+      });
+    } catch (e) {
+      categoriasError = e.toString();
+    }
+    categoriasLoading = false;
+    notifyListeners();
+  }
+
+  // Helper para inicializar edición si viene un relato
+  void loadRelatoForEditIfNeeded(Relato? relato) {
+    if (relato != null) {
+      loadRelatoForEdit(relato);
+    }
+  }
+  void loadRelatoForEdit(Relato relato) {
+    isEditing = true;
+    relatoId = relato.id;
+    titulo = relato.titulo;
+    contenido = relato.contenido;
+    categoriaId = relato.categoriaId;
+    etiquetas
+      ..clear()
+      ..addAll(relato.etiquetas);
+    departamento = relato.ubicacion?.departamento;
+    municipio = relato.ubicacion?.municipio;
+    latitud = relato.ubicacion?.latitud;
+    longitud = relato.ubicacion?.longitud;
+    uploads.clear(); // no cargar multimedia en edición
+    notifyListeners();
+  }
+
+  void resetEditMode() {
+    isEditing = false;
+    relatoId = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _catsSub?.cancel();
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  // Validaciones simples en UI (dominio hace validación fuerte)
+  bool get tituloValido => titulo.trim().length >= 5 && titulo.trim().length <= 80;
+  bool get contenidoValido => contenido.trim().length >= 20;
+  bool get categoriaValida => categoriaId != null && categoriaId!.isNotEmpty;
+  bool get formularioValido => tituloValido && contenidoValido && categoriaValida && !hasPendingUploads;
+
+  void setTitulo(String v) {
+    titulo = v;
+    notifyListeners();
+  }
+
+  void setContenido(String v) {
+    contenido = v;
+    notifyListeners();
+  }
+
+  void setCategoria(String? id) {
+    categoriaId = id;
+    notifyListeners();
+  }
+
+  void addEtiqueta(String tag) {
+    final t = tag.trim();
+    if (t.isEmpty) return;
+    if (etiquetas.contains(t)) return;
+    if (etiquetas.length >= 10) return;
+    etiquetas.add(t);
+    notifyListeners();
+  }
+
+  void removeEtiqueta(String tag) {
+    etiquetas.remove(tag);
+    notifyListeners();
+  }
+
+  void setUbicacion({String? dep, String? mun, double? lat, double? lng}) {
+    departamento = dep;
+    municipio = mun;
+    latitud = lat;
+    longitud = lng;
+    notifyListeners();
+  }
+
+  // Pickers
+  Future<void> addImagenDesdeGaleria() async {
+    final XFile? xfile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (xfile == null) return;
+    if (kIsWeb) {
+      final Uint8List data = await xfile.readAsBytes();
+      _queueUploadBytes(tipo: TipoMultimedia.imagen, bytes: data);
+    } else {
+      _queueUpload(tipo: TipoMultimedia.imagen, file: File(xfile.path));
+    }
+  }
+
+  Future<void> addImagenDesdeCamara() async {
+    if (kIsWeb) {
+      // En web, usar cámara abre file picker; tratamos igual que galería
+      return addImagenDesdeGaleria();
+    }
+    final XFile? xfile = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    if (xfile == null) return;
+    _queueUpload(tipo: TipoMultimedia.imagen, file: File(xfile.path));
+  }
+
+  bool _grabando = false;
+  bool get grabando => _grabando;
+
+  Future<void> iniciarGrabacionAudio() async {
+    if (kIsWeb) return; // degradar en web
+    if (await _recorder.hasPermission()) {
+      // Construir un path temporal para la grabación
+      final dir = await getTemporaryDirectory();
+      final filePath = '${dir.path}/mvn_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+          numChannels: 1,
+        ),
+        path: filePath,
+      );
+      _grabando = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> detenerGrabacionAudio() async {
+    if (kIsWeb) return;
+    final path = await _recorder.stop();
+    _grabando = false;
+    notifyListeners();
+    if (path == null) return;
+    final file = File(path);
+    _queueUpload(tipo: TipoMultimedia.audio, file: file);
+  }
+
+  void eliminarMedia(String id) {
+    uploads.removeWhere((u) => u.id == id);
+    notifyListeners();
+  }
+
+  void _queueUpload({required TipoMultimedia tipo, required File file}) {
+    final item = MediaUploadItem(
+      id: 'u_${DateTime.now().microsecondsSinceEpoch}',
+      tipo: tipo,
+      file: file,
+      status: UploadStatus.queued,
+      progress: 0,
+    );
+    uploads.add(item);
+    notifyListeners();
+    _uploadInBackground(item);
+  }
+
+  void _queueUploadBytes({required TipoMultimedia tipo, required Uint8List bytes}) {
+    final item = MediaUploadItem(
+      id: 'u_${DateTime.now().microsecondsSinceEpoch}',
+      tipo: tipo,
+      bytes: bytes,
+      status: UploadStatus.queued,
+      progress: 0,
+    );
+    uploads.add(item);
+    notifyListeners();
+    _uploadInBackground(item);
+  }
+
+  Future<void> _uploadInBackground(MediaUploadItem item) async {
+    if (_currentUserId == null) {
+      final current = await _useCases.auth.getCurrentUser.execute();
+      _currentUserId = current.valueOrNull?.id;
+    }
+    if (item.file == null && item.bytes == null) return;
+    item.status = UploadStatus.uploading;
+    item.progress = 5;
+    notifyListeners();
+
+    try {
+      // Usar Cloudinary datasource directo (unsigned upload preset)
+      final client = http.Client();
+      _clientsByUpload[item.id] = client;
+      final ds = CloudinaryStorageDataSourceImpl(basePath: 'relatos/${_currentUserId ?? 'anon'}', client: client);
+      final ext = item.tipo == TipoMultimedia.imagen ? 'jpg' : 'm4a';
+      final String contentType = item.tipo == TipoMultimedia.imagen ? 'image/jpeg' : 'audio/aac';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+      // Best-effort progress: simular barra mientras sube
+      final progressTimer = Timer.periodic(const Duration(milliseconds: 200), (t) {
+        if (item.progress < 90 && item.status == UploadStatus.uploading) {
+          item.progress += 2;
+          notifyListeners();
+        }
+      });
+
+      final String url;
+      if (kIsWeb || item.bytes != null) {
+        url = await ds.uploadData(
+          data: item.bytes ?? await item.file!.readAsBytes(),
+          path: fileName,
+          contentType: contentType,
+        );
+      } else {
+        url = await ds.uploadFile(
+          file: item.file!,
+          path: fileName,
+          contentType: contentType,
+        );
+      }
+      progressTimer.cancel();
+
+      item.url = url;
+      item.progress = 100;
+      item.status = UploadStatus.done;
+      notifyListeners();
+    } catch (e) {
+      item.error = e.toString();
+      item.status = UploadStatus.error;
+      notifyListeners();
+    } finally {
+      _clientsByUpload.remove(item.id)?.close();
+    }
+  }
+
+  void cancelUpload(String id) {
+    final client = _clientsByUpload.remove(id);
+    client?.close();
+    final idx = uploads.indexWhere((u) => u.id == id);
+    if (idx != -1) {
+      uploads[idx].status = UploadStatus.cancelled;
+      uploads[idx].progress = 0;
+      notifyListeners();
+    }
+  }
+
+  void retryUpload(String id) {
+    final idx = uploads.indexWhere((u) => u.id == id);
+    if (idx == -1) return;
+    final item = uploads[idx];
+    if (item.file == null) return;
+    item.status = UploadStatus.queued;
+    item.progress = 0;
+    item.error = null;
+    notifyListeners();
+    _uploadInBackground(item);
+  }
+
+  // Publicación
+  Future<bool> publicar() async {
+    if (isPublishing) return false;
+    if (!formularioValido) {
+      errorMessage = 'Completa título, contenido y categoría.';
+      notifyListeners();
+      return false;
+    }
+    if (_currentUserId == null || _currentUserId!.isEmpty) {
+      errorMessage = 'Debes iniciar sesión para publicar.';
+      notifyListeners();
+      return false;
+    }
+    debugPrint('[RELATO_FORM][INICIO_SUBMIT]');
+    isPublishing = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Recolectar multimedia listos
+      final imagenes = uploads
+          .where((u) => u.tipo == TipoMultimedia.imagen && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
+      final audio = uploads
+          .where((u) => u.tipo == TipoMultimedia.audio && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
+
+      // Nota: El estado offline para el mensaje se determinará según el resultado del caso de uso
+
+      // Ubicación por defecto si no eligió
+      String? dep = departamento;
+      String? mun = municipio;
+      double? lat = latitud;
+      double? lng = longitud;
+      if ((dep == null || mun == null) && _getIt.isRegistered<IGeolocationService>()) {
+        try {
+          final geo = _getIt<IGeolocationService>();
+          final ub = await geo.obtenerUbicacionActual();
+          dep = ub.departamento;
+          mun = ub.municipio;
+          lat = ub.latitud;
+          lng = ub.longitud;
+        } catch (_) {
+          // fallback: sin ubicación
+        }
+      }
+
+      debugPrint('[RELATO_FORM][MEDIA_OK] imagenes=${imagenes.length} audio=${audio.isNotEmpty}');
+      final res = isEditing && relatoId != null
+          ? await _useCases.relatos.actualizar.execute(
+              relatoId: relatoId!,
+              usuarioId: _currentUserId!,
+              titulo: titulo.trim(),
+              contenido: contenido.trim(),
+              categoriaId: categoriaId!,
+              departamento: dep,
+              municipio: mun,
+              latitud: lat,
+              longitud: lng,
+              etiquetas: List.of(etiquetas),
+            )
+          : await _useCases.relatos.crear.execute(
+              titulo: titulo.trim(),
+              contenido: contenido.trim(),
+              autorId: _currentUserId!,
+              categoriaId: categoriaId!,
+              departamento: dep,
+              municipio: mun,
+              latitud: lat,
+              longitud: lng,
+              imagenesUrls: imagenes,
+              audioUrl: audio.isNotEmpty ? audio.first : null,
+              etiquetas: List.of(etiquetas),
+            );
+
+      isPublishing = false;
+      // Si falló por red, lo consideramos encolado offline; si fue éxito, no es offline
+      bool queuedOffline = false;
+      if (res.isFailure) {
+        final failure = res.errorOrNull;
+        if (failure is NetworkFailure) {
+          queuedOffline = true;
+        }
+      }
+      lastPublishOffline = queuedOffline;
+      if (res.isFailure && !queuedOffline) {
+        errorMessage = res.errorOrNull?.message ?? 'No se pudo publicar el relato.';
+        notifyListeners();
+        return false;
+      }
+      debugPrint('[RELATO_FORM][USECASE_OK]');
+      notifyListeners();
+      // Si fue encolado offline, igual consideramos éxito
+      return res.isSuccess || queuedOffline;
+    } catch (e) {
+      isPublishing = false;
+      errorMessage = e.toString();
+      debugPrint('[RELATO_FORM][ERROR] $e');
+      notifyListeners();
+      return false;
+    }
+  }
+}
+
+
