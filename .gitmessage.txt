@@ -1,0 +1,17 @@
+# Conventional Commit Template
+# type(scope): short summary
+#
+# types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# scope: optional, e.g., auth, relatos, firebase, ui, ios, android
+# summary: imperative, lower-case, no final period
+#
+# body: motivation and context, what and why (wrap at 72 chars)
+#
+# footer: BREAKING CHANGE: description
+# footer: Closes #123
+
+feat(scope): short summary
+
+# Body (optional). Explain what and why, any alternatives considered.
+
+# Footer (optional). E.g., BREAKING CHANGE: ..., Closes #123
