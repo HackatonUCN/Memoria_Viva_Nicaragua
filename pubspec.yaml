@@ -42,8 +42,11 @@ dependencies:
   firebase_messaging: ^16.0.0
   firebase_performance: ^0.11.0
   firebase_crashlytics: ^5.0.0
+  firebase_remote_config: ^6.0.0
   cloud_functions: ^6.0.0
   flutter_local_notifications: ^19.4.1
+  http: ^1.2.2
+  http_parser: ^4.0.2
   google_fonts: ^6.1.0
   flutter_screenutil: ^5.9.0
   flutter_bloc: ^9.1.1
@@ -59,17 +62,35 @@ dependencies:
   flutter_side_menu: ^0.5.41
   sidebarx: ^0.17.2
   mime: ^2.0.0
+  get_it: ^7.7.0
+  shared_preferences: ^2.2.3
+  connectivity_plus: ^6.0.3
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  flutter_map_cancellable_tile_provider: ^3.0.0
+  table_calendar: ^3.1.2
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+  record: ^5.1.2
+  just_audio: ^0.9.39
+  audio_session: ^0.1.21
+  url_strategy: ^0.3.0
+  flutter_form_builder: ^9.2.1
+  google_api_availability: ^5.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  fake_cloud_firestore: ^4.0.0
+  mocktail: ^1.0.3
+  flutter_lints: ^6.0.0
+  just_audio_platform_interface: ^4.2.2
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -85,6 +106,7 @@ flutter:
   assets:
     - assets/icons/
     - assets/images/
+    - assets/config/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -122,3 +144,6 @@ dependency_overrides:
   flutter_local_notifications_platform_interface: ^9.1.0
   flutter_local_notifications_windows: ^1.0.2
   timezone: ^0.10.1
+  # For audio recording: keep plugin family in sync to avoid startStream mismatch on Linux
+  record_linux: 1.2.1
+  record_platform_interface: 1.4.0
