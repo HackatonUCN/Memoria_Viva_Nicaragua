@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Necesitamos la cámara para capturar imágenes para tus relatos.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Necesitamos el micrófono para grabar audio para tus relatos.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Necesitamos acceso a tu biblioteca para seleccionar imágenes.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Usamos tu ubicación para asociar el relato al lugar donde ocurrió.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -45,5 +53,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+    <key>GMSApiKey</key>
+    <string>YOUR_IOS_GOOGLE_MAPS_API_KEY_HERE</string>
+    
+    <!-- Google Maps API Key (set in AppDelegate) -->
+    
+    <!-- Photo/Camera usage descriptions -->
+    <key>NSCameraUsageDescription</key>
+    <string>Necesitamos acceso a la cámara para tomar fotos y videos de relatos.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Necesitamos acceso a tu galería para seleccionar imágenes y videos.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Necesitamos acceso al micrófono para grabar audio en tus relatos.</string>
 </dict>
 </plist>
