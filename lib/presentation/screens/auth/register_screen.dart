@@ -11,6 +11,7 @@ import '../../widgets/auth/custom_text_field.dart';
 import '../../widgets/auth/auth_background.dart';
 import '../../widgets/auth/animated_button.dart';
 import '../../widgets/auth/fade_animation.dart';
+import '../../../core/constants/app_icons.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -391,7 +392,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     delay: 2.0,
                     child: Center(
                       child: SocialLoginButton(
-                        icon: 'assets/icons/google.svg',
+                        icon: AppIcons.google,
                         onPressed: () => _signInWithGoogle(),
                       ),
                     ),

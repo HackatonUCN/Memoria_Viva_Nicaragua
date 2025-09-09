@@ -9,6 +9,7 @@ import '../../widgets/drawer/app_drawer.dart';
 import '../../widgets/responsive/responsive_layout.dart';
 import '../relatos/feed_screen.dart';
 import '../relatos/publicar_relato_sheet.dart';
+import '../../widgets/relatos/relato_detail_overlay.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
 
@@ -39,6 +40,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _controller = SidebarXController(selectedIndex: 0, extended: true);
     _initNavigationItems();
     _pageIndex = widget.initialIndex;
+    // Manejo simple de argumento deeplink {'relatoId': id}
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args['relatoId'] is String) {
+        final String id = args['relatoId'] as String;
+        // Abrir overlay cuando el feed esté visible
+        RelatoDetailOverlay.open(context, null, relatoId: id);
+      }
+    });
   }
 
   void _initNavigationItems() {

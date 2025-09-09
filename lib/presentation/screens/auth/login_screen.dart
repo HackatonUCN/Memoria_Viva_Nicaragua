@@ -13,6 +13,7 @@ import '../../widgets/auth/auth_background.dart';
 import '../../widgets/auth/animated_button.dart';
 import '../../widgets/auth/fade_animation.dart';
 import '../home/home_screen.dart';
+import '../../../core/constants/app_icons.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -455,7 +456,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
                     delay: 1.8,
                     child: Center(
                       child: SocialLoginButton(
-                        icon: 'assets/icons/google.svg',
+                        icon: AppIcons.google,
                         onPressed: () => _signInWithGoogle(),
                       ),
                     ),

@@ -1,4 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:video_player/video_player.dart';
+import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:memoria_viva_nicaragua/domain/value_objects/multimedia.dart';
 
@@ -20,6 +24,7 @@ class RelatoCard extends StatelessWidget {
   final VoidCallback? onReport;
   final VoidCallback? onMore;
   final bool showMore;
+  final bool isLiked;
 
   const RelatoCard({
     super.key,
@@ -30,14 +35,15 @@ class RelatoCard extends StatelessWidget {
     this.onReport,
     this.onMore,
     this.showMore = false,
+    this.isLiked = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Multimedia? firstMedia = relato.multimedia.isNotEmpty ? relato.multimedia.first : null;
+    final List<Multimedia> medias = relato.multimedia;
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWide = screenWidth >= 900;
-    const double maxCardWidth = 760;
+    const double maxCardWidth = 840;
 
     return Align(
       alignment: Alignment.topCenter,
@@ -46,24 +52,25 @@ class RelatoCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Container(
-            margin: EdgeInsets.symmetric(horizontal: isWide ? 24 : 16, vertical: 10),
+            margin: EdgeInsets.symmetric(horizontal: isWide ? 24 : 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.cardShadow,
-                  blurRadius: 12,
+                  blurRadius: 14,
                   spreadRadius: 1,
-                  offset: const Offset(0, 6),
+                  offset: const Offset(0, 8),
                 )
               ],
+              border: Border.all(color: AppColors.withOpacity(AppColors.primary, 0.05)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (firstMedia != null)
-                  _MediaPreview(media: firstMedia),
+                if (medias.isNotEmpty)
+                  _CardMediaCarousel(items: medias),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -94,12 +101,22 @@ class RelatoCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       _CategoriaChip(categoriaId: relato.categoriaId, categoriaNombre: relato.categoriaNombre),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${relato.autorNombre}${relato.ubicacion != null ? ' • ' + relato.ubicacion!.obtenerDireccionFormateada() : ''}',
-                        style: AppTypography.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _AvatarCircle(name: relato.autorNombre),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${relato.autorNombre}${relato.ubicacion != null ? ' • ' + relato.ubicacion!.obtenerDireccionFormateada() : ''}',
+                              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -116,13 +133,11 @@ class RelatoCard extends StatelessWidget {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          _actionIcon(Icons.favorite_border, onLike),
-                          Text('${relato.likes}', style: AppTypography.textTheme.bodyMedium),
-                          const SizedBox(width: 12),
-                          _actionIcon(Icons.ios_share_outlined, onShare),
-                          Text('${relato.compartidos}', style: AppTypography.textTheme.bodyMedium),
+                          _ActionIcon(icon: isLiked ? Icons.favorite : Icons.favorite_border, label: '${relato.likes}', onTap: onLike, active: isLiked),
+                          const SizedBox(width: 8),
+                          _ActionIcon(icon: Icons.ios_share_outlined, label: '${relato.compartidos}', onTap: onShare),
                           const Spacer(),
-                          _actionIcon(Icons.flag_outlined, onReport),
+                          _ActionIcon(icon: Icons.flag_outlined, label: 'Reportar', onTap: onReport),
                         ],
                       )
                     ],
@@ -148,6 +163,56 @@ class RelatoCard extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.primary),
       ),
+    );
+  }
+}
+
+class _ActionIcon extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool active;
+  const _ActionIcon({required this.icon, required this.label, this.onTap, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: active ? AppColors.withOpacity(AppColors.accent, 0.18) : AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: active ? AppColors.accent : AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 6),
+            Text(label, style: AppTypography.textTheme.bodyMedium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarCircle extends StatelessWidget {
+  final String name;
+  const _AvatarCircle({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final String initials = name.isNotEmpty
+        ? name.trim().split(RegExp(r"\s+")).take(2).map((e) => e[0].toUpperCase()).join()
+        : '?';
+    return CircleAvatar(
+      radius: 14,
+      backgroundColor: AppColors.withOpacity(AppColors.primary, 0.12),
+      child: Text(initials, style: AppTypography.textTheme.labelSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -189,79 +254,345 @@ class _MediaPreview extends StatelessWidget {
           ),
         );
       case TipoMultimedia.video:
-        // Placeholder visual para video (inline). El reproductor real se mostrará en el overlay.
-        return ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            color: AppColors.background,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 260),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Stack(
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: media.obtenerThumbnailUrl(),
-                        fit: BoxFit.cover,
-                      ),
-                      Positioned.fill(
-                        child: Container(color: AppColors.imageOverlay),
-                      ),
-                      const Positioned.fill(
-                        child: Center(
-                          child: Icon(Icons.play_circle_fill, size: 64, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
+        return _CardVideoPreview(url: media.url);
       case TipoMultimedia.audio:
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-            ),
-            color: AppColors.surfaceVariant,
+        return _InlineAudioPlayer(url: media.url);
+    }
+  }
+}
+
+class _CardMediaCarousel extends StatefulWidget {
+  final List<Multimedia> items;
+  const _CardMediaCarousel({required this.items});
+
+  @override
+  State<_CardMediaCarousel> createState() => _CardMediaCarouselState();
+}
+
+class _CardMediaCarouselState extends State<_CardMediaCarousel> {
+  late final PageController _controller;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool showArrows = widget.items.length > 1;
+    return SizedBox(
+      height: 260,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _controller,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemCount: widget.items.length,
+            itemBuilder: (ctx, i) => _MediaPreview(media: widget.items[i]),
           ),
-          child: Row(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: AppColors.accentGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Icon(Icons.play_arrow, color: Colors.white),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: AppColors.withOpacity(AppColors.primary, 0.15),
-                    borderRadius: BorderRadius.circular(10),
+          if (showArrows)
+            Positioned(
+              left: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.black26,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      final prev = (_index - 1).clamp(0, widget.items.length - 1);
+                      _controller.animateToPage(prev, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(6.0),
+                      child: Icon(Icons.chevron_left, size: 28, color: Colors.white),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Text('0:30', style: AppTypography.metadata.copyWith(color: AppColors.textSecondary)),
+            ),
+          if (showArrows)
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.black26,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      final next = (_index + 1).clamp(0, widget.items.length - 1);
+                      _controller.animateToPage(next, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(6.0),
+                      child: Icon(Icons.chevron_right, size: 28, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (showArrows)
+            Positioned(
+              bottom: 8,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(widget.items.length, (i) => _dot(i == _index)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dot(bool active) => Container(
+        width: active ? 10 : 6,
+        height: active ? 10 : 6,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(
+          color: active ? AppColors.accent : AppColors.withOpacity(AppColors.accent, 0.4),
+          shape: BoxShape.circle,
+        ),
+      );
+}
+
+class _InlineAudioPlayer extends StatefulWidget {
+  final String url;
+  const _InlineAudioPlayer({required this.url});
+
+  @override
+  State<_InlineAudioPlayer> createState() => _InlineAudioPlayerState();
+}
+
+class _CardVideoPreview extends StatefulWidget {
+  final String url;
+  const _CardVideoPreview({required this.url});
+
+  @override
+  State<_CardVideoPreview> createState() => _CardVideoPreviewState();
+}
+
+class _CardVideoPreviewState extends State<_CardVideoPreview> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _muted = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = kIsWeb
+        ? VideoPlayerController.network(widget.url)
+        : VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..setLooping(false)
+      ..initialize().then((_) {
+        if (mounted) setState(() => _initialized = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(16),
+        topRight: Radius.circular(16),
+      ),
+      child: Container(
+        color: AppColors.background,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 260),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Video centrado con cover para que se vea bien en la card
+              Positioned.fill(
+                child: _initialized
+                    ? FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _controller.value.size.width,
+                          height: _controller.value.size.height,
+                          child: VideoPlayer(_controller),
+                        ),
+                      )
+                    : Container(color: AppColors.background),
+              ),
+              Positioned.fill(child: IgnorePointer(child: Container(color: AppColors.imageOverlay))),
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.replay_10, color: Colors.white),
+                      onPressed: !_initialized
+                          ? null
+                          : () async {
+                              final pos = await _controller.position ?? Duration.zero;
+                              final target = pos - const Duration(seconds: 10);
+                              await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
+                            },
+                    ),
+                    IconButton(
+                      icon: Icon(_controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white, size: 30),
+                      onPressed: !_initialized
+                          ? null
+                          : () async {
+                              if (_controller.value.isPlaying) {
+                                await _controller.pause();
+                              } else {
+                                await _controller.play();
+                              }
+                              if (mounted) setState(() {});
+                            },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.forward_10, color: Colors.white),
+                      onPressed: !_initialized
+                          ? null
+                          : () async {
+                              final pos = await _controller.position ?? Duration.zero;
+                              final dur = _controller.value.duration;
+                              final target = pos + const Duration(seconds: 10);
+                              await _controller.seekTo(target > dur ? dur : target);
+                            },
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
+                      onPressed: !_initialized
+                          ? null
+                          : () async {
+                              _muted = !_muted;
+                              await _controller.setVolume(_muted ? 0.0 : 1.0);
+                              if (mounted) setState(() {});
+                            },
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        );
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
+  late final AudioPlayer _player;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  bool _loading = true;
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<Duration?>? _durSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      await _player.setUrl(widget.url);
+      _duration = _player.duration ?? Duration.zero;
+      _posSub = _player.positionStream.listen((pos) {
+        if (mounted) setState(() => _position = pos);
+      });
+      _durSub = _player.durationStream.listen((d) {
+        if (d != null && mounted) setState(() => _duration = d);
+      });
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _posSub?.cancel();
+    _durSub?.cancel();
+    _player.dispose();
+    super.dispose();
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(
+        height: 56,
+        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+        color: AppColors.surfaceVariant,
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: StreamBuilder<PlayerState>(
+              stream: _player.playerStateStream,
+              builder: (context, snap) {
+                final playing = _player.playing;
+                return Icon(playing ? Icons.pause_circle_filled : Icons.play_circle_fill, size: 32);
+              },
+            ),
+            onPressed: () async {
+              if (_player.playing) {
+                await _player.pause();
+              } else {
+                await _player.play();
+              }
+              if (mounted) setState(() {});
+            },
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Slider(
+              min: 0,
+              max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+              value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
+              onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('${_fmt(_position)} / ${_fmt(_duration)}', style: AppTypography.metadata.copyWith(color: AppColors.textSecondary)),
+        ],
+      ),
+    );
   }
 }
 

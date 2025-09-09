@@ -43,10 +43,6 @@ class SocialLoginButton extends StatelessWidget {
             icon,
             width: 24,
             height: 24,
-            colorFilter: const ColorFilter.mode(
-              AppColors.primary,
-              BlendMode.srcIn,
-            ),
           ),
         ),
       ),

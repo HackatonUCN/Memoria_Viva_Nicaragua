@@ -15,13 +15,26 @@ class CulturalIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Color explícito para teñir SVGs con rellenos fijos (opcional)
+    final Color? explicitColor = color;
+    // Color heredado/base para currentColor en SVGs (no nulo)
+    final Color resolvedCurrentColor =
+        DefaultTextStyle.of(context).style.color ??
+        Theme.of(context).iconTheme.color ??
+        Colors.black;
+
     return SvgPicture.asset(
       svgPath,
       width: size,
       height: size,
-      colorFilter: color != null 
-          ? ColorFilter.mode(color!, BlendMode.srcIn)
+      // Solo aplicar tinte cuando se pasa color explícito.
+      colorFilter: explicitColor != null
+          ? ColorFilter.mode(explicitColor, BlendMode.srcIn)
           : null,
+      // currentColor para SVGs que lo utilicen.
+      theme: SvgTheme(
+        currentColor: explicitColor ?? resolvedCurrentColor,
+      ),
     );
   }
 }
