@@ -12,6 +12,7 @@ import '../usecases/relatos/moderar_relato_usecase.dart';
 import '../usecases/relatos/reportar_relato_usecase.dart';
 import '../usecases/relatos/obtener_relatos_usecase.dart';
 import '../usecases/relatos/dar_like_relato_usecase.dart';
+import '../usecases/relatos/toggle_like_relato_usecase.dart';
 import '../usecases/relatos/registrar_compartido_relato_usecase.dart';
 
 /// Factory para construir casos de uso relacionados con Relatos
@@ -64,6 +65,8 @@ class RelatoUseCaseFactory {
   ObtenerRelatosUseCase get obtener => ObtenerRelatosUseCase(_relatoRepository);
 
   DarLikeRelatoUseCase get like => DarLikeRelatoUseCase(_relatoRepository);
+
+  ToggleLikeRelatoUseCase get toggleLike => ToggleLikeRelatoUseCase(_relatoRepository);
 
   RegistrarCompartidoRelatoUseCase get compartir => RegistrarCompartidoRelatoUseCase(_relatoRepository);
 }
