@@ -90,7 +90,7 @@ class _RelatoRepositoryFake implements IRelatoRepository {
   Future<void> actualizarRelato(Relato relato) async {}
 
   @override
-  Future<void> darLike(String id) async {}
+  Future<bool> toggleLike({required String id, required String userId}) async => true;
 
   @override
   Future<void> eliminarRelato(String id) async {}
@@ -117,7 +117,7 @@ class _RelatoRepositoryFake implements IRelatoRepository {
   Future<void> registrarCompartido(String id) async {}
 
   @override
-  Future<void> reportarRelato(String id, String razon) async {}
+  Future<bool> reportarRelato(String id, String razon, {required String userId}) async => true;
 
   @override
   Future<void> restaurarRelato(String id) async {}

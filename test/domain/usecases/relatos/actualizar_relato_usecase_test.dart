@@ -18,6 +18,8 @@ class _RelatoRepoStub implements IRelatoRepository {
   Future<Relato?> obtenerRelatoPorId(String id) async => fuente;
   @override
   Future<void> guardarRelato(Relato relato) async { almacenado = relato; }
+  @override
+  Future<bool> toggleLike({required String id, required String userId}) async => false;
   @override noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

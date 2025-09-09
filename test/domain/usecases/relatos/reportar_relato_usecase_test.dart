@@ -12,9 +12,11 @@ class _RelatoRepoStub implements IRelatoRepository {
   @override
   Future<Relato?> obtenerRelatoPorId(String id) async => fuente;
   @override
-  Future<void> reportarRelato(String id, String razon) async { reportado = true; }
+  Future<bool> reportarRelato(String id, String razon, {required String userId}) async { reportado = true; return true; }
   @override
   Future<void> moderarRelato(String id, dynamic estado) async {}
+  @override
+  Future<bool> toggleLike({required String id, required String userId}) async => false;
   @override noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

@@ -34,13 +34,13 @@ class _RemoteRelatoRepoFake implements IRelatoRepository {
   @override
   Future<List<Relato>> obtenerRelatosPorUbicacion({String? departamento, String? municipio}) async => <Relato>[];
   @override
-  Future<void> reportarRelato(String id, String razon) async {}
+  Future<bool> reportarRelato(String id, String razon, {required String userId}) async => true;
   @override
   Future<void> restaurarRelato(String id) async {}
   @override
   Future<void> moderarRelato(String id, estado) async {}
   @override
-  Future<void> darLike(String id) async {}
+  Future<bool> toggleLike({required String id, required String userId}) async => true;
   @override
   Future<void> registrarCompartido(String id) async {}
   @override
