@@ -16,6 +16,7 @@ import 'presentation/providers/navigation_provider.dart';
 // Importamos RouteObserver para las animaciones
 import 'config/app_router.dart';
 import 'package:url_strategy/url_strategy.dart';
+import 'core/services/deep_link_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,6 +45,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Inicializar deep links al construir la app
+    DeepLinkService().init();
     return MultiProvider(
       providers: [
         BlocProvider<SplashBloc>(

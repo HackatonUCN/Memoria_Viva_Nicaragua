@@ -55,6 +55,8 @@ class AppRouter {
         return _material(const RegisterScreen(), settings);
 
       case AppRoutes.home:
+        // Permite recibir argumento opcional {'relatoId': id} desde deep link
+        final args = settings.arguments;
         return _material(
           _AuthRequired(child: const HomeScreen(title: '', initialIndex: 0)),
           settings,

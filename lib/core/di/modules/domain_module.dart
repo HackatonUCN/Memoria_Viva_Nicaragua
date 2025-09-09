@@ -47,6 +47,7 @@ import '../../../domain/usecases/relatos/reportar_relato_usecase.dart';
 import '../../../domain/usecases/relatos/moderar_relato_usecase.dart';
 import '../../../domain/usecases/relatos/obtener_relatos_usecase.dart';
 import '../../../domain/usecases/relatos/dar_like_relato_usecase.dart';
+import '../../../domain/usecases/relatos/toggle_like_relato_usecase.dart';
 import '../../../domain/usecases/relatos/registrar_compartido_relato_usecase.dart';
 
 // Casos de uso - Saberes Populares
@@ -171,6 +172,7 @@ class DomainModule {
         ));
     getIt.registerFactory<ObtenerRelatosUseCase>(() => ObtenerRelatosUseCase(getIt<IRelatoRepository>()));
     getIt.registerFactory<DarLikeRelatoUseCase>(() => DarLikeRelatoUseCase(getIt<IRelatoRepository>()));
+    getIt.registerFactory<ToggleLikeRelatoUseCase>(() => ToggleLikeRelatoUseCase(getIt<IRelatoRepository>()));
     getIt.registerFactory<RegistrarCompartidoRelatoUseCase>(() => RegistrarCompartidoRelatoUseCase(getIt<IRelatoRepository>()));
 
     // Saberes Populares
