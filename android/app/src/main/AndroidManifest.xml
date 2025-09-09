@@ -39,6 +39,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Deep link: memoriaviva://relatos/{id} -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="memoriaviva" android:host="relatos" />
+            </intent-filter>
         </activity>
         <!-- Default FCM notification icon and color -->
         <meta-data

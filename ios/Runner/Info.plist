@@ -65,5 +65,16 @@
     <string>Necesitamos acceso a tu galería para seleccionar imágenes y videos.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Necesitamos acceso al micrófono para grabar audio en tus relatos.</string>
+
+    <!-- Deep links: memoriaviva://relatos/{id} -->
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>memoriaviva</string>
+        </array>
+      </dict>
+    </array>
 </dict>
 </plist>

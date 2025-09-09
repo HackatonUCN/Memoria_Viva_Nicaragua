@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
+import 'dart:async';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -475,11 +476,19 @@ class _MediaLivePreview extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(u.tipo == TipoMultimedia.imagen ? Icons.image_outlined : Icons.graphic_eq, size: 16, color: border),
+                    Icon(
+                      u.tipo == TipoMultimedia.imagen
+                          ? Icons.image_outlined
+                          : (u.tipo == TipoMultimedia.video ? Icons.videocam_outlined : Icons.graphic_eq),
+                      size: 16,
+                      color: border,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        u.tipo == TipoMultimedia.imagen ? 'Imagen' : 'Audio',
+                        u.tipo == TipoMultimedia.imagen
+                            ? 'Imagen'
+                            : (u.tipo == TipoMultimedia.video ? 'Video' : 'Audio'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.textTheme.bodySmall,
@@ -541,17 +550,19 @@ class _MediaLivePreview extends StatelessWidget {
                           ],
                         );
                       }
-                      // Placeholder para otros tipos (video, etc.)
-                      return Stack(
-                        children: [
-                          Container(color: AppColors.surfaceVariant),
-                          const Positioned.fill(
-                            child: Center(
-                              child: Icon(Icons.play_circle_fill, size: 40, color: AppColors.textSecondary),
-                            ),
-                          )
-                        ],
-                      );
+                      if (u.tipo == TipoMultimedia.video) {
+                        return Stack(
+                          children: [
+                            Container(color: AppColors.surfaceVariant),
+                            const Positioned.fill(
+                              child: Center(
+                                child: Icon(Icons.play_circle_fill, size: 40, color: AppColors.textSecondary),
+                              ),
+                            )
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
                     }(),
                   ),
                 ),
@@ -600,6 +611,8 @@ class _AudioPreviewMiniState extends State<_AudioPreviewMini> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _loading = true;
+  StreamSubscription<Duration>? _posSub;
+  StreamSubscription<Duration?>? _durSub;
 
   @override
   void initState() {
@@ -612,8 +625,11 @@ class _AudioPreviewMiniState extends State<_AudioPreviewMini> {
     try {
       await _player.setUrl(widget.url);
       _duration = _player.duration ?? Duration.zero;
-      _player.positionStream.listen((pos) {
-        setState(() => _position = pos);
+      _posSub = _player.positionStream.listen((pos) {
+        if (mounted) setState(() => _position = pos);
+      });
+      _durSub = _player.durationStream.listen((d) {
+        if (d != null && mounted) setState(() => _duration = d);
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -622,6 +638,8 @@ class _AudioPreviewMiniState extends State<_AudioPreviewMini> {
 
   @override
   void dispose() {
+    _posSub?.cancel();
+    _durSub?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -656,7 +674,7 @@ class _AudioPreviewMiniState extends State<_AudioPreviewMini> {
                 } else {
                   await _player.play();
                 }
-                setState(() {});
+                if (mounted) setState(() {});
               },
             ),
             Expanded(

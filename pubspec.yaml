@@ -74,9 +74,13 @@ dependencies:
   record: ^5.1.2
   just_audio: ^0.9.39
   audio_session: ^0.1.21
+  video_player: ^2.9.2
+  video_player_web: ^2.3.3
   url_strategy: ^0.3.0
   flutter_form_builder: ^9.2.1
   google_api_availability: ^5.0.1
+  share_plus: ^10.0.2
+  app_links: ^6.1.1
 
 dev_dependencies:
   flutter_test:

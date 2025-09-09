@@ -32,6 +32,11 @@ class MediaPickerRow extends StatelessWidget {
               onTap: provider.addImagenDesdeCamara,
             ),
             _ActionButton(
+              icon: Icons.attach_file_outlined,
+              label: 'Archivos',
+              onTap: provider.addDesdeArchivos,
+            ),
+            _ActionButton(
               icon: provider.grabando ? Icons.stop_circle_outlined : Icons.mic_none_outlined,
               label: provider.grabando ? 'Detener' : 'Grabar audio',
               onTap: provider.grabando ? provider.detenerGrabacionAudio : provider.iniciarGrabacionAudio,
@@ -46,7 +51,9 @@ class MediaPickerRow extends StatelessWidget {
             for (final u in provider.uploads)
               _UploadChip(
                 id: u.id,
-                label: u.tipo == TipoMultimedia.imagen ? 'Imagen' : 'Audio',
+                label: u.tipo == TipoMultimedia.imagen
+                    ? 'Imagen'
+                    : (u.tipo == TipoMultimedia.video ? 'Video' : 'Audio'),
                 status: u.status,
                 progress: u.progress,
                 onDelete: () => provider.eliminarMedia(u.id),
