@@ -7,7 +7,7 @@ import '../../../core/theme/app_typography.dart';
 
 class RelatoDetailScreen extends StatelessWidget {
   final Relato relato;
-
+  
   const RelatoDetailScreen({super.key, required this.relato});
 
   @override

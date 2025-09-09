@@ -38,19 +38,27 @@ class FilterSegmentedChips extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        children: [
-          chip('Recientes', FeedFilter.recientes),
-          chip('Populares', FeedFilter.populares),
-          isLoggedIn
-              ? chip('Mis relatos', FeedFilter.mis)
-              : ActionChip(
-                  label: Text('Inicia sesión', style: AppTypography.textTheme.labelLarge?.copyWith(color: AppColors.primaryDark)),
-                  onPressed: onLoginTap,
-                  backgroundColor: AppColors.surface,
-                ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isNarrow = constraints.maxWidth < 420;
+          final chips = <Widget>[
+            chip('Recientes', FeedFilter.recientes),
+            chip('Populares', FeedFilter.populares),
+            if (isLoggedIn) chip('Mis relatos', FeedFilter.mis) else ActionChip(
+              label: Text('Inicia sesión', style: AppTypography.textTheme.labelLarge?.copyWith(color: AppColors.primaryDark)),
+              onPressed: onLoginTap,
+              backgroundColor: AppColors.surface,
+            ),
+            if (isLoggedIn) chip('Me gusta', FeedFilter.liked),
+          ];
+          if (isNarrow) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [const SizedBox(width: 4), ...chips.map((w) => Padding(padding: const EdgeInsets.only(right: 8), child: w))]),
+            );
+          }
+          return Wrap(spacing: 8, children: chips);
+        },
       ),
     );
   }
