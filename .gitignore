@@ -118,3 +118,10 @@ local.properties
 firebase-debug.log
 pglite-debug.log
 .firebaserc
+# Build reports and backups
+android/build/
+android/build/**
+android/build/reports/**
+firestore.rules.backup
+firestore.rules.temp
+.cursor/
