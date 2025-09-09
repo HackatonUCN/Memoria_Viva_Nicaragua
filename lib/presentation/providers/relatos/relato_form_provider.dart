@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -197,13 +198,42 @@ class RelatoFormProvider extends ChangeNotifier {
 
   // Pickers
   Future<void> addImagenDesdeGaleria() async {
-    final XFile? xfile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
-    if (xfile == null) return;
-    if (kIsWeb) {
-      final Uint8List data = await xfile.readAsBytes();
-      _queueUploadBytes(tipo: TipoMultimedia.imagen, bytes: data);
-    } else {
-      _queueUpload(tipo: TipoMultimedia.imagen, file: File(xfile.path));
+    // Móvil (Android/iOS): usar selector del sistema con múltiples imágenes/videos
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final List<XFile> files = await _picker.pickMultipleMedia(imageQuality: 90);
+      if (files.isEmpty) return;
+      for (final x in files) {
+        final String pathOrName = x.path.isNotEmpty ? x.path : x.name;
+        final String ext = pathOrName.split('.').last.toLowerCase();
+        final bool isVideo = TipoMultimedia.video.extensionesPermitidas.contains(ext);
+        final TipoMultimedia tipo = isVideo ? TipoMultimedia.video : TipoMultimedia.imagen;
+        _queueUpload(tipo: tipo, file: File(x.path));
+      }
+      return;
+    }
+
+    // Web y desktop: usar FilePicker con gestor de archivos y selección múltiple
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: true,
+      allowedExtensions: [
+        ...TipoMultimedia.imagen.extensionesPermitidas,
+        ...TipoMultimedia.video.extensionesPermitidas,
+      ],
+      withData: kIsWeb,
+    );
+    if (result == null || result.files.isEmpty) return;
+    for (final f in result.files) {
+      final name = f.name.toLowerCase();
+      final bool isVideo = TipoMultimedia.video.extensionesPermitidas.any((e) => name.endsWith('.$e'));
+      final TipoMultimedia tipo = isVideo ? TipoMultimedia.video : TipoMultimedia.imagen;
+      if (kIsWeb) {
+        if (f.bytes == null) continue;
+        _queueUploadBytes(tipo: tipo, bytes: f.bytes!);
+      } else {
+        if (f.path == null) continue;
+        _queueUpload(tipo: tipo, file: File(f.path!));
+      }
     }
   }
 
@@ -215,6 +245,39 @@ class RelatoFormProvider extends ChangeNotifier {
     final XFile? xfile = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
     if (xfile == null) return;
     _queueUpload(tipo: TipoMultimedia.imagen, file: File(xfile.path));
+  }
+
+  Future<void> addDesdeArchivos() async {
+    // Permitir audio, video e imagen desde selector de archivos (móvil y web)
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowMultiple: true,
+      allowedExtensions: [
+        ...TipoMultimedia.imagen.extensionesPermitidas,
+        ...TipoMultimedia.video.extensionesPermitidas,
+        ...TipoMultimedia.audio.extensionesPermitidas,
+      ],
+      withData: kIsWeb,
+    );
+    if (result == null || result.files.isEmpty) return;
+    for (final file in result.files) {
+      final String name = (file.name).toLowerCase();
+      TipoMultimedia tipo;
+      if (TipoMultimedia.imagen.extensionesPermitidas.any((e) => name.endsWith('.$e'))) {
+        tipo = TipoMultimedia.imagen;
+      } else if (TipoMultimedia.video.extensionesPermitidas.any((e) => name.endsWith('.$e'))) {
+        tipo = TipoMultimedia.video;
+      } else {
+        tipo = TipoMultimedia.audio;
+      }
+      if (kIsWeb) {
+        if (file.bytes == null) continue;
+        _queueUploadBytes(tipo: tipo, bytes: file.bytes!);
+      } else {
+        if (file.path == null) continue;
+        _queueUpload(tipo: tipo, file: File(file.path!));
+      }
+    }
   }
 
   bool _grabando = false;
@@ -296,8 +359,12 @@ class RelatoFormProvider extends ChangeNotifier {
       final client = http.Client();
       _clientsByUpload[item.id] = client;
       final ds = CloudinaryStorageDataSourceImpl(basePath: 'relatos/${_currentUserId ?? 'anon'}', client: client);
-      final ext = item.tipo == TipoMultimedia.imagen ? 'jpg' : 'm4a';
-      final String contentType = item.tipo == TipoMultimedia.imagen ? 'image/jpeg' : 'audio/aac';
+      final ext = item.tipo == TipoMultimedia.imagen
+          ? 'jpg'
+          : (item.tipo == TipoMultimedia.audio ? 'm4a' : 'mp4');
+      final String contentType = item.tipo == TipoMultimedia.imagen
+          ? 'image/jpeg'
+          : (item.tipo == TipoMultimedia.audio ? 'audio/aac' : 'video/mp4');
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
 
       // Best-effort progress: simular barra mientras sube
@@ -388,6 +455,10 @@ class RelatoFormProvider extends ChangeNotifier {
           .where((u) => u.tipo == TipoMultimedia.audio && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
           .map((u) => u.url!)
           .toList();
+      final videos = uploads
+          .where((u) => u.tipo == TipoMultimedia.video && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
 
       // Nota: El estado offline para el mensaje se determinará según el resultado del caso de uso
 
@@ -409,7 +480,7 @@ class RelatoFormProvider extends ChangeNotifier {
         }
       }
 
-      debugPrint('[RELATO_FORM][MEDIA_OK] imagenes=${imagenes.length} audio=${audio.isNotEmpty}');
+      debugPrint('[RELATO_FORM][MEDIA_OK] imagenes=${imagenes.length} audio=${audio.isNotEmpty} video=${videos.isNotEmpty}');
       final res = isEditing && relatoId != null
           ? await _useCases.relatos.actualizar.execute(
               relatoId: relatoId!,
@@ -434,6 +505,7 @@ class RelatoFormProvider extends ChangeNotifier {
               longitud: lng,
               imagenesUrls: imagenes,
               audioUrl: audio.isNotEmpty ? audio.first : null,
+              videoUrl: videos.isNotEmpty ? videos.first : null,
               etiquetas: List.of(etiquetas),
             );
 
