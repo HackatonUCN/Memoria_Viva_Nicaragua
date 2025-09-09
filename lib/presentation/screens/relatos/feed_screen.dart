@@ -15,6 +15,7 @@ import '../../providers/feed_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/relato.dart';
 import '../../../domain/factories/usecases.dart';
+import 'package:share_plus/share_plus.dart';
 
 class FeedScreen extends StatelessWidget {
   const FeedScreen({super.key});
@@ -134,14 +135,21 @@ class FeedScreen extends StatelessWidget {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: FilterSegmentedChips(
-                      isLoggedIn: provider.isLoggedIn,
-                      onLoginTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        );
-                      },
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _FeedSearchBar(),
+                        const SizedBox(height: 8),
+                        FilterSegmentedChips(
+                          isLoggedIn: provider.isLoggedIn,
+                          onLoginTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -158,7 +166,7 @@ class FeedScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (provider.feedLoading)
+                if (provider.feedLoading || provider.searching)
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(child: CircularProgressIndicator()),
@@ -168,10 +176,15 @@ class FeedScreen extends StatelessWidget {
                     hasScrollBody: false,
                     child: ErrorView(message: provider.feedError!, onRetry: provider.refresh),
                   )
-                else if (provider.relatos.isEmpty)
-                  const SliverFillRemaining(
+                else if (provider.searchError != null)
+                  SliverFillRemaining(
                     hasScrollBody: false,
-                    child: EmptyView(message: 'No hay relatos disponibles'),
+                    child: ErrorView(message: provider.searchError!, onRetry: () => provider.setSearchQuery(provider.searchQuery)),
+                  )
+                else if (provider.relatos.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EmptyView(message: provider.searchQuery.isEmpty ? 'No hay relatos disponibles' : 'No hay resultados'),
                   )
                 else
                   SliverList.builder(
@@ -182,18 +195,53 @@ class FeedScreen extends StatelessWidget {
                       return RelatoCard(
                         relato: relato,
                         onTap: () => RelatoDetailOverlay.open(context, relato),
-                        onLike: () async {},
-                        onShare: () async {},
+                        onLike: () async { await provider.toggleLike(relato.id); },
+                        onShare: () async {
+                          final uriApp = Uri.parse('memoriaviva://relatos/${relato.id}');
+                          final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
+                          final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';
+                          await Share.share(message, subject: 'Relato – ${relato.titulo}');
+                          await provider.compartir(relato.id);
+                        },
                         onReport: () => _showReportDialog(context, relato.id),
                         showMore: showMore,
                         onMore: showMore ? () => _showOwnerActions(context, provider, relato) : null,
+                        isLiked: provider.isLiked(relato.id),
                       );
                     },
                   ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Resultados: ${provider.relatos.length}',
+                        style: AppTypography.textTheme.labelMedium,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _FeedSearchBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<FeedProvider>();
+    return TextField(
+      onChanged: provider.setSearchQuery,
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search),
+        hintText: 'Buscar relatos por título, autor, categoría o etiquetas...',
+        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+        isDense: true,
       ),
     );
   }
