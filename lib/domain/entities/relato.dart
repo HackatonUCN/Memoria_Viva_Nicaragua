@@ -232,6 +232,31 @@ class Relato {
     );
   }
 
+  /// Incrementa el contador de likes (puro)
+  Relato incrementarLikes() {
+    return copyWith(
+      likes: likes + 1,
+      fechaActualizacion: DateTime.now().toUtc(),
+    );
+  }
+
+  /// Decrementa el contador de likes (puro)
+  Relato decrementarLikes() {
+    final int nuevo = likes > 0 ? likes - 1 : 0;
+    return copyWith(
+      likes: nuevo,
+      fechaActualizacion: DateTime.now().toUtc(),
+    );
+  }
+
+  /// Incrementa el contador de compartidos (puro)
+  Relato incrementarCompartidos() {
+    return copyWith(
+      compartidos: compartidos + 1,
+      fechaActualizacion: DateTime.now().toUtc(),
+    );
+  }
+
   /// Modera el relato
   Relato moderar({required bool aprobar}) {
     return copyWith(

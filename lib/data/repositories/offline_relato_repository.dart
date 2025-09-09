@@ -87,11 +87,11 @@ class OfflineRelatoRepository implements IRelatoRepository {
   @override
   Future<void> restaurarRelato(String id) => _remote.restaurarRelato(id);
   @override
-  Future<void> reportarRelato(String id, String razon) => _remote.reportarRelato(id, razon);
+  Future<bool> reportarRelato(String id, String razon, {required String userId}) => _remote.reportarRelato(id, razon, userId: userId);
   @override
   Future<void> moderarRelato(String id, EstadoModeracion estado) => _remote.moderarRelato(id, estado);
   @override
-  Future<void> darLike(String id) => _remote.darLike(id);
+  Future<bool> toggleLike({required String id, required String userId}) => _remote.toggleLike(id: id, userId: userId);
   @override
   Future<void> registrarCompartido(String id) => _remote.registrarCompartido(id);
   @override

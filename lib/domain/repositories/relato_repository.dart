@@ -33,14 +33,14 @@ abstract class IRelatoRepository {
   /// Restaura un relato eliminado
   Future<void> restaurarRelato(String id);
 
-  /// Reporta un relato
-  Future<void> reportarRelato(String id, String razon);
+  /// Reporta un relato (idempotente por usuario)
+  Future<bool> reportarRelato(String id, String razon, {required String userId});
 
   /// Modera un relato (aprobar/ocultar)
   Future<void> moderarRelato(String id, EstadoModeracion estado);
 
-  /// Incrementa el contador de likes
-  Future<void> darLike(String id);
+  /// Toggle de like idempotente por usuario; retorna true si quedó en like
+  Future<bool> toggleLike({required String id, required String userId});
 
   /// Incrementa el contador de compartidos
   Future<void> registrarCompartido(String id);

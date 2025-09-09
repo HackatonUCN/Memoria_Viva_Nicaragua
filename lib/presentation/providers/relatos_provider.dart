@@ -59,21 +59,7 @@ class RelatosProvider extends ChangeNotifier {
   }
 
   Future<void> like(String relatoId) async {
-    // Optimistic update
-    final idx = items.indexWhere((r) => r.id == relatoId);
-    if (idx != -1) {
-      items[idx] = items[idx].copyWith(likes: items[idx].likes + 1);
-      notifyListeners();
-    }
-    final result = await _relatoUseCases.like.execute(relatoId: relatoId);
-    if (result.isFailure) {
-      // revert if needed
-      if (idx != -1) {
-        items[idx] = items[idx].copyWith(likes: (items[idx].likes - 1).clamp(0, 1 << 30));
-        notifyListeners();
-      }
-      error = result.errorOrNull?.message;
-    }
+    // Obsoleto: este provider no se usa en Feed. Mantener placeholder.
   }
 
   Future<void> share(String relatoId) async {

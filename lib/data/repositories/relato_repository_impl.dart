@@ -294,36 +294,33 @@ class RelatoRepositoryImpl implements IRelatoRepository {
   }
 
   @override
-  Future<void> reportarRelato(String id, String razon) async {
+  Future<bool> reportarRelato(String id, String razon, {required String userId}) async {
     return await _handleExceptions(() async {
-      // Verificar que el relato exista
-      final relatoModel = await _firestoreDataSource.getById(id);
-      if (relatoModel == null) {
-        throw RelatoNotFoundException('No se encontró el relato con ID $id');
-      }
-      
-      // Incrementar conteo de reportes y cambiar estado
-      final relato = relatoModel.toDomain().reportar();
-      
-      // Guardar el reporte en una subcolección para revisión
-      final reporteData = {
-        'relatoId': id,
-        'razon': razon,
-        'fecha': FieldValue.serverTimestamp(),
-        'procesado': false,
-      };
-      
-      // Crear transacción para actualizar relato y guardar reporte
-      await _firestoreDataSource.runTransaction((transaction) async {
-        // Actualizar el relato
-        final relatoActualizadoModel = RelatoModel.fromDomain(relato);
-        transaction.set(_firestoreDataSource.collectionPath, id, relatoActualizadoModel.toMap());
-        
-        // Crear un ID único para el reporte
-        final reporteId = '${id}_${DateTime.now().millisecondsSinceEpoch}';
-        
-        // Guardar el reporte en subcolección
-        transaction.set('${_firestoreDataSource.collectionPath}/$id/reportes', reporteId, reporteData);
+      final firestore = FirebaseFirestore.instance;
+      final relatoRef = firestore.collection(_firestoreDataSource.collectionPath).doc(id);
+      final reporteRef = relatoRef.collection('reportes').doc(userId);
+
+      return await firestore.runTransaction<bool>((tx) async {
+        final relatoSnap = await tx.get(relatoRef);
+        if (!relatoSnap.exists) {
+          throw RelatoNotFoundException('No se encontró el relato con ID $id');
+        }
+
+        final reporteSnap = await tx.get(reporteRef);
+        if (reporteSnap.exists) {
+          // Ya reportado por este usuario
+          return false;
+        }
+
+        tx.set(reporteRef, {
+          'razon': razon,
+          'ts': FieldValue.serverTimestamp(),
+        });
+        tx.update(relatoRef, {
+          'reportes': FieldValue.increment(1),
+          'fechaActualizacion': FieldValue.serverTimestamp(),
+        });
+        return true;
       });
     });
   }
@@ -361,13 +358,47 @@ class RelatoRepositoryImpl implements IRelatoRepository {
   }
 
   @override
-  Future<void> darLike(String id) async {
+  Future<bool> toggleLike({required String id, required String userId}) async {
     return await _handleExceptions(() async {
-      // Usar update con incremento atómico de Firestore
-      await _firestoreDataSource.update(
-        id: id, 
-        data: {'likes': FieldValue.increment(1)},
-      );
+      final firestore = FirebaseFirestore.instance;
+      final relatoRef = firestore.collection(_firestoreDataSource.collectionPath).doc(id);
+      final likeRef = relatoRef.collection('likes').doc(userId);
+
+      return await firestore.runTransaction<bool>((tx) async {
+        // Obtener relato para validar autor
+        final relatoSnap = await tx.get(relatoRef);
+        if (!relatoSnap.exists) {
+          throw RelatoNotFoundException('No se encontró el relato con ID $id');
+        }
+        final Map<String, dynamic> data = (relatoSnap.data() ?? {}) as Map<String, dynamic>;
+        final String autorId = (data['autorId'] ?? '') as String;
+        if (autorId == userId) {
+          // No permitir like propio
+          return false;
+        }
+
+        final likeSnap = await tx.get(likeRef);
+        if (likeSnap.exists) {
+          // Quitar like
+          tx.delete(likeRef);
+          tx.update(relatoRef, {
+            'likes': FieldValue.increment(-1),
+            'fechaActualizacion': FieldValue.serverTimestamp(),
+          });
+          return false;
+        } else {
+          // Dar like
+          tx.set(likeRef, {
+            'liked': true,
+            'ts': FieldValue.serverTimestamp(),
+          });
+          tx.update(relatoRef, {
+            'likes': FieldValue.increment(1),
+            'fechaActualizacion': FieldValue.serverTimestamp(),
+          });
+          return true;
+        }
+      });
     });
   }
 
@@ -455,10 +486,14 @@ class RelatoRepositoryImpl implements IRelatoRepository {
             final tituloLower = r.titulo.toLowerCase();
             final contenidoLower = r.contenido.toLowerCase();
             final etiquetasLower = r.etiquetas.map((e) => e.toLowerCase()).join(' ');
+            final autorLower = r.autorNombre.toLowerCase();
+            final categoriaLower = r.categoriaNombre.toLowerCase();
             
             return tituloLower.contains(textoBusqueda) ||
                    contenidoLower.contains(textoBusqueda) ||
-                   etiquetasLower.contains(textoBusqueda);
+                   etiquetasLower.contains(textoBusqueda) ||
+                   autorLower.contains(textoBusqueda) ||
+                   categoriaLower.contains(textoBusqueda);
           })
           .map((model) => model.toDomain())
           .toList();

@@ -98,10 +98,10 @@ service cloud.firestore {
       // Crear por el autor autenticado
       allow create: if isSignedIn() && request.resource.data.autorId == userId();
 
-      // Editar propio (contenido/ubicación/etiquetas/multimedia)
+      // Editar propio (contenido/ubicación/etiquetas/multimedia/categoría)
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(
-          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion']
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','categoriaId','categoriaNombre','fechaActualizacion']
         );
 
       // Soft delete (propietario puede marcar como eliminado)
@@ -111,10 +111,18 @@ service cloud.firestore {
         ) &&
         request.resource.data.eliminado == true;
 
-      // Likes
+      // Likes (toggle idempotente). Permite +1 si el usuario aún NO ha dado like; permite -1 si SÍ ha dado like
       allow update: if isSignedIn() &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes','fechaActualizacion']) &&
-        request.resource.data.likes == resource.data.likes + 1;
+        (
+          (
+            request.resource.data.likes == resource.data.likes + 1 &&
+            !exists(/databases/$(database)/documents/relatos/$(relatoId)/likes/$(userId()))
+          ) || (
+            request.resource.data.likes == resource.data.likes - 1 &&
+            exists(/databases/$(database)/documents/relatos/$(relatoId)/likes/$(userId()))
+          )
+        );
 
       // Compartidos (permitido para no auth también si lo deseas)
       allow update: if request.time != null &&
@@ -138,6 +146,16 @@ service cloud.firestore {
       match /reportes/{reporteId} {
         allow create: if isSignedIn();
         allow read, update, delete: if isAdmin();
+      }
+
+      // Subcolección likes: un doc por usuario para idempotencia del like
+      match /likes/{uid} {
+        // Crear/Quitar like solo sobre el propio documento
+        allow create: if isSignedIn() && uid == userId();
+        allow delete: if isSignedIn() && uid == userId();
+        // Lectura opcional (puede ser false si no se necesita)
+        allow read: if isSignedIn() && uid == userId();
+        allow update: if false; // no se actualiza, solo create/delete
       }
     }
 

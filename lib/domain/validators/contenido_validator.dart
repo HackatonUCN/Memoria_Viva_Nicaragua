@@ -27,12 +27,19 @@ class ContenidoValidator {
       errores.add('El contenido debe tener entre $MIN_DESCRIPCION_LENGTH y $MAX_DESCRIPCION_LENGTH caracteres');
     }
 
-    try {
-      validarMultimedia(relato.multimedia, TipoMultimedia.imagen);
-    } catch (e) {
-      if (e is ContenidoValidationException) {
-        errores.addAll(e.errores);
-      }
+    // Validación de multimedia por tipo (permitidos: imagen, audio, video)
+    final imagenes = relato.multimedia.where((m) => m.tipo == TipoMultimedia.imagen).toList();
+    final videos = relato.multimedia.where((m) => m.tipo == TipoMultimedia.video).toList();
+    final audios = relato.multimedia.where((m) => m.tipo == TipoMultimedia.audio).toList();
+
+    if (imagenes.length > MAX_IMAGENES) {
+      errores.add('No puede tener más de $MAX_IMAGENES imágenes');
+    }
+    if (videos.length > MAX_VIDEOS) {
+      errores.add('No puede tener más de $MAX_VIDEOS videos');
+    }
+    if (audios.length > MAX_AUDIOS) {
+      errores.add('No puede tener más de $MAX_AUDIOS audios');
     }
 
     try {

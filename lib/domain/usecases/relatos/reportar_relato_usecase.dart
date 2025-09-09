@@ -46,8 +46,8 @@ class ReportarRelatoUseCase {
         throw RelatoNotFoundException();
       }
 
-      // Reportar el relato
-      await _relatoRepository.reportarRelato(relatoId, razon);
+      // Reportar el relato (idempotente por usuario)
+      await _relatoRepository.reportarRelato(relatoId, razon, userId: usuarioId);
 
       // Si alcanza cierto número de reportes, cambiar estado
       if (relato.reportes >= 4) { // 5 reportes incluyendo este
