@@ -24,7 +24,7 @@ class FilterSegmentedChips extends StatelessWidget {
         child: ChoiceChip(
           label: Text(label, style: AppTypography.textTheme.labelLarge),
           selected: selected,
-          onSelected: enabled ? (_) => provider.changeFilter(value) : null,
+          onSelected: enabled ? (_) => provider.setFiltro(value) : null,
           selectedColor: AppColors.primary,
           labelStyle: TextStyle(color: selected ? AppColors.textLight : AppColors.textPrimary),
           backgroundColor: AppColors.surface,
