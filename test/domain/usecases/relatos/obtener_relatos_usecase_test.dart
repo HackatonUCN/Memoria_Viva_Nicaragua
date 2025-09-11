@@ -22,6 +22,8 @@ class _RelatoRepoListStub implements IRelatoRepository {
   Stream<List<Relato>> observarRelatos() => Stream.value(lista);
   @override
   Stream<List<Relato>> observarRelatosPorCategoria(String categoriaId) => Stream.value(lista);
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({required double south, required double west, required double north, required double east, int limit = 200}) async => lista;
   @override noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
