@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import '../../config/app_router.dart';
+import 'map_provider.dart';
 
 class NavigationProvider extends ChangeNotifier {
+  final GetIt _getIt = GetIt.I;
   int _selectedIndex = 0;
   String _selectedRoute = AppRoutes.home;
+  String? _mapFocusRelatoId;
 
   int get selectedIndex => _selectedIndex;
   String get selectedRoute => _selectedRoute;
+  String? get mapFocusRelatoId => _mapFocusRelatoId;
 
   void setIndex(int index) {
     if (index == _selectedIndex) return;
@@ -20,6 +25,32 @@ class NavigationProvider extends ChangeNotifier {
     _selectedRoute = route;
     _selectedIndex = _indexForRoute(route);
     notifyListeners();
+  }
+
+  void setMapFocusRelatoId(String? relatoId) {
+    if (relatoId == null) {
+      _mapFocusRelatoId = null;
+      notifyListeners();
+      return;
+    }
+    
+    _mapFocusRelatoId = relatoId;
+    notifyListeners();
+    
+    // Forzar acceso directo al MapProvider si ya existe
+    if (_getIt.isRegistered<MapProvider>()) {
+      try {
+        final mapProvider = _getIt<MapProvider>();
+        mapProvider.focusRelatoByIdOrFetch(relatoId);
+      } catch (_) {}
+    }
+  }
+
+  String? takeMapFocusRelatoId() {
+    final id = _mapFocusRelatoId;
+    _mapFocusRelatoId = null;
+    notifyListeners();
+    return id;
   }
 
   String _routeForIndex(int index) {
