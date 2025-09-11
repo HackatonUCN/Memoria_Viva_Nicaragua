@@ -14,18 +14,52 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../providers/navigation_provider.dart';
 import '../../providers/feed_provider.dart';
+import '../../providers/media_playback_provider.dart';
 
 class RelatoDetailOverlay extends StatelessWidget {
   final Relato relato;
   const RelatoDetailOverlay({super.key, required this.relato});
 
   static Future<void> open(BuildContext context, Relato? relato, {String? relatoId}) async {
+    // Antes de abrir: pausar reproducción en cards
+    try {
+      final media = context.read<MediaPlaybackProvider>();
+      await media.pauseScope('card', relatoId: relato?.id ?? relatoId);
+    } catch (_) {}
+    // Primero cerrar cualquier bottom sheet existente para evitar conflictos
+    Navigator.of(context, rootNavigator: true).popUntil((route) {
+      return route.isFirst || (!route.willHandlePopInternally && !route.hasActiveRouteBelow);
+    });
+    
+    // Pequeño delay para asegurar que el anterior se cerró completamente
+    await Future.delayed(const Duration(milliseconds: 50));
+    
+    // Ahora abrir el nuevo overlay
+    if (!context.mounted) return;
+    FeedProvider? feedProvider;
+    try {
+      feedProvider = context.read<FeedProvider>();
+    } catch (_) {
+      feedProvider = null;
+    }
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
       barrierColor: AppColors.withOpacity(AppColors.primaryDark, 0.6),
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _OverlayScaffold(relato: relato, relatoId: relatoId),
+      builder: (ctx) {
+        final content = _OverlayScaffold(relato: relato, relatoId: relatoId);
+        if (feedProvider != null) {
+          // Inyectar el FeedProvider existente para que like/compartir/reportar funcionen y refresquen UI
+          return ChangeNotifierProvider<FeedProvider>.value(
+            value: feedProvider!,
+            child: content,
+          );
+        }
+        return content;
+      },
     );
   }
 
@@ -149,13 +183,42 @@ class _DetailContent extends StatelessWidget {
                   runSpacing: 8,
                   alignment: WrapAlignment.spaceBetween,
                   children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        context.read<NavigationProvider>().setIndex(1);
-                        Navigator.of(context).pop();
+                    Builder(
+                      builder: (context) {
+                        final bool canViewOnMap = r.ubicacion != null;
+                        return Tooltip(
+                          message: canViewOnMap ? 'Ver en el mapa' : 'Sin ubicación',
+                          child: Opacity(
+                            opacity: canViewOnMap ? 1.0 : 0.55,
+                            child: ElevatedButton.icon(
+                              onPressed: canViewOnMap
+                                  ? () {
+                                      print('DEBUG: Botón "Ver en el mapa" presionado para relato ${r.id}');
+                                      print('DEBUG: Navegando al mapa con ubicación: (${r.ubicacion!.latitud}, ${r.ubicacion!.longitud})');
+                                      // Cerrar primero el overlay para evitar problemas de contexto
+                                      Navigator.of(context).pop();
+                                      // Pequeña espera para asegurar que el overlay se cerró
+                                      Future.delayed(const Duration(milliseconds: 50), () {
+                                        if (!context.mounted) return;
+                                        // Obtener el NavigationProvider
+                                        final nav = context.read<NavigationProvider>();
+                                        // Establecer el ID del relato para enfoque (esto es importante hacerlo ANTES de cambiar de tab)
+                                        nav.setMapFocusRelatoId(r.id);
+                                        // Cambiar al tab del mapa
+                                        nav.setIndex(1);
+                                        // Mostrar mensaje de confirmación
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Centrando en "${r.titulo}"...'), duration: const Duration(seconds: 2))
+                                        );
+                                      });
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.map_outlined),
+                              label: const Text('Ver en el mapa'),
+                            ),
+                          ),
+                        );
                       },
-                      icon: const Icon(Icons.map_outlined),
-                      label: const Text('Ver en el mapa'),
                     ),
                     Wrap(
                       spacing: 4,
@@ -271,7 +334,7 @@ class _DetailContent extends StatelessWidget {
 
 class _MediaCarousel extends StatefulWidget {
   final List<Multimedia> multimedia;
-  const _MediaCarousel({required this.multimedia});
+  const _MediaCarousel({super.key, required this.multimedia});
 
   @override
   State<_MediaCarousel> createState() => _MediaCarouselState();
@@ -409,12 +472,12 @@ class _MediaCarouselState extends State<_MediaCarousel> {
       case TipoMultimedia.video:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: _InlineVideo(url: m.url),
+          child: _InlineVideo(key: ValueKey('overlay_video_${m.url}'), url: m.url),
         );
       case TipoMultimedia.audio:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: _AudioPlayerCard(url: m.url),
+          child: _AudioPlayerCard(key: ValueKey('overlay_audio_${m.url}'), url: m.url),
         );
     }
   }
@@ -422,16 +485,23 @@ class _MediaCarouselState extends State<_MediaCarousel> {
 
 class _InlineVideo extends StatefulWidget {
   final String url;
-  const _InlineVideo({required this.url});
+  const _InlineVideo({super.key, required this.url});
 
   @override
   State<_InlineVideo> createState() => _InlineVideoState();
 }
 
-class _InlineVideoState extends State<_InlineVideo> {
+class _InlineVideoState extends State<_InlineVideo> with AutomaticKeepAliveClientMixin {
   late final VideoPlayerController _controller;
   bool _initialized = false;
   bool _muted = false;
+  String? _handlerKey;
+  bool _isSeeking = false;
+  Timer? _resumeDebounce;
+  bool _wasPlayingBeforeSeek = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -444,16 +514,31 @@ class _InlineVideoState extends State<_InlineVideo> {
       ..initialize().then((_) {
         if (mounted) setState(() => _initialized = true);
       });
+    // Registrar handler de pausa con scope 'overlay'
+    try {
+      final media = context.read<MediaPlaybackProvider>();
+      _handlerKey = media.registerHandler(
+        scope: 'overlay',
+        sourceId: widget.url,
+        onPause: () async { await _controller.pause(); },
+        tipo: 'video',
+      );
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _resumeDebounce?.cancel();
+    if (_handlerKey != null) {
+      try { context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!); } catch (_) {}
+    }
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (!_initialized) {
       return AspectRatio(
         aspectRatio: 16 / 9,
@@ -480,17 +565,25 @@ class _InlineVideoState extends State<_InlineVideo> {
             ),
             // Botón central play/pause
             Center(
-              child: IconButton(
-                iconSize: 64,
-                icon: Icon(_controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white),
-                onPressed: () async {
-                  if (_controller.value.isPlaying) {
-                    await _controller.pause();
-                  } else {
-                    await _controller.play();
-                  }
-                  if (mounted) setState(() {});
+              child: Listener(
+                onPointerDown: (_) async {
+                  // Evitar blinks en móviles al pulsar
+                  _resumeDebounce?.cancel();
                 },
+                child: IconButton(
+                  iconSize: 64,
+                  icon: Icon(_controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white),
+                  onPressed: () async {
+                    final media = context.read<MediaPlaybackProvider>();
+                    if (_controller.value.isPlaying) {
+                      await _controller.pause();
+                    } else {
+                      await media.willStartPlayback(scope: 'overlay', sourceId: widget.url, tipo: 'video');
+                      await _controller.play();
+                    }
+                    if (mounted) setState(() {});
+                  },
+                ),
               ),
             ),
             // Barra de controles inferior (overlay) para evitar overflow vertical
@@ -541,19 +634,21 @@ class _InlineVideoState extends State<_InlineVideo> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onHorizontalDragUpdate: (d) async {
-                          final dur = _controller.value.duration;
-                          if (dur == Duration.zero) return;
-                          final w = MediaQuery.of(context).size.width;
-                          final delta = (d.primaryDelta ?? 0) / w;
-                          final current = await _controller.position ?? Duration.zero;
-                          final target = current + Duration(milliseconds: (dur.inMilliseconds * delta).toInt());
-                          final clamped = target < Duration.zero
-                              ? Duration.zero
-                              : (target > dur ? dur : target);
-                          await _controller.seekTo(clamped);
+                      child: Listener(
+                        onPointerDown: (_) async {
+                          _isSeeking = true;
+                          _wasPlayingBeforeSeek = _controller.value.isPlaying;
+                          await _controller.pause();
+                        },
+                        onPointerUp: (_) {
+                          _resumeDebounce?.cancel();
+                          if (_wasPlayingBeforeSeek) {
+                            _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                              if (!mounted) return;
+                              await _controller.play();
+                            });
+                          }
+                          _isSeeking = false;
                         },
                         child: VideoProgressIndicator(_controller, allowScrubbing: true, colors: VideoProgressColors(playedColor: Colors.white)),
                       ),
@@ -588,7 +683,7 @@ class _InlineVideoState extends State<_InlineVideo> {
 class _FullscreenVideoPage extends StatefulWidget {
   final String url;
   final Duration startAt;
-  const _FullscreenVideoPage({required this.url, required this.startAt});
+  const _FullscreenVideoPage({super.key, required this.url, required this.startAt});
 
   @override
   State<_FullscreenVideoPage> createState() => _FullscreenVideoPageState();
@@ -598,6 +693,8 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
   late final VideoPlayerController _controller;
   bool _initialized = false;
   bool _muted = false;
+  bool _isSeeking = false;
+  Timer? _resumeDebounce;
 
   @override
   void initState() {
@@ -614,6 +711,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
 
   @override
   void dispose() {
+    _resumeDebounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -659,6 +757,8 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
                           IconButton(
                             icon: const Icon(Icons.replay_10, color: Colors.white),
                             onPressed: () async {
+                              final dur = _controller.value.duration;
+                              if (dur == Duration.zero) return;
                               final pos = await _controller.position ?? Duration.zero;
                               final target = pos - const Duration(seconds: 10);
                               await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
@@ -667,8 +767,9 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
                           IconButton(
                             icon: const Icon(Icons.forward_10, color: Colors.white),
                             onPressed: () async {
-                              final pos = await _controller.position ?? Duration.zero;
                               final dur = _controller.value.duration;
+                              if (dur == Duration.zero) return;
+                              final pos = await _controller.position ?? Duration.zero;
                               final target = pos + const Duration(seconds: 10);
                               await _controller.seekTo(target > dur ? dur : target);
                             },
@@ -682,7 +783,23 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
                             },
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: VideoProgressIndicator(_controller, allowScrubbing: true, colors: VideoProgressColors(playedColor: Colors.white))),
+                          Expanded(
+                            child: Listener(
+                              onPointerDown: (_) async {
+                                _isSeeking = true;
+                                await _controller.pause();
+                              },
+                              onPointerUp: (_) {
+                                _resumeDebounce?.cancel();
+                                _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                                  if (!mounted) return;
+                                  await _controller.play();
+                                });
+                                _isSeeking = false;
+                              },
+                              child: VideoProgressIndicator(_controller, allowScrubbing: true, colors: VideoProgressColors(playedColor: Colors.white)),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -697,7 +814,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
 
 class _AudioPlayerCard extends StatefulWidget {
   final String url;
-  const _AudioPlayerCard({required this.url});
+  const _AudioPlayerCard({super.key, required this.url});
 
   @override
   State<_AudioPlayerCard> createState() => _AudioPlayerCardState();
@@ -710,6 +827,10 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
   bool _loading = true;
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<Duration?>? _durSub;
+  String? _handlerKey;
+  bool _isSeeking = false;
+  Timer? _resumeDebounce;
+  bool _wasPlayingBeforeSeek = false;
 
   @override
   void initState() {
@@ -728,6 +849,15 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
       _durSub = _player.durationStream.listen((d) {
         if (d != null && mounted) setState(() => _duration = d);
       });
+      try {
+        final media = context.read<MediaPlaybackProvider>();
+        _handlerKey = media.registerHandler(
+          scope: 'overlay',
+          sourceId: widget.url,
+          onPause: () async { await _player.pause(); },
+          tipo: 'audio',
+        );
+      } catch (_) {}
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -737,6 +867,10 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
   void dispose() {
     _posSub?.cancel();
     _durSub?.cancel();
+    _resumeDebounce?.cancel();
+    if (_handlerKey != null) {
+      try { context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!); } catch (_) {}
+    }
     _player.dispose();
     super.dispose();
   }
@@ -770,9 +904,11 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
                       },
                     ),
                     onPressed: () async {
+                      final media = context.read<MediaPlaybackProvider>();
                       if (_player.playing) {
                         await _player.pause();
                       } else {
+                        await media.willStartPlayback(scope: 'overlay', sourceId: widget.url, tipo: 'audio');
                         await _player.play();
                       }
                       if (mounted) setState(() {});
@@ -780,11 +916,28 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Slider(
-                      min: 0,
-                      max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
-                      value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
-                      onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+                    child: Listener(
+                      onPointerDown: (_) async {
+                        _isSeeking = true;
+                        _wasPlayingBeforeSeek = _player.playing;
+                        await _player.pause();
+                      },
+                      onPointerUp: (_) {
+                        _resumeDebounce?.cancel();
+                        if (_wasPlayingBeforeSeek) {
+                          _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                            if (!mounted) return;
+                            await _player.play();
+                          });
+                        }
+                        _isSeeking = false;
+                      },
+                      child: Slider(
+                        min: 0,
+                        max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+                        value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
+                        onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
