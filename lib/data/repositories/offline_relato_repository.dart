@@ -106,6 +106,15 @@ class OfflineRelatoRepository implements IRelatoRepository {
   Future<List<Relato>> obtenerRelatosCercanos({required double latitud, required double longitud, required double radioKm}) => _remote.obtenerRelatosCercanos(latitud: latitud, longitud: longitud, radioKm: radioKm);
   @override
   Future<List<Relato>> buscarRelatosSimilares({required String titulo, required String autorId}) => _remote.buscarRelatosSimilares(titulo: titulo, autorId: autorId);
+
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) => _remote.obtenerRelatosEnBounds(south: south, west: west, north: north, east: east, limit: limit);
 }
 
 

@@ -69,4 +69,14 @@ abstract class IRelatoRepository {
     required String titulo,
     required String autorId,
   });
+
+  /// Obtiene relatos dentro de un bounding box (sur, oeste, norte, este)
+  /// Solo retornará relatos activos y no eliminados. Implícitamente requiere ubicación.
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  });
 }

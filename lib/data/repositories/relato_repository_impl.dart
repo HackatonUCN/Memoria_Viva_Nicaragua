@@ -600,6 +600,52 @@ class RelatoRepositoryImpl implements IRelatoRepository {
     });
   }
 
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async {
+    return await _handleExceptions(() async {
+      // Validación simple de límites
+      if (south > north || west > east) {
+        throw RelatoException('Bounds inválidos: (south,north,west,east)=($south,$north,$west,$east)');
+      }
+
+      // Firestore no permite múltiples rangos en distintos campos.
+      // Estrategia: reducir el universo base usando filtros discretos y un orden predecible.
+      // 1) Filtrar solo documentos que tienen ubicación (bandera o campos presentes)
+      final base = await _firestoreDataSource.query(
+        filters: {
+          'eliminado': false,
+          'estado': EstadoModeracion.activo.value,
+        },
+        // Evitar orderBy para no requerir índice compuesto
+        limit: limit * 3,
+      );
+
+      final resultados = <Relato>[];
+      for (final m in base) {
+        final r = m.toDomain();
+        final u = r.ubicacion;
+        // Solo incluir relatos con ubicación válida dentro de los bounds
+        if (u != null && 
+            u.latitud >= south && u.latitud <= north &&
+            u.longitud >= west && u.longitud <= east) {
+          resultados.add(r);
+        }
+      }
+
+      // Si aún excede el límite solicitado, recortar
+      if (resultados.length > limit) {
+        return resultados.take(limit).toList();
+      }
+      return resultados;
+    });
+  }
+
   /// Valida un relato antes de guardarlo
   void _validarRelato(Relato relato) {
     // Validar título
