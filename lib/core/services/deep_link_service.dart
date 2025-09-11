@@ -50,6 +50,10 @@ class DeepLinkService {
       // Navegar a Home y abrir overlay de detalle vía evento (placeholder: ruta home)
       AppRouter.navigatorKey.currentState?.pushNamed(AppRoutes.home, arguments: {'relatoId': id});
     }
+    if (uri.host == 'map' || uri.host == 'mapa') {
+      final relatoId = uri.queryParameters['relatoId'];
+      AppRouter.navigatorKey.currentState?.pushNamed(AppRoutes.mapa, arguments: relatoId != null ? {'relatoId': relatoId} : null);
+    }
   }
 }
 

@@ -62,8 +62,14 @@ class AppRouter {
           settings,
         );
       case AppRoutes.mapa:
+        // Permite argumento opcional {'relatoId': id} para enfocar en el mapa
+        final args = settings.arguments;
+        String? relatoId;
+        if (args is Map && args['relatoId'] is String) {
+          relatoId = args['relatoId'] as String;
+        }
         return _material(
-          _AuthRequired(child: const HomeScreen(title: '', initialIndex: 1)),
+          _AuthRequired(child: HomeScreen(title: '', initialIndex: 1, mapFocusRelatoId: relatoId)),
           settings,
         );
       case AppRoutes.publicar:
