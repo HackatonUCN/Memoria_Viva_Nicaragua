@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -15,6 +16,7 @@ import '../../../core/constants/app_icons.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/entities/categoria.dart';
 import '../../../domain/repositories/categoria_repository.dart';
+import '../../providers/media_playback_provider.dart';
 
 class RelatoCard extends StatelessWidget {
   final Relato relato;
@@ -70,7 +72,7 @@ class RelatoCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (medias.isNotEmpty)
-                  _CardMediaCarousel(items: medias),
+                  RepaintBoundary(child: _CardMediaCarousel(key: PageStorageKey('card_media_${relato.id}'), items: medias)),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -254,16 +256,16 @@ class _MediaPreview extends StatelessWidget {
           ),
         );
       case TipoMultimedia.video:
-        return _CardVideoPreview(url: media.url);
+        return _CardVideoPreview(key: ValueKey('card_video_${media.url}'), url: media.url);
       case TipoMultimedia.audio:
-        return _InlineAudioPlayer(url: media.url);
+        return _InlineAudioPlayer(key: ValueKey('card_audio_${media.url}'), url: media.url);
     }
   }
 }
 
 class _CardMediaCarousel extends StatefulWidget {
   final List<Multimedia> items;
-  const _CardMediaCarousel({required this.items});
+  const _CardMediaCarousel({super.key, required this.items});
 
   @override
   State<_CardMediaCarousel> createState() => _CardMediaCarouselState();
@@ -272,6 +274,7 @@ class _CardMediaCarousel extends StatefulWidget {
 class _CardMediaCarouselState extends State<_CardMediaCarousel> {
   late final PageController _controller;
   int _index = 0;
+  bool _autoplayTried = false;
 
   @override
   void initState() {
@@ -298,6 +301,8 @@ class _CardMediaCarouselState extends State<_CardMediaCarousel> {
             itemCount: widget.items.length,
             itemBuilder: (ctx, i) => _MediaPreview(media: widget.items[i]),
           ),
+          // Deshabilitar autoplay en carrusel para evitar decodificación simultánea
+          if (!_autoplayTried) const SizedBox.shrink(),
           if (showArrows)
             Positioned(
               left: 8,
@@ -372,7 +377,7 @@ class _CardMediaCarouselState extends State<_CardMediaCarousel> {
 
 class _InlineAudioPlayer extends StatefulWidget {
   final String url;
-  const _InlineAudioPlayer({required this.url});
+  const _InlineAudioPlayer({super.key, required this.url});
 
   @override
   State<_InlineAudioPlayer> createState() => _InlineAudioPlayerState();
@@ -380,16 +385,20 @@ class _InlineAudioPlayer extends StatefulWidget {
 
 class _CardVideoPreview extends StatefulWidget {
   final String url;
-  const _CardVideoPreview({required this.url});
+  const _CardVideoPreview({super.key, required this.url});
 
   @override
   State<_CardVideoPreview> createState() => _CardVideoPreviewState();
 }
 
-class _CardVideoPreviewState extends State<_CardVideoPreview> {
+class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeepAliveClientMixin {
   late final VideoPlayerController _controller;
   bool _initialized = false;
   bool _muted = true;
+  String? _handlerKey;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -401,16 +410,28 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> {
       ..initialize().then((_) {
         if (mounted) setState(() => _initialized = true);
       });
+    // Registrar pausa global con ámbito 'card'
+    final media = context.read<MediaPlaybackProvider>();
+    _handlerKey = media.registerHandler(
+      scope: 'card',
+      sourceId: widget.url,
+      onPause: () async { await _controller.pause(); },
+      tipo: 'video',
+    );
   }
 
   @override
   void dispose() {
+    if (_handlerKey != null) {
+      context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!);
+    }
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return ClipRRect(
       borderRadius: const BorderRadius.only(
         topLeft: Radius.circular(16),
@@ -448,6 +469,8 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> {
                       onPressed: !_initialized
                           ? null
                           : () async {
+                              final dur = _controller.value.duration;
+                              if (dur == Duration.zero) return;
                               final pos = await _controller.position ?? Duration.zero;
                               final target = pos - const Duration(seconds: 10);
                               await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
@@ -458,9 +481,12 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> {
                       onPressed: !_initialized
                           ? null
                           : () async {
+                              final media = context.read<MediaPlaybackProvider>();
                               if (_controller.value.isPlaying) {
                                 await _controller.pause();
                               } else {
+                                // Garantizar exclusividad antes de reproducir
+                                await media.willStartPlayback(scope: 'card', sourceId: widget.url, tipo: 'video');
                                 await _controller.play();
                               }
                               if (mounted) setState(() {});
@@ -471,8 +497,9 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> {
                       onPressed: !_initialized
                           ? null
                           : () async {
-                              final pos = await _controller.position ?? Duration.zero;
                               final dur = _controller.value.duration;
+                              if (dur == Duration.zero) return;
+                              final pos = await _controller.position ?? Duration.zero;
                               final target = pos + const Duration(seconds: 10);
                               await _controller.seekTo(target > dur ? dur : target);
                             },
@@ -499,13 +526,20 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> {
   }
 }
 
-class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
+class _InlineAudioPlayerState extends State<_InlineAudioPlayer> with AutomaticKeepAliveClientMixin {
   late final AudioPlayer _player;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _loading = true;
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<Duration?>? _durSub;
+  String? _handlerKey;
+  bool _isSeeking = false;
+  Timer? _resumeDebounce;
+  bool _wasPlayingBeforeSeek = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -524,6 +558,14 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
       _durSub = _player.durationStream.listen((d) {
         if (d != null && mounted) setState(() => _duration = d);
       });
+      // Registrar pausa global con ámbito 'card'
+      final media = context.read<MediaPlaybackProvider>();
+      _handlerKey = media.registerHandler(
+        scope: 'card',
+        sourceId: widget.url,
+        onPause: () async { await _player.pause(); },
+        tipo: 'audio',
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -533,6 +575,10 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
   void dispose() {
     _posSub?.cancel();
     _durSub?.cancel();
+    _resumeDebounce?.cancel();
+    if (_handlerKey != null) {
+      context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!);
+    }
     _player.dispose();
     super.dispose();
   }
@@ -545,6 +591,7 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_loading) {
       return const SizedBox(
         height: 56,
@@ -571,9 +618,11 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
               },
             ),
             onPressed: () async {
+              final media = context.read<MediaPlaybackProvider>();
               if (_player.playing) {
                 await _player.pause();
               } else {
+                await media.willStartPlayback(scope: 'card', sourceId: widget.url, tipo: 'audio');
                 await _player.play();
               }
               if (mounted) setState(() {});
@@ -581,11 +630,27 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Slider(
-              min: 0,
-              max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
-              value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
-              onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+            child: Listener(
+              onPointerDown: (_) async {
+                _isSeeking = true;
+                _wasPlayingBeforeSeek = _player.playing;
+                await _player.pause();
+              },
+              onPointerUp: (_) {
+                _resumeDebounce?.cancel();
+                if (_wasPlayingBeforeSeek) {
+                  _resumeDebounce = Timer(const Duration(milliseconds: 150), () {
+                    if (mounted) _player.play();
+                  });
+                }
+                _isSeeking = false;
+              },
+              child: Slider(
+                min: 0,
+                max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+                value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
+                onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
+              ),
             ),
           ),
           const SizedBox(width: 8),

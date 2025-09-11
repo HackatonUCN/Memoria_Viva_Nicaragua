@@ -150,7 +150,7 @@ class FeedProvider extends ChangeNotifier {
     _relatosSub = _useCases.relatos.obtener.observe().listen((data) {
       _allRelatos = data;
       // Cargar estado de likes propios para los relatos visibles
-      if (_currentUserId != null) {
+      if (_currentUserId != null && filtro != FeedFilter.liked) {
         _refreshLikedByMe(visibles: relatos);
       }
       relatos = _applyFilterAndSort(_activeSource());
@@ -206,11 +206,40 @@ class FeedProvider extends ChangeNotifier {
   }
 
   void changeFilter(FeedFilter value) {
+    // Mantener compatibilidad; preferir setFiltro
+    // ignore: discarded_futures
+    setFiltro(value);
+  }
+
+  Future<void> setFiltro(FeedFilter value) async {
+    // Reset de estado y paginación
+    _debounce?.cancel();
+    searchQuery = '';
+    searchError = null;
+    searching = false;
+    _searchResults = [];
+    feedError = null;
+    _pageSize = 20;
+
     filtro = value;
-    relatos = _applyFilterAndSort(_activeSource());
-    if (_currentUserId != null) {
-      _refreshLikedByMe(visibles: relatos);
+
+    // Si es filtro de "Me gusta", cargar IDs liked globalmente
+    if (filtro == FeedFilter.liked) {
+      if (_currentUserId == null) {
+        relatos = [];
+        notifyListeners();
+        return;
+      }
+      feedLoading = true;
+      notifyListeners();
+      await _loadAllLikedIds();
+      feedLoading = false;
+    } else if (_currentUserId != null) {
+      // Para otros filtros, refrescar likes de visibles para iconos
+      await _refreshLikedByMe(visibles: _applyFilterAndSort(_activeSource()));
     }
+
+    relatos = _applyFilterAndSort(_activeSource());
     notifyListeners();
   }
 
@@ -292,6 +321,29 @@ class FeedProvider extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       // Silencio: no bloquear UI por este estado auxiliar
+    }
+  }
+
+  Future<void> _loadAllLikedIds() async {
+    try {
+      final String? uid = _currentUserId;
+      if (uid == null) return;
+      final query = await FirebaseFirestore.instance
+          .collectionGroup('likes')
+          .where(FieldPath.documentId, isEqualTo: uid)
+          .get();
+      final Set<String> likedIds = <String>{};
+      for (final doc in query.docs) {
+        final parentRelato = doc.reference.parent.parent;
+        if (parentRelato != null) {
+          likedIds.add(parentRelato.id);
+        }
+      }
+      _likedByMe
+        ..clear()
+        ..addAll(likedIds);
+    } catch (_) {
+      // Silencio; un fallo aquí no debe bloquear el feed
     }
   }
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 
 import '../../providers/feed_provider.dart';
@@ -15,10 +17,22 @@ import '../../providers/feed_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../domain/entities/relato.dart';
 import '../../../domain/factories/usecases.dart';
+import '../../providers/media_playback_provider.dart';
+import '../../providers/navigation_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-class FeedScreen extends StatelessWidget {
+class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
+
+  @override
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen> {
+  Timer? _loadMoreDebounce;
+  bool _loadMorePending = false;
+  final ScrollController _scrollCtrl = ScrollController();
+  bool _showScrollTop = false;
 
   void _showReportDialog(BuildContext context, String relatoId) async {
     final controller = TextEditingController();
@@ -114,16 +128,53 @@ class FeedScreen extends StatelessWidget {
     );
   }
 
+  bool _onScrollNotification(ScrollNotification n, FeedProvider provider) {
+    if (kIsWeb) return false; // en Web usamos botón
+    if (n.metrics.maxScrollExtent <= 0) return false;
+    final threshold = 600.0; // px antes del final
+    if (n.metrics.pixels >= n.metrics.maxScrollExtent - threshold) {
+      if (!_loadMorePending && !provider.feedLoading && !provider.searching) {
+        _loadMorePending = true;
+        provider.loadMore();
+        _loadMoreDebounce?.cancel();
+        _loadMoreDebounce = Timer(const Duration(milliseconds: 500), () {
+          if (mounted) setState(() => _loadMorePending = false);
+        });
+      }
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _loadMoreDebounce?.cancel();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => FeedProvider()..init(),
+    // Listener para mostrar/ocultar botón flotante de "ir arriba"
+    _scrollCtrl.addListener(() {
+      final bool show = _scrollCtrl.hasClients && _scrollCtrl.offset > 300;
+      if (show != _showScrollTop && mounted) setState(() => _showScrollTop = show);
+    });
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => FeedProvider()..init()),
+      ],
       child: Consumer<FeedProvider>(
         builder: (context, provider, _) {
           return RefreshIndicator(
             onRefresh: provider.refresh,
-            child: CustomScrollView(
-              slivers: [
+            child: Stack(
+              children: [
+                NotificationListener<ScrollNotification>(
+                  onNotification: (n) => _onScrollNotification(n, provider),
+                  child: CustomScrollView(
+                    controller: _scrollCtrl,
+                    cacheExtent: 800,
+                    slivers: [
                 SliverToBoxAdapter(
                   child: StoriesStrip(
                     eventos: provider.historias,
@@ -187,38 +238,92 @@ class FeedScreen extends StatelessWidget {
                     child: EmptyView(message: provider.searchQuery.isEmpty ? 'No hay relatos disponibles' : 'No hay resultados'),
                   )
                 else
-                  SliverList.builder(
-                    itemCount: provider.relatos.length,
-                    itemBuilder: (context, index) {
-                      final relato = provider.relatos[index];
-                      final showMore = provider.filtro == FeedFilter.mis && provider.isLoggedIn && relato.autorId == provider.currentUserId;
-                      return RelatoCard(
-                        relato: relato,
-                        onTap: () => RelatoDetailOverlay.open(context, relato),
-                        onLike: () async { await provider.toggleLike(relato.id); },
-                        onShare: () async {
-                          final uriApp = Uri.parse('memoriaviva://relatos/${relato.id}');
-                          final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
-                          final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';
-                          await Share.share(message, subject: 'Relato – ${relato.titulo}');
-                          await provider.compartir(relato.id);
-                        },
-                        onReport: () => _showReportDialog(context, relato.id),
-                        showMore: showMore,
-                        onMore: showMore ? () => _showOwnerActions(context, provider, relato) : null,
-                        isLiked: provider.isLiked(relato.id),
-                      );
-                    },
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final relato = provider.relatos[index];
+                        final showMore = provider.filtro == FeedFilter.mis && provider.isLoggedIn && relato.autorId == provider.currentUserId;
+                        return RepaintBoundary(
+                          key: ValueKey(relato.id),
+                          child: RelatoCard(
+                            relato: relato,
+                            onTap: () => RelatoDetailOverlay.open(context, relato),
+                            onLike: () async { await provider.toggleLike(relato.id); },
+                            onShare: () async {
+                              final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
+                              final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';
+                              await Share.share(message, subject: 'Relato – ${relato.titulo}');
+                              await provider.compartir(relato.id);
+                            },
+                            onReport: () => _showReportDialog(context, relato.id),
+                            showMore: showMore,
+                            onMore: showMore ? () => _showOwnerActions(context, provider, relato) : null,
+                            isLiked: provider.isLiked(relato.id),
+                          ),
+                        );
+                      },
+                      childCount: provider.relatos.length,
+                      addAutomaticKeepAlives: true,
+                      addRepaintBoundaries: true,
+                      addSemanticIndexes: false,
+                    ),
                   ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Resultados: ${provider.relatos.length}',
                         style: AppTypography.textTheme.labelMedium,
                       ),
+                    ),
+                  ),
+                ),
+                // Controles de paginación incremental
+                if (kIsWeb)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: ElevatedButton.icon(
+                          onPressed: () => provider.loadMore(),
+                          icon: const Icon(Icons.expand_more),
+                          label: const Text('Cargar más'),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: AnimatedOpacity(
+                        opacity: _loadMorePending ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Center(child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )),
+                      ),
+                    ),
+                  ),
+                    ],
+                  ),
+                ),
+                // Botón flotante para ir al inicio
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: AnimatedScale(
+                    scale: _showScrollTop ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: FloatingActionButton(
+                      mini: true,
+                      tooltip: 'Ir al inicio',
+                      onPressed: () => _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),
+                      child: const Icon(Icons.vertical_align_top),
                     ),
                   ),
                 ),
@@ -235,6 +340,8 @@ class _FeedSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FeedProvider>();
+
+
     return TextField(
       onChanged: provider.setSearchQuery,
       decoration: const InputDecoration(

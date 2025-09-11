@@ -55,6 +55,15 @@ class _RemoteRelatoRepoFake implements IRelatoRepository {
   Future<List<Relato>> obtenerRelatosCercanos({required double latitud, required double longitud, required double radioKm}) async => <Relato>[];
   @override
   Future<List<Relato>> buscarRelatosSimilares({required String titulo, required String autorId}) async => <Relato>[];
+
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async => <Relato>[];
 }
 
 void main() {
