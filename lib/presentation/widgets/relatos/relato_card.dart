@@ -2,9 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:memoria_viva_nicaragua/domain/value_objects/multimedia.dart';
 
 import '../../../domain/entities/relato.dart';
@@ -396,6 +398,18 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeep
   bool _initialized = false;
   bool _muted = true;
   String? _handlerKey;
+  bool _isSeeking = false;
+  Timer? _resumeDebounce;
+  bool _wasPlayingBeforeSeek = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  late final String _srcUrl;
+  // Debug helpers
+  int _dbgLastDurMs = -1;
+  int _dbgLastPosMs = -1;
+  bool _dbgLastInit = false;
+  bool _dbgLastBuf = false;
+  String? _dbgLastErr;
 
   @override
   bool get wantKeepAlive => true;
@@ -403,13 +417,37 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeep
   @override
   void initState() {
     super.initState();
+    _srcUrl = kIsWeb ? widget.url : _maybeToCloudinaryHls(widget.url);
     _controller = kIsWeb
-        ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.networkUrl(Uri.parse(widget.url))
+        ? VideoPlayerController.network(_srcUrl)
+        : VideoPlayerController.networkUrl(
+            Uri.parse(_srcUrl),
+            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+            formatHint: _inferFormatFromUrl(_srcUrl),
+          )
       ..setLooping(false)
-      ..initialize().then((_) {
+      ..initialize().then((_) async {
+        _duration = _controller.value.duration;
+        if (!kIsWeb && _duration == Duration.zero) {
+          await _warmUpAndPollDuration();
+        }
         if (mounted) setState(() => _initialized = true);
       });
+    
+    // Listener para actualizar posición
+    _controller.addListener(() {
+      final value = _controller.value;
+      if (!mounted || !value.isInitialized) return;
+      if (_isSeeking) return;
+      setState(() {
+        _position = value.position;
+        if (value.duration > Duration.zero && value.duration >= _duration) {
+          _duration = value.duration;
+        }
+      });
+      _dbgLogIfChanged(prefix: 'Card');
+    });
+    
     // Registrar pausa global con ámbito 'card'
     final media = context.read<MediaPlaybackProvider>();
     _handlerKey = media.registerHandler(
@@ -422,11 +460,108 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeep
 
   @override
   void dispose() {
+    _resumeDebounce?.cancel();
     if (_handlerKey != null) {
       context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!);
     }
     _controller.dispose();
     super.dispose();
+  }
+  
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  VideoFormat? _inferFormatFromUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('.m3u8')) return VideoFormat.hls;
+    if (lower.contains('.mp4')) return VideoFormat.other;
+    if (lower.contains('.m3u8')) return VideoFormat.hls;
+    if (lower.contains('.webm')) return VideoFormat.other;
+    if (lower.contains('.mov')) return VideoFormat.other;
+    return null;
+  }
+
+  String _maybeToCloudinaryHls(String url) {
+    try {
+      final uri = Uri.parse(url);
+      if (!uri.host.contains('res.cloudinary.com')) return url;
+      final segments = List<String>.from(uri.pathSegments);
+      // Expect something like /video/upload/v123/.../<public_id>.mp4
+      final uploadIndex = segments.indexOf('upload');
+      if (uploadIndex == -1) return url;
+      // Insert streaming profile after 'upload'
+      if (uploadIndex + 1 < segments.length && !segments[uploadIndex + 1].startsWith('sp_')) {
+        segments.insert(uploadIndex + 1, 'sp_auto');
+      }
+      // Replace last extension with .m3u8
+      if (segments.isNotEmpty) {
+        final last = segments.last;
+        if (last.contains('.')) {
+          final base = last.substring(0, last.lastIndexOf('.'));
+          segments[segments.length - 1] = '$base.m3u8';
+        } else {
+          segments[segments.length - 1] = '${segments.last}.m3u8';
+        }
+      }
+      final newUri = uri.replace(pathSegments: segments);
+      final newUrl = newUri.toString();
+      _dbgLog('Resolved Cloudinary HLS: $newUrl');
+      return newUrl;
+    } catch (_) {
+      return url;
+    }
+  }
+
+  Future<void> _warmUpAndPollDuration() async {
+    final bool wasMuted = _muted;
+    try {
+      await _controller.setVolume(0.0);
+      await _controller.play();
+    } catch (_) {}
+    final sw = Stopwatch()..start();
+    while (mounted && sw.elapsed < const Duration(seconds: 3)) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      final d = _controller.value.duration;
+      if (d > Duration.zero) {
+        _duration = d;
+        break;
+      }
+    }
+    try {
+      await _controller.pause();
+      await _controller.setVolume(wasMuted ? 0.0 : 1.0);
+    } catch (_) {}
+  }
+
+  void _dbgLog(String msg) {
+    print('[VideoDBG] $msg | url=${widget.url}');
+  }
+
+  void _dbgLogIfChanged({required String prefix}) {
+    final v = _controller.value;
+    final durMs = v.duration.inMilliseconds;
+    final posMs = v.position.inMilliseconds;
+    final init = v.isInitialized;
+    final buf = v.isBuffering;
+    final err = v.errorDescription;
+    if (durMs != _dbgLastDurMs || posMs != _dbgLastPosMs || init != _dbgLastInit || buf != _dbgLastBuf || err != _dbgLastErr) {
+      _dbgLastDurMs = durMs;
+      _dbgLastPosMs = posMs;
+      _dbgLastInit = init;
+      _dbgLastBuf = buf;
+      _dbgLastErr = err;
+      _dbgLog('$prefix state init=$init dur=$durMs pos=$posMs buf=$buf err=${err ?? 'none'}');
+    }
+  }
+
+  String _dbgInfo() {
+    final v = _controller.value;
+    return 'init=${v.isInitialized} buf=${v.isBuffering}\n'
+        'dur=${v.duration.inMilliseconds} pos=${v.position.inMilliseconds}\n'
+        'play=${v.isPlaying} err=${v.errorDescription ?? 'none'}';
   }
 
   @override
@@ -457,67 +592,187 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeep
                       )
                     : Container(color: AppColors.background),
               ),
-              Positioned.fill(child: IgnorePointer(child: Container(color: AppColors.imageOverlay))),
-              Positioned(
-                bottom: 8,
-                left: 8,
-                right: 8,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.replay_10, color: Colors.white),
-                      onPressed: !_initialized
-                          ? null
-                          : () async {
-                              final dur = _controller.value.duration;
-                              if (dur == Duration.zero) return;
-                              final pos = await _controller.position ?? Duration.zero;
-                              final target = pos - const Duration(seconds: 10);
-                              await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
-                            },
+              
+              // Overlay oscuro para los controles
+              Positioned.fill(child: Container(color: AppColors.imageOverlay)),
+              
+              // Botón central play/pause
+              if (_initialized)
+                Center(
+                  child: IconButton(
+                    iconSize: 64,
+                    icon: Icon(
+                      _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                      color: Colors.white,
                     ),
-                    IconButton(
-                      icon: Icon(_controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white, size: 30),
-                      onPressed: !_initialized
-                          ? null
-                          : () async {
-                              final media = context.read<MediaPlaybackProvider>();
-                              if (_controller.value.isPlaying) {
-                                await _controller.pause();
-                              } else {
-                                // Garantizar exclusividad antes de reproducir
-                                await media.willStartPlayback(scope: 'card', sourceId: widget.url, tipo: 'video');
-                                await _controller.play();
+                    onPressed: () async {
+                      final media = context.read<MediaPlaybackProvider>();
+                      if (_controller.value.isPlaying) {
+                        await _controller.pause();
+                      } else {
+                        // Garantizar exclusividad antes de reproducir
+                        final excludeKey = media.keyFor(scope: 'card', sourceId: widget.url);
+                        await media.willStartPlayback(scope: 'card', sourceId: widget.url, tipo: 'video', excludeKey: excludeKey);
+                        if (_muted) {
+                          await _controller.setVolume(1.0);
+                          _muted = false;
+                        }
+                        await _controller.play();
+                      }
+                      if (mounted) setState(() {});
+                      _dbgLog('Card playToggle isPlaying=${_controller.value.isPlaying}');
+                    },
+                  ),
+                ),
+              
+              // Controles inferiores
+              if (_initialized)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Slider para posición (seek en cambio final para móviles)
+                        SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 2,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                            activeTrackColor: Colors.white,
+                            inactiveTrackColor: Colors.white.withOpacity(0.3),
+                            thumbColor: Colors.white,
+                          ),
+                          child: Slider(
+                            min: 0,
+                            max: (() {
+                              final d = _duration.inMilliseconds;
+                              final p = _position.inMilliseconds;
+                              final ms = d > 0 ? d : (p + 1000);
+                              final m = ms.toDouble();
+                              return m < 1.0 ? 1.0 : m;
+                            })(),
+                            value: (() {
+                              final d = _duration.inMilliseconds;
+                              final p = _position.inMilliseconds;
+                              final maxMs = d > 0 ? d : (p + 1000);
+                              final v = p.clamp(0, maxMs).toDouble();
+                              return v;
+                            })(),
+                            onChangeStart: (value) async {
+                              _isSeeking = true;
+                              _wasPlayingBeforeSeek = _controller.value.isPlaying;
+                              await _controller.pause();
+                            },
+                            onChanged: (value) {
+                              setState(() {
+                                _position = Duration(milliseconds: value.toInt());
+                              });
+                            },
+                            onChangeEnd: (value) async {
+                              final newPosition = Duration(milliseconds: value.toInt());
+                              await _controller.seekTo(newPosition);
+                              _resumeDebounce?.cancel();
+                              if (_wasPlayingBeforeSeek) {
+                                _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                                  if (!mounted) return;
+                                  await _controller.play();
+                                });
                               }
-                              if (mounted) setState(() {});
+                              _isSeeking = false;
                             },
+                          ),
+                        ),
+                        
+                        // Controles y tiempo
+                        Row(
+                          children: [
+                            // Botones de control
+                            IconButton(
+                              icon: const Icon(Icons.replay_10, color: Colors.white, size: 20),
+                              onPressed: () async {
+                                final pos = _position;
+                                final target = pos - const Duration(seconds: 10);
+                                await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.forward_10, color: Colors.white, size: 20),
+                              onPressed: () async {
+                                final pos = _position;
+                                final dur = _duration;
+                                final target = pos + const Duration(seconds: 10);
+                                await _controller.seekTo(target > dur ? dur : target);
+                              },
+                            ),
+                            
+                            // Tiempo actual / duración
+                            Expanded(
+                              child: Text(
+                                '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            
+                            // Botón de mute
+                            IconButton(
+                              icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
+                              onPressed: () async {
+                                _muted = !_muted;
+                                await _controller.setVolume(_muted ? 0.0 : 1.0);
+                                if (mounted) setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.forward_10, color: Colors.white),
-                      onPressed: !_initialized
-                          ? null
-                          : () async {
-                              final dur = _controller.value.duration;
-                              if (dur == Duration.zero) return;
-                              final pos = await _controller.position ?? Duration.zero;
-                              final target = pos + const Duration(seconds: 10);
-                              await _controller.seekTo(target > dur ? dur : target);
-                            },
+                  ),
+                ),
+              
+              // Logo de prueba
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    "Memoria Viva",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
-                      onPressed: !_initialized
-                          ? null
-                          : () async {
-                              _muted = !_muted;
-                              await _controller.setVolume(_muted ? 0.0 : 1.0);
-                              if (mounted) setState(() {});
-                            },
-                    ),
-                  ],
+                  ),
                 ),
               ),
+              
+              // Indicador de carga
+              if (!_initialized)
+                const Center(child: CircularProgressIndicator()),
+
+              // Debug overlay en modo debug
+              if (kDebugMode)
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                    child: Text(
+                      _dbgInfo(),
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -680,8 +935,10 @@ class _CategoriaChip extends StatelessWidget {
       future: repo.obtenerCategoriaPorId(categoriaId),
       builder: (context, snapshot) {
         final Categoria? categoria = snapshot.data;
-        final Color chipColor = _hexToColorOrFallback(categoria?.color);
+        final Color chipColor = AppColors.categoryColor(categoryId: categoriaId, hex: categoria?.color);
         final String iconPath = _resolveIconPath(categoria?.icono);
+        final bool isDark = Theme.of(context).brightness == Brightness.dark;
+        final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.primaryDark;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -698,7 +955,7 @@ class _CategoriaChip extends StatelessWidget {
               Text(
                 categoriaNombre,
                 style: AppTypography.textTheme.labelMedium?.copyWith(
-                  color: AppColors.primaryDark,
+                  color: textColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -707,18 +964,6 @@ class _CategoriaChip extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-Color _hexToColorOrFallback(String? hex) {
-  if (hex == null || hex.isEmpty) return AppColors.accent;
-  String value = hex;
-  if (value.startsWith('#')) value = value.substring(1);
-  if (value.length == 6) value = 'FF$value';
-  try {
-    return Color(int.parse(value, radix: 16));
-  } catch (_) {
-    return AppColors.accent;
   }
 }
 
@@ -751,4 +996,3 @@ String _resolveIconPath(String? iconoNombre) {
       return AppIcons.relato;
   }
 }
-
