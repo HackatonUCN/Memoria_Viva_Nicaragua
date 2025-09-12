@@ -203,8 +203,11 @@ service cloud.firestore {
     match /categorias/{categoriaId} {
       // Permite lectura pública de categorías activas
       allow read: if resource.data != null && (resource.data.activa == true || resource.data.activa == null);
-      // Escrituras solo para administradores
-      allow create, update, delete: if isAdmin();
+      // TEMP MIGRATION: permitir crear/actualizar categorías a cualquier usuario autenticado (incluye anónimo)
+      // IMPORTANTE: Revertir tras la migración para endurecer seguridad
+      allow create, update: if isSignedIn();
+      // Eliminar sigue restringido a administradores
+      allow delete: if isAdmin();
     }
 
     // Sugerencias de eventos (sugerencias_eventos)

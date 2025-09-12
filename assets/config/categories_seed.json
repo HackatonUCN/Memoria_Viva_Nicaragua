@@ -5,7 +5,7 @@
     "descripcion": "Relatos sobre tradiciones locales",
     "tipo": "relato",
     "icono": "relato",
-    "color": "#177245",
+    "color": "#2A9D8F",
     "orden": 1,
     "activa": true,
     "categoriaPadreId": null
@@ -16,7 +16,7 @@
     "descripcion": "Relatos de costumbres y vida cotidiana",
     "tipo": "relato",
     "icono": "relato",
-    "color": "#4A6192",
+    "color": "#F4A261",
     "orden": 2,
     "activa": true,
     "categoriaPadreId": null
@@ -27,7 +27,7 @@
     "descripcion": "Saberes de cocina tradicional",
     "tipo": "saber",
     "icono": "guitarra",
-    "color": "#B85C3C",
+    "color": "#FF7043",
     "orden": 1,
     "activa": true,
     "categoriaPadreId": null
@@ -38,7 +38,7 @@
     "descripcion": "Eventos y ferias culturales",
     "tipo": "evento",
     "icono": "iglesia",
-    "color": "#2E3A59",
+    "color": "#F57C00",
     "orden": 1,
     "activa": true,
     "categoriaPadreId": null
@@ -49,7 +49,7 @@
     "descripcion": "Relatos sobre leyendas, mitos y tradiciones orales",
     "tipo": "relato",
     "icono": "volcan",
-    "color": "#6D4C41",
+    "color": "#7E57C2",
     "orden": 3,
     "activa": true,
     "categoriaPadreId": null
@@ -60,7 +60,7 @@
     "descripcion": "Memorias y testimonios de la comunidad",
     "tipo": "relato",
     "icono": "relato",
-    "color": "#3E2723",
+    "color": "#DAA520",
     "orden": 4,
     "activa": true,
     "categoriaPadreId": null
@@ -71,7 +71,7 @@
     "descripcion": "Historias de personas destacadas de la comunidad",
     "tipo": "relato",
     "icono": "guardabarranco",
-    "color": "#2E3A59",
+    "color": "#8D6E63",
     "orden": 5,
     "activa": true,
     "categoriaPadreId": null
@@ -82,7 +82,7 @@
     "descripcion": "Relatos de identidad y vida comunitaria",
     "tipo": "relato",
     "icono": "nicaragua",
-    "color": "#A3B18A",
+    "color": "#66BB6A",
     "orden": 6,
     "activa": true,
     "categoriaPadreId": null
@@ -93,7 +93,7 @@
     "descripcion": "Sabiduría popular expresada en frases",
     "tipo": "saber",
     "icono": "nicaragua",
-    "color": "#6D4C41",
+    "color": "#FFB300",
     "orden": 2,
     "activa": true,
     "categoriaPadreId": null
@@ -104,7 +104,7 @@
     "descripcion": "Técnicas y oficios artesanales",
     "tipo": "saber",
     "icono": "artesania",
-    "color": "#BC8F8F",
+    "color": "#C97C5D",
     "orden": 3,
     "activa": true,
     "categoriaPadreId": null
@@ -115,7 +115,7 @@
     "descripcion": "Prácticas curativas y uso de plantas",
     "tipo": "saber",
     "icono": "cacao",
-    "color": "#177245",
+    "color": "#2E7D32",
     "orden": 4,
     "activa": true,
     "categoriaPadreId": null
@@ -126,7 +126,7 @@
     "descripcion": "Preparaciones y saberes culinarios",
     "tipo": "saber",
     "icono": "apple",
-    "color": "#B85C3C",
+    "color": "#E76F51",
     "orden": 5,
     "activa": true,
     "categoriaPadreId": null
@@ -137,7 +137,7 @@
     "descripcion": "Prácticas agrícolas y manejo del campo",
     "tipo": "saber",
     "icono": "nicaragua",
-    "color": "#177245",
+    "color": "#7CB342",
     "orden": 6,
     "activa": true,
     "categoriaPadreId": null
@@ -159,7 +159,7 @@
     "descripcion": "Juegos y dinámicas populares",
     "tipo": "saber",
     "icono": "guitarra",
-    "color": "#A3B18A",
+    "color": "#26C6DA",
     "orden": 8,
     "activa": true,
     "categoriaPadreId": null
