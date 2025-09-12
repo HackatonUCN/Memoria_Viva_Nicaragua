@@ -72,7 +72,7 @@ class MyApp extends StatelessWidget {
             title: 'Memoria Viva Nicaragua',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.light, // Forzamos tema claro para consistencia
+            themeMode: ThemeMode.system,
             debugShowCheckedModeBanner: false,
             // Registramos el observador de rutas para controlar las animaciones
             navigatorObservers: [LoginScreen.routeObserver],

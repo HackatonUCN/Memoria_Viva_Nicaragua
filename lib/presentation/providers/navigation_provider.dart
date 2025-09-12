@@ -8,10 +8,12 @@ class NavigationProvider extends ChangeNotifier {
   int _selectedIndex = 0;
   String _selectedRoute = AppRoutes.home;
   String? _mapFocusRelatoId;
+  MapFocusLocation? _mapFocusLocation;
 
   int get selectedIndex => _selectedIndex;
   String get selectedRoute => _selectedRoute;
   String? get mapFocusRelatoId => _mapFocusRelatoId;
+  MapFocusLocation? get mapFocusLocation => _mapFocusLocation;
 
   void setIndex(int index) {
     if (index == _selectedIndex) return;
@@ -53,6 +55,18 @@ class NavigationProvider extends ChangeNotifier {
     return id;
   }
 
+  void setMapFocusLocation({required double lat, required double lng, double radiusKm = 5}) {
+    _mapFocusLocation = MapFocusLocation(lat: lat, lng: lng, radiusKm: radiusKm);
+    notifyListeners();
+  }
+
+  MapFocusLocation? takeMapFocusLocation() {
+    final loc = _mapFocusLocation;
+    _mapFocusLocation = null;
+    notifyListeners();
+    return loc;
+  }
+
   String _routeForIndex(int index) {
     switch (index) {
       case 0:
@@ -86,6 +100,13 @@ class NavigationProvider extends ChangeNotifier {
         return _selectedIndex;
     }
   }
+}
+
+class MapFocusLocation {
+  final double lat;
+  final double lng;
+  final double radiusKm;
+  const MapFocusLocation({required this.lat, required this.lng, required this.radiusKm});
 }
 
 
