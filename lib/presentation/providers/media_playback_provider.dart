@@ -36,8 +36,11 @@ class MediaPlaybackProvider extends ChangeNotifier {
   }
 
   /// Pausa todas las fuentes registradas.
-  Future<void> pauseAll() async {
-    final handlers = List.of(_handlers.values);
+  Future<void> pauseAll({String? exceptKey}) async {
+    final handlers = List.of(_handlers.entries)
+        .where((e) => exceptKey == null ? true : e.key != exceptKey)
+        .map((e) => e.value)
+        .toList();
     for (final h in handlers) {
       try {
         await h.onPause();
@@ -78,14 +81,20 @@ class MediaPlaybackProvider extends ChangeNotifier {
     String? relatoId,
     required String sourceId,
     required String tipo,
+    String? excludeKey,
   }) async {
-    await pauseAll();
+    await pauseAll(exceptKey: excludeKey);
     _current = PlaybackEntry(scope: scope, relatoId: relatoId, sourceId: sourceId, tipo: tipo);
     notifyListeners();
   }
 
   String _buildKey({required String scope, String? relatoId, required String sourceId}) {
     return '$scope::${relatoId ?? ''}::${sourceId}';
+  }
+
+  /// Expone construcción de clave para que los widgets puedan excluirse.
+  String keyFor({required String scope, String? relatoId, required String sourceId}) {
+    return _buildKey(scope: scope, relatoId: relatoId, sourceId: sourceId);
   }
 }
 
