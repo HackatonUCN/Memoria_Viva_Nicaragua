@@ -1,9 +1,11 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/flutter_map.dart' as latlng;
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:flutter_map_cancellable_tile_provider/flutter_map_cancellable_tile_provider.dart';
 import 'package:provider/provider.dart';
@@ -39,20 +41,36 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   latlng.LatLng _center = const latlng.LatLng(12.114993, -86.236174);
   double _zoom = 6.5;
-  String? _hoverRelatoId;
   bool _didProviderInit = false;
-  final Set<String> _longPressedMarkers = {}; // Guardar IDs de marcadores presionados
+  bool _showRelatosList = false; // Controla la visibilidad de la lista lateral
+  // Eliminando state para simplificar
+  // final Set<String> _pressedMarkers = {}; // IDs de marcadores mientras están presionados (tooltip)
+  // final Map<String, Timer> _pressTimers = {}; // Temporizadores por marcador para long press (tooltip)
+  // final Set<String> _longPressFired = {}; // Marcadores cuyo long-press (1.5s) ya se disparó (tooltip)
 
   @override
   void initState() {
     super.initState();
+    // En la próxima frame, ajustar visibilidad de lista según tamaño de pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final size = MediaQuery.of(context).size;
+        if (mounted) {
+          setState(() {
+            _showRelatosList = size.width >= 900; // Mostrar lista solo en pantallas grandes
+          });
+        }
+      }
+    });
   }
+
+  // Eliminado método dispose
 
   @override
   void didUpdateWidget(covariant MapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Si cambia el foco solicitado desde fuera, pedirlo al provider
-    if (widget.focusRelatoId != null && widget.focusRelatoId != oldWidget.focusRelatoId) {
+    if (widget.focusRelatoId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
           final p = context.read<MapProvider>();
@@ -60,6 +78,29 @@ class _MapScreenState extends State<MapScreen> {
         } catch (_) {}
       });
     }
+
+    // Consumir foco por ubicación si llega mientras el widget ya está montado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final nav = context.read<NavigationProvider>();
+        final loc = nav.takeMapFocusLocation();
+        if (loc != null) {
+          final vp = MediaQuery.of(context).size;
+          final destZoom = _zoomForRadiusKm(latitude: loc.lat, radiusKm: loc.radiusKm, viewportSize: vp);
+          _animatedMapMove(latlng.LatLng(loc.lat, loc.lng), destZoom);
+          final p = context.read<MapProvider>();
+          p.setMapView(lat: loc.lat, lng: loc.lng, newZoom: destZoom);
+          Future.delayed(const Duration(milliseconds: 550), () { _updateBounds(p); });
+          
+          // Si hay navegación desde feed, mostrar lista lateral
+          if (widget.focusRelatoId != null && mounted) {
+            setState(() {
+              _showRelatosList = true;
+            });
+          }
+        }
+      } catch (_) {}
+    });
   }
 
   Widget _roundIconButton({required IconData icon, required String tooltip, required VoidCallback onTap}) {
@@ -74,6 +115,238 @@ class _MapScreenState extends State<MapScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Tooltip(message: tooltip, child: Icon(icon, size: 22, color: AppColors.primaryDark)),
         ),
+      ),
+    );
+  }
+
+  // Método para verificar si un relato está en los límites visibles del mapa
+  bool _isRelatoInBounds(Relato relato, latlng.LatLngBounds bounds) {
+    if (relato.ubicacion?.latitud == null || relato.ubicacion?.longitud == null) {
+      return false;
+    }
+    
+    final lat = relato.ubicacion!.latitud;
+    final lng = relato.ubicacion!.longitud;
+    
+    return lat >= bounds.south && 
+           lat <= bounds.north && 
+           lng >= bounds.west && 
+           lng <= bounds.east;
+  }
+
+  // Widget para la lista lateral de relatos
+  Widget _buildRelatosList(MapProvider provider, BoxConstraints constraints) {
+    final bool isSmallScreen = constraints.maxWidth < 900;
+    final double listWidth = isSmallScreen ? constraints.maxWidth * 0.85 : 320;
+    
+    // Filtrar relatos visibles en el mapa actual
+    List<Relato> visibleRelatos = [];
+    try {
+      // Verificar que el controlador esté montado antes de acceder a la cámara
+      if (_mapController.camera != null) {
+        final bounds = _mapController.camera.visibleBounds;
+        visibleRelatos = provider.relatos.where((r) => 
+          r.ubicacion != null && _isRelatoInBounds(r, bounds)
+        ).toList();
+      } else {
+        // Si el mapa no está listo, mostrar todos los relatos con ubicación
+        visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
+      }
+    } catch (e) {
+      // Si hay error obteniendo bounds, mostrar todos los relatos
+      visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
+    }
+
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      right: (_showRelatosList == true) ? 12 : -listWidth - 12,
+      top: 120,
+      bottom: 12,
+      width: listWidth,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        elevation: 8,
+        child: Column(
+          children: [
+            // Header de la lista
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.list_alt, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Relatos (${visibleRelatos.length})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: () => setState(() => _showRelatosList = false),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Lista de relatos
+            Expanded(
+              child: visibleRelatos.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 48, color: AppColors.textSecondary),
+                          SizedBox(height: 8),
+                          Text(
+                            'No hay relatos en esta área',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Mueve el mapa para explorar',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: visibleRelatos.length,
+                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final relato = visibleRelatos[index];
+                      final isSelected = relato.id == provider.focusRelatoId;
+                      final categoryColor = AppColors.categoryColor(categoryId: relato.categoriaId);
+                      
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        elevation: isSelected ? 4 : 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: isSelected ? AppColors.primary : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: RadioListTile<String>(
+                          title: Text(
+                            relato.titulo,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (relato.ubicacion != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.location_on, size: 12, color: categoryColor),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          relato.ubicacion!.obtenerDireccionFormateada(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.person, size: 12, color: AppColors.textSecondary),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        relato.autorNombre,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          value: relato.id,
+                          groupValue: provider.focusRelatoId,
+                          activeColor: AppColors.primary,
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          onChanged: (value) {
+                            if (value != null) {
+                              // Focalizar en el provider
+                              provider.requestFocusOnRelato(value);
+                              
+                              // Centrar mapa en el relato
+                              final lat = relato.ubicacion!.latitud;
+                              final lng = relato.ubicacion!.longitud;
+                              _animatedMapMove(latlng.LatLng(lat, lng), 15.0);
+                              
+                              // Abrir overlay con el relato
+                              Future.delayed(const Duration(milliseconds: 400), () {
+                                if (mounted) {
+                                  _openRelatoOverlay(context, relato);
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Botón flotante para mostrar/ocultar la lista en pantallas pequeñas
+  Widget _buildToggleListButton(bool isSmallScreen) {
+    if (!isSmallScreen) return const SizedBox.shrink();
+    
+    return Positioned(
+      right: 12,
+      top: 60,
+      child: _roundIconButton(
+        icon: (_showRelatosList == true) ? Icons.list_alt : Icons.list_alt_outlined,
+        tooltip: (_showRelatosList == true) ? 'Ocultar lista' : 'Mostrar lista de relatos',
+        onTap: () => setState(() => _showRelatosList = !(_showRelatosList == true)),
       ),
     );
   }
@@ -110,6 +383,7 @@ class _MapScreenState extends State<MapScreen> {
     final lng = p.centerLng;
     // Calcular zoom para ~5 km de radio
     final destZoom = _zoomForRadiusKm(latitude: lat, radiusKm: 5, viewportSize: vp);
+    // Moviendo cámara por foco
     // Actualizar estado local y provider para mantener consistencia
     _animatedMapMove(latlng.LatLng(lat, lng), destZoom);
     try {
@@ -124,7 +398,7 @@ class _MapScreenState extends State<MapScreen> {
   void _updateBounds([MapProvider? provider]) {
     try {
       final bounds = _mapController.camera.visibleBounds;
-      print('DEBUG: Actualizando bounds del mapa: S=${bounds.south}, W=${bounds.west}, N=${bounds.north}, E=${bounds.east}');
+      // Actualizar bounds del mapa
       // Aplicamos un ligero padding a los límites para asegurar que vemos suficientes relatos
       final padding = 0.05;
       
@@ -147,12 +421,12 @@ class _MapScreenState extends State<MapScreen> {
               e: bounds.east + padding,
             );
           } catch (e) {
-            print('DEBUG: Error al acceder al provider en _updateBounds: $e');
+            // Error al acceder al provider en _updateBounds
           }
         });
       }
     } catch (e) {
-      print('DEBUG: Error al actualizar bounds: $e');
+      // Error al actualizar bounds
     }
   }
 
@@ -171,16 +445,33 @@ class _MapScreenState extends State<MapScreen> {
             if (!_didProviderInit) {
           _didProviderInit = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            print('DEBUG: Inicializando MapScreen');
-            print('DEBUG: Relatos actuales en provider: ${provider.relatos.length}');
             provider.initialFetchIfNeeded();
             _syncCameraFromProvider(provider);
-            final navFocus = context.read<NavigationProvider>().takeMapFocusRelatoId();
+            final nav = context.read<NavigationProvider>();
+            final navFocus = nav.takeMapFocusRelatoId();
             final toFocus = widget.focusRelatoId ?? navFocus;
             if (toFocus != null) {
-              print('DEBUG: Solicitando foco en relato ID: $toFocus');
-              // Si el relato todavía no está cargado, forzamos fetch puntual
               provider.focusRelatoByIdOrFetch(toFocus);
+            }
+            // Consumir foco por ubicación si viene definido (prioriza centrado inmediato por lat/lng)
+            final loc = nav.takeMapFocusLocation();
+            if (loc != null) {
+              final vp = MediaQuery.of(context).size;
+              final destZoom = _zoomForRadiusKm(latitude: loc.lat, radiusKm: loc.radiusKm, viewportSize: vp);
+              _animatedMapMove(latlng.LatLng(loc.lat, loc.lng), destZoom);
+              try {
+                provider.setMapView(lat: loc.lat, lng: loc.lng, newZoom: destZoom);
+              } catch (_) {}
+              Future.delayed(const Duration(milliseconds: 550), () {
+                _updateBounds(provider);
+              });
+              
+              // Si viene navegación desde feed, mostrar lista lateral automáticamente
+              if (toFocus != null && mounted) {
+                setState(() {
+                  _showRelatosList = true; // Mostrar lista para ver el relato seleccionado
+                });
+              }
             }
             // Post-frame para acceder a camera de forma segura
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -203,11 +494,7 @@ class _MapScreenState extends State<MapScreen> {
           } catch (_) {}
         });
         
-        // Debug: Mostrar información del estado del mapa (solo en debug)
-        if (kDebugMode) {
-          // ignore: avoid_print
-          print('DEBUG: Estado del mapa - Relatos: ${provider.relatos.length}, Loading: ${provider.loading}, Error: ${provider.error}');
-        }
+        // Información del estado del mapa omitida en producción
         return Scaffold(
           backgroundColor: AppColors.background,
           body: Stack(
@@ -220,7 +507,7 @@ class _MapScreenState extends State<MapScreen> {
                   minZoom: 3,
                   maxZoom: 19,
                   interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate & ~InteractiveFlag.doubleTapZoom,
                   ),
                   onMapEvent: (e) {
                     if (e is MapEventMoveEnd || e is MapEventFlingAnimationEnd || e is MapEventRotateEnd || e is MapEventDoubleTapZoomEnd) {
@@ -232,8 +519,10 @@ class _MapScreenState extends State<MapScreen> {
                               lng: _mapController.camera.center.longitude,
                               newZoom: _mapController.camera.zoom,
                             );
+                        // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
+                        p.clearFocus();
                       } catch (e) {
-                        print('DEBUG: Error al actualizar vista del mapa: $e');
+                        // Error al actualizar vista del mapa
                       }
                       // Actualizar zoom local de forma segura
                       final newZoom = _mapController.camera.zoom;
@@ -247,12 +536,14 @@ class _MapScreenState extends State<MapScreen> {
                          final p = context.read<MapProvider>();
                          _moveCameraToFocusIfRequested(p);
                        } catch (e) {
-                         print('DEBUG: Error al acceder al provider en onMapEvent: $e');
+                         // Error al acceder al provider en onMapEvent
                        }
                      });
                   },
                   onTap: (tapPos, point) {
-                    setState(() => _hoverRelatoId = null);
+                    // Limpiar selección si se toca el mapa
+                    final provider = context.read<MapProvider>();
+                    provider.clearFocus();
                   },
                 ),
                 children: [
@@ -274,7 +565,7 @@ class _MapScreenState extends State<MapScreen> {
                         return rels.take(cap).map((r) => _buildMarker(context, r)).toList();
                       }(),
                       disableClusteringAtZoom: 15,
-                      zoomToBoundsOnClick: true,
+                      zoomToBoundsOnClick: false,
                       builder: (context, markers) {
                         final count = markers.length;
                         return Container(
@@ -302,13 +593,19 @@ class _MapScreenState extends State<MapScreen> {
                 bottom: 0,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final bool isSmallScreen = constraints.maxWidth < 600;
+                    final bool isSmallScreen = constraints.maxWidth < 900;
                     
                     return Stack(
                       children: [
+                        // Lista lateral de relatos
+                        _buildRelatosList(provider, constraints),
+                        
+                        // Botón para mostrar/ocultar lista en pantallas pequeñas
+                        _buildToggleListButton(isSmallScreen),
+                        
                         // Botones de zoom y navegación (derecha)
                         Positioned(
-                          right: 12,
+                          right: (_showRelatosList == true && !isSmallScreen) ? 344 : 12, // Ajustar posición según lista
                           top: 120, // Posición fija debajo de los chips en todas las pantallas
                           child: Column(
                             children: [
@@ -317,7 +614,7 @@ class _MapScreenState extends State<MapScreen> {
                                 tooltip: 'Acercar',
                                 onTap: () {
                                   final c = _mapController.camera.center;
-                                  final z = (_mapController.camera.zoom + 1).clamp(3.0, 19.0) as double;
+                                  final z = (_mapController.camera.zoom + 1).clamp(3.0, 19.0);
                                   _mapController.move(c, z);
                                 },
                               ),
@@ -327,7 +624,7 @@ class _MapScreenState extends State<MapScreen> {
                                 tooltip: 'Alejar',
                                 onTap: () {
                                   final c = _mapController.camera.center;
-                                  final z = (_mapController.camera.zoom - 1).clamp(3.0, 19.0) as double;
+                                  final z = (_mapController.camera.zoom - 1).clamp(3.0, 19.0);
                                   _mapController.move(c, z);
                                 },
                               ),
@@ -410,7 +707,7 @@ class _MapScreenState extends State<MapScreen> {
                                );
                              }
                            } catch (e) {
-                             print('DEBUG: Error al actualizar vista del mapa en mi ubicación: $e');
+                             // Error al actualizar vista del mapa en mi ubicación
                            }
                          } catch (e) {
                            if (!mounted) return;
@@ -461,7 +758,7 @@ class _MapScreenState extends State<MapScreen> {
                         // Filtros por categoría (barra superior)
                         Positioned(
                           left: 12,
-                          right: 70, // Dejar espacio a la derecha para los botones
+                          right: (_showRelatosList == true && !isSmallScreen) ? 376 : 70, // Ajustar según lista lateral
                           top: 64,
                           child: Container(
                             height: 44,
@@ -499,7 +796,7 @@ class _MapScreenState extends State<MapScreen> {
                                         onSelected: (_) => provider.toggleCategoria(c.id),
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 ],
                               ),
                             ),
@@ -541,127 +838,97 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Optimizado para mejor rendimiento
+  // Marcador simplificado ya que la interacción principal es via lista lateral
   Marker _buildMarker(BuildContext context, Relato r) {
-    final color = _colorForCategoria(r.categoriaNombre);
-    // Obtener el MapProvider para verificar si el relato está seleccionado o cerca
+    final color = AppColors.categoryColor(categoryId: r.categoriaId);
+    // Obtener el MapProvider para verificar si el relato está seleccionado
     final provider = Provider.of<MapProvider>(context, listen: false);
     final bool isSelected = r.id == provider.focusRelatoId;
-    final bool isNearby = _isRelatoNearby(r, provider);
     
-    // Estado local para mantener presionado
-    final String markerKey = "marker_${r.id}";
-    final bool isLongPressed = _longPressedMarkers.contains(markerKey);
-    
-    // Aumentar tamaño base del marcador para mejor visibilidad y tap
-    final size = _markerSize(_mapController.camera.zoom) * 1.2;
+    // Tamaño base del marcador sin amplificación excesiva
+    final size = _markerSize(_zoom);
     
     return Marker(
       point: latlng.LatLng(r.ubicacion!.latitud, r.ubicacion!.longitud),
-      width: size * 2.5, // Área más grande para facilitar el tap
-      height: size * 2.5,
-      child: Stack(
-        children: [
-          // Marcador principal con tap y longPress
-          Material(
-            color: Colors.transparent,
-            child: GestureDetector(
-              onTap: () {
-                print('DEBUG: Tap en marcador detectado para relato ${r.id}');
-                RelatoDetailOverlay.open(context, r);
-              },
-              onLongPressStart: (_) {
-                setState(() {
-                  _longPressedMarkers.add(markerKey);
-                });
-              },
-              onLongPressEnd: (_) {
-                setState(() {
-                  _longPressedMarkers.remove(markerKey);
-                });
-              },
-              onLongPressCancel: () {
-                setState(() {
-                  _longPressedMarkers.remove(markerKey);
-                });
-              },
-              child: Container(
-                alignment: Alignment.center,
-                child: _buildMarkerContent(color, size, isSelected, r),
-              ),
-            ),
-          ),
-          
-          // Tooltip condicional (mostrar si está seleccionado, cercano, o mantenido presionado)
-          if (isSelected || isNearby || isLongPressed)
-            _buildTooltipLabel(r.titulo ?? 'Sin título', isSelected)
-        ],
+      width: size,
+      height: size,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          // Focalizar en el provider y abrir overlay
+          provider.requestFocusOnRelato(r.id);
+          _openRelatoOverlay(context, r);
+        },
+        child: _buildMarkerContent(color, size, isSelected, r),
       ),
     );
   }
+  
+  // Eliminado método duplicado
+  
+  // Método para abrir el overlay de forma confiable
+  void _openRelatoOverlay(BuildContext context, Relato r) {
+    // Usar el método original pero con try-catch para evitar errores
+    try {
+      RelatoDetailOverlay.open(context, r);
+    } catch (e) {
+      print('ERROR al abrir overlay: $e');
+      
+      // Intento alternativo directo
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        
+        try {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            enableDrag: true,
+            isDismissible: true,
+            barrierColor: Colors.black54,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) {
+              return Material(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.8,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(r.titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        ],
+                      ),
+                      const Divider(),
+                      Expanded(child: SingleChildScrollView(child: Text(r.contenido))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        } catch (e2) {
+          print('ERROR en intento alternativo: $e2');
+        }
+      });
+    }
+  }
+
+  // Eliminado método _openOverlayOnce
   
    // Método separado para reducir reconstrucciones innecesarias
    Widget _buildMarkerContent(Color color, double size, bool isSelected, Relato r) {
      return _pinIcon(color, size, isSelected);
    }
    
-  // Widget para mostrar el título sobre el marcador sin interferir con el tap
-  Widget _buildTooltipLabel(String title, bool isSelected) {
-    return Positioned(
-      // Posicionamiento mejorado para evitar recortes
-      bottom: 40,
-      left: 0,
-      right: 0,
-      child: IgnorePointer(
-        ignoring: true,
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 180),
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                  spreadRadius: 0,
-                ),
-              ],
-              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                CustomPaint(
-                  size: const Size(14, 7),
-                  painter: _TrianglePainter(),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   // Optimización: Simplificar icono de pin para mejor rendimiento
   Widget _pinIcon(Color color, double size, bool isSelected) {
     // En dispositivos móviles o con zoom bajo, usar un icono más simple
-    final bool useSimpleIcon = !kIsWeb || _mapController.camera.zoom < 10;
+    final bool useSimpleIcon = !kIsWeb || _zoom < 10;
     
     if (useSimpleIcon) {
       return Container(
@@ -697,111 +964,8 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Tooltip optimizado para mejor rendimiento
-  Widget _hoverTooltip(Relato r) {
-    return Positioned(
-      left: 24,
-      bottom: 24,
-      child: Material(
-        color: AppColors.surface,
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 260),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Optimizado: solo mostrar imagen si está en zoom alto para mejor rendimiento
-                if (_mapController.camera.zoom > 12)
-                  if (r.multimedia.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: CachedNetworkImage(
-                        imageUrl: r.multimedia.first.url,
-                        width: 40, // Reducido para mejor rendimiento
-                        height: 40,
-                        fit: BoxFit.cover,
-                        // Optimizaciones para imágenes
-                        memCacheWidth: 80,
-                        memCacheHeight: 80,
-                        fadeInDuration: const Duration(milliseconds: 100),
-                        placeholder: (context, url) => Container(
-                          color: AppColors.surfaceVariant,
-                          width: 40,
-                          height: 40,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      width: 40, // Reducido para mejor rendimiento
-                      height: 40,
-                      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(6)),
-                      child: const Icon(Icons.image_outlined, size: 18),
-                    ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    r.titulo,
-                    maxLines: 1, // Reducido para mejor rendimiento
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
-  Color _colorForCategoria(String nombre) {
-    final key = nombre.toLowerCase();
-    if (key.contains('gastr') || key.contains('comida')) return AppColors.tierra;
-    if (key.contains('artes')) return AppColors.ceramica;
-    if (key.contains('música') || key.contains('musica')) return AppColors.musicaColor;
-    if (key.contains('trad')) return AppColors.jade;
-    if (key.contains('hist')) return AppColors.cacao;
-    return AppColors.primary;
-  }
   
-  // Verificar si un relato está cerca del usuario
-  bool _isRelatoNearby(Relato relato, MapProvider mapProvider) {
-    // Si no hay ubicación del usuario o el relato no tiene ubicación, no es cercano
-    if (mapProvider.userLocation == null || 
-        relato.ubicacion == null || 
-        relato.ubicacion?.latitud == null || 
-        relato.ubicacion?.longitud == null) {
-      return false;
-    }
-    
-    // Calcular distancia aproximada usando la fórmula del haversine
-    final double lat1 = mapProvider.userLocation!.latitude;
-    final double lon1 = mapProvider.userLocation!.longitude;
-    final double lat2 = relato.ubicacion!.latitud!;
-    final double lon2 = relato.ubicacion!.longitud!;
-    
-    const int radioTierra = 6371; // Radio de la Tierra en km
-    final double latDistance = _toRadians(lat2 - lat1);
-    final double lonDistance = _toRadians(lon2 - lon1);
-    
-    final double a = sin(latDistance / 2) * sin(latDistance / 2) +
-               cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
-               sin(lonDistance / 2) * sin(lonDistance / 2);
-    
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    final double distancia = radioTierra * c;
-    
-    // Mostrar tooltip si está a menos de 1km
-    return distancia < 1.0;
-  }
-  
-  double _toRadians(double grados) {
-    return grados * pi / 180;
-  }
 
    // Implementación personalizada de animación de movimiento del mapa
    void _animatedMapMove(latlng.LatLng destLocation, double destZoom) {

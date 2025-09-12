@@ -135,6 +135,13 @@ class MapProvider extends ChangeNotifier {
     _centerIfPossible();
   }
 
+  void clearFocus() {
+    print('DEBUG: MapProvider.clearFocus');
+    focusRelatoId = null;
+    cameraMoveRequested = false;
+    notifyListeners();
+  }
+
   /// Fuerza centrado en un relato por ID, buscándolo si no está en memoria
   Future<void> focusRelatoByIdOrFetch(String relatoId) async {
     print('DEBUG: MapProvider.focusRelatoByIdOrFetch($relatoId)');

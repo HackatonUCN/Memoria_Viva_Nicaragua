@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:memoria_viva_nicaragua/domain/entities/relato.dart';
 import 'package:get_it/get_it.dart';
 import 'package:memoria_viva_nicaragua/domain/repositories/relato_repository.dart';
@@ -174,7 +175,7 @@ class _DetailContent extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _chip('Categoría: ${r.categoriaNombre}')
+                    _categoriaChip(context, r.categoriaId, r.categoriaNombre)
                   ]..addAll(r.etiquetas.map((e) => _chip('#$e'))),
                 ),
                 const SizedBox(height: 16),
@@ -195,20 +196,37 @@ class _DetailContent extends StatelessWidget {
                                   ? () {
                                       print('DEBUG: Botón "Ver en el mapa" presionado para relato ${r.id}');
                                       print('DEBUG: Navegando al mapa con ubicación: (${r.ubicacion!.latitud}, ${r.ubicacion!.longitud})');
-                                      // Cerrar primero el overlay para evitar problemas de contexto
+                                      
+                                      // Obtener el NavigationProvider antes de cerrar  
+                                      final nav = context.read<NavigationProvider>();
+                                      
+                                      // Establecer datos de navegación ANTES de cambiar de pantalla
+                                      nav.setMapFocusRelatoId(r.id);
+                                      if (r.ubicacion != null) {
+                                        nav.setMapFocusLocation(
+                                          lat: r.ubicacion!.latitud,
+                                          lng: r.ubicacion!.longitud,
+                                          radiusKm: 3, // Radio más específico para mejor centrado
+                                        );
+                                      }
+                                      
+                                      // Cerrar overlay
                                       Navigator.of(context).pop();
-                                      // Pequeña espera para asegurar que el overlay se cerró
-                                      Future.delayed(const Duration(milliseconds: 50), () {
+                                      
+                                      // Pequeña espera y cambiar al mapa
+                                      Future.delayed(const Duration(milliseconds: 100), () {
                                         if (!context.mounted) return;
-                                        // Obtener el NavigationProvider
-                                        final nav = context.read<NavigationProvider>();
-                                        // Establecer el ID del relato para enfoque (esto es importante hacerlo ANTES de cambiar de tab)
-                                        nav.setMapFocusRelatoId(r.id);
+                                        
                                         // Cambiar al tab del mapa
                                         nav.setIndex(1);
+                                        
                                         // Mostrar mensaje de confirmación
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Centrando en "${r.titulo}"...'), duration: const Duration(seconds: 2))
+                                          SnackBar(
+                                            content: Text('Mostrando "${r.titulo}" en el mapa'),
+                                            duration: const Duration(seconds: 2),
+                                            backgroundColor: AppColors.primary,
+                                          )
                                         );
                                       });
                                     }
@@ -235,10 +253,11 @@ class _DetailContent extends StatelessWidget {
                               feed = null;
                               liked = false;
                             }
+                            final bool isOwner = feed?.currentUserId != null && r.autorId == feed!.currentUserId;
                             return IconButton(
                               tooltip: 'Me gusta',
                               icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? AppColors.accent : null),
-                              onPressed: feed == null
+                              onPressed: feed == null || isOwner
                                   ? null
                                   : () async {
                                       final f = feed!;
@@ -330,6 +349,17 @@ class _DetailContent extends StatelessWidget {
         label: Text(text),
         backgroundColor: AppColors.withOpacity(AppColors.accent, 0.2),
       );
+
+  Widget _categoriaChip(BuildContext context, String categoriaId, String categoriaNombre) {
+    final Color chipColor = AppColors.categoryColor(categoryId: categoriaId);
+    final bool isDark = (Theme.of(context).brightness == Brightness.dark);
+    final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.primaryDark;
+    return Chip(
+      label: Text('Categoría: $categoriaNombre', style: AppTypography.textTheme.labelMedium?.copyWith(color: textColor)),
+      backgroundColor: AppColors.withOpacity(chipColor, 0.15),
+      shape: StadiumBorder(side: BorderSide(color: AppColors.withOpacity(chipColor, 0.5))),
+    );
+  }
 }
 
 class _MediaCarousel extends StatefulWidget {
@@ -499,6 +529,14 @@ class _InlineVideoState extends State<_InlineVideo> with AutomaticKeepAliveClien
   bool _isSeeking = false;
   Timer? _resumeDebounce;
   bool _wasPlayingBeforeSeek = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  // Debug helpers
+  int _dbgLastDurMs = -1;
+  int _dbgLastPosMs = -1;
+  bool _dbgLastInit = false;
+  bool _dbgLastBuf = false;
+  String? _dbgLastErr;
 
   @override
   bool get wantKeepAlive => true;
@@ -507,13 +545,36 @@ class _InlineVideoState extends State<_InlineVideo> with AutomaticKeepAliveClien
   void initState() {
     super.initState();
     // En web, habilitar uso de HTML video (HLS/MP4)
+    final resolvedUrl = kIsWeb ? widget.url : _maybeToCloudinaryHls(widget.url);
     _controller = kIsWeb
-        ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.networkUrl(Uri.parse(widget.url))
+        ? VideoPlayerController.network(resolvedUrl)
+        : VideoPlayerController.networkUrl(
+            Uri.parse(resolvedUrl),
+            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+            formatHint: _inferFormatFromUrl(resolvedUrl),
+          )
       ..setLooping(false)
-      ..initialize().then((_) {
+      ..initialize().then((_) async {
+        _duration = _controller.value.duration;
+        if (!kIsWeb && _duration == Duration.zero) {
+          await _warmUpAndPollDuration(_controller, muted: _muted);
+          _duration = _controller.value.duration;
+        }
         if (mounted) setState(() => _initialized = true);
       });
+    
+    // Listener para actualizar posición y duración
+    _controller.addListener(() {
+      final value = _controller.value;
+      if (!mounted || !value.isInitialized) return;
+      if (_isSeeking) return;
+      setState(() {
+        _position = value.position;
+        _duration = value.duration;
+      });
+      _dbgLogIfChanged(prefix: 'Inline');
+    });
+    
     // Registrar handler de pausa con scope 'overlay'
     try {
       final media = context.read<MediaPlaybackProvider>();
@@ -535,148 +596,338 @@ class _InlineVideoState extends State<_InlineVideo> with AutomaticKeepAliveClien
     _controller.dispose();
     super.dispose();
   }
+  
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  /// Intenta inferir el formato de video para ayudar al plugin nativo
+  /// cuando el servidor no expone cabeceras completas (móvil).
+  VideoFormat? _inferFormatFromUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('.m3u8')) return VideoFormat.hls;
+    if (lower.contains('.mp4')) return VideoFormat.other;
+    if (lower.contains('.webm')) return VideoFormat.other;
+    if (lower.contains('.mov')) return VideoFormat.other;
+    return null;
+  }
+
+  String _maybeToCloudinaryHls(String url) {
+    try {
+      final uri = Uri.parse(url);
+      if (!uri.host.contains('res.cloudinary.com')) return url;
+      final segments = List<String>.from(uri.pathSegments);
+      final uploadIndex = segments.indexOf('upload');
+      if (uploadIndex == -1) return url;
+      if (uploadIndex + 1 < segments.length && !segments[uploadIndex + 1].startsWith('sp_')) {
+        segments.insert(uploadIndex + 1, 'sp_auto');
+      }
+      if (segments.isNotEmpty) {
+        final last = segments.last;
+        if (last.contains('.')) {
+          final base = last.substring(0, last.lastIndexOf('.'));
+          segments[segments.length - 1] = '$base.m3u8';
+        } else {
+          segments[segments.length - 1] = '${segments.last}.m3u8';
+        }
+      }
+      final newUri = uri.replace(pathSegments: segments);
+      final newUrl = newUri.toString();
+      _dbgLog('Resolved Cloudinary HLS: $newUrl');
+      return newUrl;
+    } catch (_) {
+      return url;
+    }
+  }
+
+  Future<void> _warmUpAndPollDuration(VideoPlayerController controller, {required bool muted}) async {
+    try {
+      await controller.setVolume(0.0);
+      await controller.play();
+    } catch (_) {}
+    final sw = Stopwatch()..start();
+    while (mounted && sw.elapsed < const Duration(seconds: 3)) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      final d = controller.value.duration;
+      if (d > Duration.zero) break;
+    }
+    try {
+      await controller.pause();
+      await controller.setVolume(muted ? 0.0 : 1.0);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (!_initialized) {
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Container(color: AppColors.surfaceVariant, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
-      );
-    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: AspectRatio(
-        aspectRatio: _controller.value.aspectRatio == 0 ? 16 / 9 : _controller.value.aspectRatio,
+        aspectRatio: _initialized && _controller.value.aspectRatio > 0 
+            ? _controller.value.aspectRatio 
+            : 16 / 9,
         child: Stack(
           alignment: Alignment.center,
           children: [
             // Video centrado y cubriendo el contenedor
             Positioned.fill(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _controller.value.size.width,
-                  height: _controller.value.size.height,
-                  child: VideoPlayer(_controller),
-                ),
-              ),
+              child: _initialized
+                  ? FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _controller.value.size.width,
+                        height: _controller.value.size.height,
+                        child: VideoPlayer(_controller),
+                      ),
+                    )
+                  : Container(color: AppColors.surfaceVariant),
             ),
+            
+            // Overlay oscuro para los controles
+            Positioned.fill(child: Container(color: AppColors.imageOverlay.withOpacity(0.3))),
+            
             // Botón central play/pause
-            Center(
-              child: Listener(
-                onPointerDown: (_) async {
-                  // Evitar blinks en móviles al pulsar
-                  _resumeDebounce?.cancel();
-                },
+            if (_initialized)
+              Center(
                 child: IconButton(
                   iconSize: 64,
-                  icon: Icon(_controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: Colors.white),
+                  icon: Icon(
+                    _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    color: Colors.white,
+                  ),
                   onPressed: () async {
-                    final media = context.read<MediaPlaybackProvider>();
-                    if (_controller.value.isPlaying) {
-                      await _controller.pause();
-                    } else {
-                      await media.willStartPlayback(scope: 'overlay', sourceId: widget.url, tipo: 'video');
-                      await _controller.play();
+                    try {
+                      final media = context.read<MediaPlaybackProvider>();
+                      if (_controller.value.isPlaying) {
+                        await _controller.pause();
+                      } else {
+                        // Garantizar exclusividad antes de reproducir
+                        final excludeKey = media.keyFor(scope: 'overlay', sourceId: widget.url);
+                        await media.willStartPlayback(scope: 'overlay', sourceId: widget.url, tipo: 'video', excludeKey: excludeKey);
+                        if (_muted) {
+                          await _controller.setVolume(1.0);
+                          _muted = false;
+                        }
+                        await _controller.play();
+                      }
+                      if (mounted) setState(() {});
+                      _dbgLog('Inline playToggle isPlaying=${_controller.value.isPlaying}');
+                    } catch (e) {
+                      print("Error al reproducir: $e");
                     }
-                    if (mounted) setState(() {});
                   },
                 ),
               ),
-            ),
-            // Barra de controles inferior (overlay) para evitar overflow vertical
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                color: Colors.black45,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                      onPressed: () async {
-                        if (_controller.value.isPlaying) {
-                          await _controller.pause();
-                        } else {
-                          await _controller.play();
-                        }
-                        if (mounted) setState(() {});
-                      },
+            
+            // Controles inferiores
+            if (_initialized)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                      stops: const [0.0, 1.0],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.replay_10, color: Colors.white),
-                      onPressed: () async {
-                        final pos = await _controller.position ?? Duration.zero;
-                        final target = pos - const Duration(seconds: 10);
-                        await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.forward_10, color: Colors.white),
-                      onPressed: () async {
-                        final pos = await _controller.position ?? Duration.zero;
-                        final dur = _controller.value.duration;
-                        final target = pos + const Duration(seconds: 10);
-                        await _controller.seekTo(target > dur ? dur : target);
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
-                      onPressed: () async {
-                        _muted = !_muted;
-                        await _controller.setVolume(_muted ? 0.0 : 1.0);
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Listener(
-                        onPointerDown: (_) async {
-                          _isSeeking = true;
-                          _wasPlayingBeforeSeek = _controller.value.isPlaying;
-                          await _controller.pause();
-                        },
-                        onPointerUp: (_) {
-                          _resumeDebounce?.cancel();
-                          if (_wasPlayingBeforeSeek) {
-                            _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
-                              if (!mounted) return;
-                              await _controller.play();
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Slider para posición (seek al soltar en móviles)
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: Colors.white,
+                          inactiveTrackColor: Colors.white.withOpacity(0.3),
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: (() {
+                            final d = _duration.inMilliseconds;
+                            final p = _position.inMilliseconds;
+                            final ms = d > 0 ? d : (p + 1000);
+                            final m = ms.toDouble();
+                            return m < 1.0 ? 1.0 : m;
+                          })(),
+                          value: (() {
+                            final d = _duration.inMilliseconds;
+                            final p = _position.inMilliseconds;
+                            final maxMs = d > 0 ? d : (p + 1000);
+                            final v = p.clamp(0, maxMs).toDouble();
+                            return v;
+                          })(),
+                          onChangeStart: (value) async {
+                            _isSeeking = true;
+                            _wasPlayingBeforeSeek = _controller.value.isPlaying;
+                            await _controller.pause();
+                            _dbgLog('Inline seek start at ${_position.inMilliseconds}');
+                          },
+                          onChanged: (value) {
+                            setState(() {
+                              _position = Duration(milliseconds: value.toInt());
                             });
-                          }
-                          _isSeeking = false;
-                        },
-                        child: VideoProgressIndicator(_controller, allowScrubbing: true, colors: VideoProgressColors(playedColor: Colors.white)),
+                          },
+                          onChangeEnd: (value) async {
+                            final newPosition = Duration(milliseconds: value.toInt());
+                            await _controller.seekTo(newPosition);
+                            _resumeDebounce?.cancel();
+                            if (_wasPlayingBeforeSeek) {
+                              _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                                if (!mounted) return;
+                                await _controller.play();
+                              });
+                            }
+                            _isSeeking = false;
+                            _dbgLog('Inline seek end to ${newPosition.inMilliseconds}');
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Pantalla completa',
-                      icon: const Icon(Icons.fullscreen, color: Colors.white),
-                      onPressed: () async {
-                        final start = await _controller.position ?? Duration.zero;
-                        if (!mounted) return;
-                        // Abrir página de pantalla completa
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => _FullscreenVideoPage(url: widget.url, startAt: start),
-                            fullscreenDialog: true,
+                      
+                      // Controles y tiempo
+                      Row(
+                        children: [
+                          // Botones de control
+                          IconButton(
+                            icon: const Icon(Icons.replay_10, color: Colors.white, size: 20),
+                            onPressed: () async {
+                              final pos = _position;
+                              final target = pos - const Duration(seconds: 10);
+                              await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
+                            },
                           ),
-                        );
-                      },
-                    ),
-                  ],
+                          IconButton(
+                            icon: const Icon(Icons.forward_10, color: Colors.white, size: 20),
+                            onPressed: () async {
+                              final pos = _position;
+                              final dur = _duration;
+                              final target = pos + const Duration(seconds: 10);
+                              await _controller.seekTo(target > dur ? dur : target);
+                            },
+                          ),
+                          
+                          // Tiempo actual / duración
+                          Expanded(
+                            child: Text(
+                              '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          
+                          // Botón de mute
+                          IconButton(
+                            icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
+                            onPressed: () async {
+                              _muted = !_muted;
+                              await _controller.setVolume(_muted ? 0.0 : 1.0);
+                              if (mounted) setState(() {});
+                            },
+                          ),
+                          
+                          // Botón de pantalla completa
+                          IconButton(
+                            icon: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
+                            onPressed: () async {
+                              final start = await _controller.position ?? Duration.zero;
+                              if (!mounted) return;
+                              // Abrir página de pantalla completa
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => _FullscreenVideoPage(url: widget.url, startAt: start),
+                                  fullscreenDialog: true,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            
+            // Logo de prueba
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  "Memoria Viva",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
+            
+            // Indicador de carga
+            if (!_initialized)
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+
+            // Debug overlay en modo debug
+            if (kDebugMode)
+              Positioned(
+                left: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
+                  child: Text(
+                    _dbgInfo(),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  void _dbgLog(String msg) {
+    // Prefijo útil para agrupar logs
+    print('[VideoDBG] $msg | url=${widget.url}');
+  }
+
+  void _dbgLogIfChanged({required String prefix}) {
+    final v = _controller.value;
+    final durMs = v.duration.inMilliseconds;
+    final posMs = v.position.inMilliseconds;
+    final init = v.isInitialized;
+    final buf = v.isBuffering;
+    final err = v.errorDescription;
+    if (durMs != _dbgLastDurMs || posMs != _dbgLastPosMs || init != _dbgLastInit || buf != _dbgLastBuf || err != _dbgLastErr) {
+      _dbgLastDurMs = durMs;
+      _dbgLastPosMs = posMs;
+      _dbgLastInit = init;
+      _dbgLastBuf = buf;
+      _dbgLastErr = err;
+      _dbgLog('$prefix state init=$init dur=$durMs pos=$posMs buf=$buf err=${err ?? 'none'}');
+    }
+  }
+
+  String _dbgInfo() {
+    final v = _controller.value;
+    return 'init=${v.isInitialized} buf=${v.isBuffering}\n'
+        'dur=${v.duration.inMilliseconds} pos=${v.position.inMilliseconds}\n'
+        'play=${v.isPlaying} err=${v.errorDescription ?? 'none'}';
   }
 }
 
@@ -695,25 +946,91 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
   bool _muted = false;
   bool _isSeeking = false;
   Timer? _resumeDebounce;
+  bool _wasPlayingBeforeSeek = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _controller = kIsWeb
         ? VideoPlayerController.network(widget.url)
-        : VideoPlayerController.networkUrl(Uri.parse(widget.url))
+        : VideoPlayerController.networkUrl(
+            Uri.parse(widget.url),
+            videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+            formatHint: _inferFormatFromUrl(widget.url),
+          )
       ..setLooping(false)
       ..initialize().then((_) async {
         await _controller.seekTo(widget.startAt);
-        if (mounted) setState(() => _initialized = true);
+        _duration = _controller.value.duration;
+        if (!kIsWeb && _duration == Duration.zero) {
+          await _warmUpAndPollDuration(_controller, muted: _muted);
+          _duration = _controller.value.duration;
+        }
+        if (mounted) {
+          setState(() => _initialized = true);
+          _controller.play();
+        }
       });
+    
+    // Listener para actualizar posición
+    _controller.addListener(() {
+      if (_controller.value.isInitialized && mounted && !_isSeeking) {
+        setState(() {
+          _position = _controller.value.position;
+        });
+      }
+    });
+    
+    // Forzar orientación landscape para pantalla completa
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   @override
   void dispose() {
     _resumeDebounce?.cancel();
     _controller.dispose();
+    // Restaurar orientación
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
     super.dispose();
+  }
+  
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  VideoFormat? _inferFormatFromUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.contains('.mp4')) return VideoFormat.other;
+    if (lower.contains('.m3u8')) return VideoFormat.hls;
+    if (lower.contains('.webm')) return VideoFormat.other;
+    if (lower.contains('.mov')) return VideoFormat.other;
+    return null;
+  }
+
+  Future<void> _warmUpAndPollDuration(VideoPlayerController controller, {required bool muted}) async {
+    try {
+      await controller.setVolume(0.0);
+      await controller.play();
+    } catch (_) {}
+    final sw = Stopwatch()..start();
+    while (mounted && sw.elapsed < const Duration(seconds: 3)) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      final d = controller.value.duration;
+      if (d > Duration.zero) break;
+    }
+    try {
+      await controller.pause();
+      await controller.setVolume(muted ? 0.0 : 1.0);
+    } catch (_) {}
   }
 
   @override
@@ -726,87 +1043,184 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
         title: const Text('Reproduciendo'),
       ),
       body: Center(
-        child: _initialized
-            ? Stack(
-                alignment: Alignment.center,
-                children: [
-                  AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio == 0 ? 16 / 9 : _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Video centrado
+            if (_initialized)
+              AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: VideoPlayer(_controller),
+              )
+            else
+              const CircularProgressIndicator(color: Colors.white),
+              
+            // Botón central play/pause
+            if (_initialized)
+              Center(
+                child: IconButton(
+                  iconSize: 64,
+                  icon: Icon(
+                    _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                    color: Colors.white,
                   ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      color: Colors.black45,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                            onPressed: () async {
-                              if (_controller.value.isPlaying) {
-                                await _controller.pause();
-                              } else {
+                  onPressed: () async {
+                    try {
+                      if (_controller.value.isPlaying) {
+                        await _controller.pause();
+                      } else {
+                        if (_muted) {
+                          await _controller.setVolume(1.0);
+                          _muted = false;
+                        }
+                        await _controller.play();
+                      }
+                      if (mounted) setState(() {});
+                    } catch (e) {
+                      print("Error al reproducir: $e");
+                    }
+                  },
+                ),
+              ),
+            
+            // Controles inferiores
+            if (_initialized)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                      stops: const [0.0, 1.0],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Slider para posición (pantalla completa)
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          activeTrackColor: Colors.white,
+                          inactiveTrackColor: Colors.white.withOpacity(0.3),
+                          thumbColor: Colors.white,
+                        ),
+                        child: Slider(
+                          min: 0,
+                          max: (() {
+                            final d = _duration.inMilliseconds;
+                            final p = _position.inMilliseconds;
+                            final ms = d > 0 ? d : (p + 1000);
+                            final m = ms.toDouble();
+                            return m < 1.0 ? 1.0 : m;
+                          })(),
+                          value: (() {
+                            final d = _duration.inMilliseconds;
+                            final p = _position.inMilliseconds;
+                            final maxMs = d > 0 ? d : (p + 1000);
+                            return p.clamp(0, maxMs).toDouble();
+                          })(),
+                          onChangeStart: (value) async {
+                            _isSeeking = true;
+                            _wasPlayingBeforeSeek = _controller.value.isPlaying;
+                            await _controller.pause();
+                          },
+                          onChanged: (value) {
+                            setState(() {
+                              _position = Duration(milliseconds: value.toInt());
+                            });
+                          },
+                          onChangeEnd: (value) async {
+                            final newPosition = Duration(milliseconds: value.toInt());
+                            await _controller.seekTo(newPosition);
+                            _resumeDebounce?.cancel();
+                            if (_wasPlayingBeforeSeek) {
+                              _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
+                                if (!mounted) return;
                                 await _controller.play();
-                              }
-                              if (mounted) setState(() {});
-                            },
-                          ),
+                              });
+                            }
+                            _isSeeking = false;
+                          },
+                        ),
+                      ),
+                      
+                      // Controles y tiempo
+                      Row(
+                        children: [
+                          // Botones de control
                           IconButton(
-                            icon: const Icon(Icons.replay_10, color: Colors.white),
+                            icon: const Icon(Icons.replay_10, color: Colors.white, size: 20),
                             onPressed: () async {
-                              final dur = _controller.value.duration;
-                              if (dur == Duration.zero) return;
-                              final pos = await _controller.position ?? Duration.zero;
+                              final pos = _position;
                               final target = pos - const Duration(seconds: 10);
                               await _controller.seekTo(target < Duration.zero ? Duration.zero : target);
                             },
                           ),
                           IconButton(
-                            icon: const Icon(Icons.forward_10, color: Colors.white),
+                            icon: const Icon(Icons.forward_10, color: Colors.white, size: 20),
                             onPressed: () async {
-                              final dur = _controller.value.duration;
-                              if (dur == Duration.zero) return;
-                              final pos = await _controller.position ?? Duration.zero;
+                              final pos = _position;
+                              final dur = _duration;
                               final target = pos + const Duration(seconds: 10);
                               await _controller.seekTo(target > dur ? dur : target);
                             },
                           ),
+                          
+                          // Tiempo actual / duración
+                          Expanded(
+                            child: Text(
+                              '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          
+                          // Botón de mute
                           IconButton(
-                            icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white),
+                            icon: Icon(_muted ? Icons.volume_off : Icons.volume_up, color: Colors.white, size: 20),
                             onPressed: () async {
                               _muted = !_muted;
                               await _controller.setVolume(_muted ? 0.0 : 1.0);
                               if (mounted) setState(() {});
                             },
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Listener(
-                              onPointerDown: (_) async {
-                                _isSeeking = true;
-                                await _controller.pause();
-                              },
-                              onPointerUp: (_) {
-                                _resumeDebounce?.cancel();
-                                _resumeDebounce = Timer(const Duration(milliseconds: 150), () async {
-                                  if (!mounted) return;
-                                  await _controller.play();
-                                });
-                                _isSeeking = false;
-                              },
-                              child: VideoProgressIndicator(_controller, allowScrubbing: true, colors: VideoProgressColors(playedColor: Colors.white)),
-                            ),
-                          ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              )
-            : const CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            
+            // Logo de prueba
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  "Memoria Viva",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -934,7 +1348,10 @@ class _AudioPlayerCardState extends State<_AudioPlayerCard> {
                       },
                       child: Slider(
                         min: 0,
-                        max: _duration.inMilliseconds.toDouble().clamp(1, double.infinity),
+                        max: () {
+                          final m = _duration.inMilliseconds.toDouble();
+                          return m < 1.0 ? 1.0 : m;
+                        }(),
                         value: _position.inMilliseconds.clamp(0, _duration.inMilliseconds).toDouble(),
                         onChanged: (v) => _player.seek(Duration(milliseconds: v.toInt())),
                       ),
