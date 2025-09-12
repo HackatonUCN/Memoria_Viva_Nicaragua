@@ -243,12 +243,13 @@ class _FeedScreenState extends State<FeedScreen> {
                       (context, index) {
                         final relato = provider.relatos[index];
                         final showMore = provider.filtro == FeedFilter.mis && provider.isLoggedIn && relato.autorId == provider.currentUserId;
+                        final bool isOwner = provider.currentUserId != null && relato.autorId == provider.currentUserId;
                         return RepaintBoundary(
                           key: ValueKey(relato.id),
                           child: RelatoCard(
                             relato: relato,
                             onTap: () => RelatoDetailOverlay.open(context, relato),
-                            onLike: () async { await provider.toggleLike(relato.id); },
+                            onLike: isOwner ? null : () async { await provider.toggleLike(relato.id); },
                             onShare: () async {
                               final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
                               final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';

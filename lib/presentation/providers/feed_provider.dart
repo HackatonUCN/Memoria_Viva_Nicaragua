@@ -63,17 +63,26 @@ class FeedProvider extends ChangeNotifier {
   // Estado efímero: relatos a los que el usuario actual ha dado like en esta sesión
   final Set<String> _likedByMe = <String>{};
   bool isLiked(String relatoId) => _likedByMe.contains(relatoId);
+  bool _awaitingFeedForLiked = false;
 
   Future<void> init() async {
     _listenConnectivity();
     await _loadCurrentUser();
+    // Precargar likes del usuario para que íconos y filtro "Me gusta" funcionen desde el inicio
+    if (_currentUserId != null) {
+      await _loadAllLikedIds();
+    }
     _authSub?.cancel();
-    _authSub = _useCases.auth.getCurrentUser.observe().listen((user) {
+    _authSub = _useCases.auth.getCurrentUser.observe().listen((user) async {
       _currentUserId = user?.id;
       // Al cambiar de usuario, refrescar likes propios visibles
       _likedByMe.clear();
-      if (_currentUserId != null && _allRelatos.isNotEmpty) {
-        _refreshLikedByMe();
+      if (_currentUserId != null) {
+        // Cargar set global de liked para consistencia inmediata
+        await _loadAllLikedIds();
+        if (_allRelatos.isNotEmpty && filtro != FeedFilter.liked) {
+          _refreshLikedByMe(visibles: _applyFilterAndSort(_activeSource()));
+        }
       }
       relatos = _applyFilterAndSort(_activeSource());
       notifyListeners();
@@ -147,14 +156,23 @@ class FeedProvider extends ChangeNotifier {
     notifyListeners();
 
     _relatosSub?.cancel();
-    _relatosSub = _useCases.relatos.obtener.observe().listen((data) {
+    _relatosSub = _useCases.relatos.obtener.observe().listen((data) async {
       _allRelatos = data;
-      // Cargar estado de likes propios para los relatos visibles
-      if (_currentUserId != null && filtro != FeedFilter.liked) {
-        _refreshLikedByMe(visibles: relatos);
+      // Calcular visibles con la fuente actual (búsqueda o feed completo)
+      if (filtro == FeedFilter.liked) {
+        if (_currentUserId != null && _likedByMe.isEmpty) {
+          await _loadAllLikedIds();
+        }
+        relatos = _applyFilterAndSort(_activeSource());
+      } else {
+        final visibles = _applyFilterAndSort(_activeSource());
+        if (_currentUserId != null) {
+          await _refreshLikedByMe(visibles: visibles);
+        }
+        relatos = visibles;
       }
-      relatos = _applyFilterAndSort(_activeSource());
       feedLoading = false;
+      _awaitingFeedForLiked = false;
       notifyListeners();
     }, onError: (err) {
       feedError = err.toString();
@@ -233,13 +251,20 @@ class FeedProvider extends ChangeNotifier {
       feedLoading = true;
       notifyListeners();
       await _loadAllLikedIds();
-      feedLoading = false;
+      _awaitingFeedForLiked = _allRelatos.isEmpty;
+      if (!_awaitingFeedForLiked) {
+        relatos = _applyFilterAndSort(_activeSource());
+        feedLoading = false;
+      }
     } else if (_currentUserId != null) {
       // Para otros filtros, refrescar likes de visibles para iconos
-      await _refreshLikedByMe(visibles: _applyFilterAndSort(_activeSource()));
+      // Importante: refrescar por el conjunto completo para evitar misses al paginar
+      await _refreshLikedByMe(visibles: _allRelatos);
     }
 
-    relatos = _applyFilterAndSort(_activeSource());
+    if (filtro != FeedFilter.liked || !_awaitingFeedForLiked) {
+      relatos = _applyFilterAndSort(_activeSource());
+    }
     notifyListeners();
   }
 
@@ -299,8 +324,20 @@ class FeedProvider extends ChangeNotifier {
     try {
       final String? uid = _currentUserId;
       if (uid == null) return;
-      // Consultar likes del usuario actual sobre los relatos visibles
+      // Si ya tenemos el set global, podemos opcionalmente intersectar con visibles para acelerar
+      if (_likedByMe.isNotEmpty && visibles != null) {
+        final Set<String> visiblesIds = visibles.map((e) => e.id).toSet();
+        final Set<String> intersect = _likedByMe.intersection(visiblesIds);
+        _likedByMe
+          ..clear()
+          ..addAll(intersect);
+        notifyListeners();
+        return;
+      }
+
+      // Fallback: consultar por visibles
       final List<Relato> visiblesList = visibles ?? _applyFilterAndSort(_activeSource());
+      if (visiblesList.isEmpty) return;
       final List<Future<void>> tasks = [];
       final Set<String> newSet = <String>{};
       for (final r in visiblesList) {
