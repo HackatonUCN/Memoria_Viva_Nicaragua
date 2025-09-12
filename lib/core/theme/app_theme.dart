@@ -11,11 +11,13 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.background,
+      canvasColor: AppColors.background,
       colorScheme: ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.accent,
         tertiary: AppColors.primaryDark,
         surface: AppColors.surface,
+        background: AppColors.background,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
@@ -103,11 +105,14 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      scaffoldBackgroundColor: AppColors.darkBackground,
+      canvasColor: AppColors.darkBackground,
       colorScheme: ColorScheme.dark(
         primary: AppColors.primary,
         secondary: AppColors.accent,
         tertiary: AppColors.primaryDark,
         surface: AppColors.darkSurface,
+        background: AppColors.darkBackground,
         error: AppColors.error,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
@@ -151,7 +156,7 @@ class AppTheme {
         clipBehavior: Clip.antiAlias,
         margin: AppSpacing.marginSm,
         color: AppColors.darkSurfaceVariant,
-        shadowColor: AppColors.cardShadow,
+        shadowColor: AppColors.darkCardShadow,
       ),
 
       // Input Decorations
@@ -188,7 +193,7 @@ class AppTheme {
 
       // Divider Theme
       dividerTheme: DividerThemeData(
-        color: AppColors.darkTextSecondary.withOpacity(0.2),
+        color: AppColors.darkDivider,
         space: AppSpacing.sm,
         thickness: 1,
       ),
