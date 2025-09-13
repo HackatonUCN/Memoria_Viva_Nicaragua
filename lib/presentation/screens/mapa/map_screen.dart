@@ -14,12 +14,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:ui' as ui;
+import 'package:get_it/get_it.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../providers/map_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../widgets/relatos/relato_detail_overlay.dart';
 import '../../../domain/entities/relato.dart';
+import '../../../domain/services/i_geolocation_service.dart';
 
 class MapScreen extends StatefulWidget {
   final String? focusRelatoId;
@@ -32,7 +34,7 @@ class MapScreen extends StatefulWidget {
 // Implementación simple de TickerProvider para animaciones
 class _TickerProviderImpl extends TickerProvider {
   const _TickerProviderImpl();
-  
+
   @override
   Ticker createTicker(TickerCallback onTick) => Ticker(onTick, debugLabel: 'MapAnimationTicker');
 }
@@ -43,6 +45,7 @@ class _MapScreenState extends State<MapScreen> {
   double _zoom = 6.5;
   bool _didProviderInit = false;
   bool _showRelatosList = false; // Controla la visibilidad de la lista lateral
+  latlng.LatLng? _userHere; // Última ubicación del usuario para mostrar punto azul
   // Eliminando state para simplificar
   // final Set<String> _pressedMarkers = {}; // IDs de marcadores mientras están presionados (tooltip)
   // final Map<String, Timer> _pressTimers = {}; // Temporizadores por marcador para long press (tooltip)
@@ -91,7 +94,7 @@ class _MapScreenState extends State<MapScreen> {
           final p = context.read<MapProvider>();
           p.setMapView(lat: loc.lat, lng: loc.lng, newZoom: destZoom);
           Future.delayed(const Duration(milliseconds: 550), () { _updateBounds(p); });
-          
+
           // Si hay navegación desde feed, mostrar lista lateral
           if (widget.focusRelatoId != null && mounted) {
             setState(() {
@@ -124,29 +127,29 @@ class _MapScreenState extends State<MapScreen> {
     if (relato.ubicacion?.latitud == null || relato.ubicacion?.longitud == null) {
       return false;
     }
-    
+
     final lat = relato.ubicacion!.latitud;
     final lng = relato.ubicacion!.longitud;
-    
-    return lat >= bounds.south && 
-           lat <= bounds.north && 
-           lng >= bounds.west && 
-           lng <= bounds.east;
+
+    return lat >= bounds.south &&
+        lat <= bounds.north &&
+        lng >= bounds.west &&
+        lng <= bounds.east;
   }
 
   // Widget para la lista lateral de relatos
   Widget _buildRelatosList(MapProvider provider, BoxConstraints constraints) {
     final bool isSmallScreen = constraints.maxWidth < 900;
-    final double listWidth = isSmallScreen ? constraints.maxWidth * 0.85 : 320;
-    
+    final double listWidth = isSmallScreen ? constraints.maxWidth * 0.92 : 320;
+
     // Filtrar relatos visibles en el mapa actual
     List<Relato> visibleRelatos = [];
     try {
       // Verificar que el controlador esté montado antes de acceder a la cámara
       if (_mapController.camera != null) {
         final bounds = _mapController.camera.visibleBounds;
-        visibleRelatos = provider.relatos.where((r) => 
-          r.ubicacion != null && _isRelatoInBounds(r, bounds)
+        visibleRelatos = provider.relatos.where((r) =>
+        r.ubicacion != null && _isRelatoInBounds(r, bounds)
         ).toList();
       } else {
         // Si el mapa no está listo, mostrar todos los relatos con ubicación
@@ -200,135 +203,140 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
             ),
-            
+
             // Lista de relatos
             Expanded(
               child: visibleRelatos.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                  ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: AppColors.textSecondary),
+                      SizedBox(height: 8),
+                      Text(
+                        'No hay relatos en esta área',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Mueve el mapa para explorar',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.separated(
+                padding: const EdgeInsets.all(8),
+                itemCount: visibleRelatos.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final relato = visibleRelatos[index];
+                  final isSelected = relato.id == provider.focusRelatoId;
+                  final categoryColor = AppColors.categoryColor(categoryId: relato.categoriaId);
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    elevation: isSelected ? 4 : 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected ? AppColors.primary : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: RadioListTile<String>(
+                      title: Text(
+                        relato.titulo,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: isSmallScreen ? 15 : 14,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.search_off, size: 48, color: AppColors.textSecondary),
-                          SizedBox(height: 8),
-                          Text(
-                            'No hay relatos en esta área',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Mueve el mapa para explorar',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
+                          if (relato.ubicacion != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.location_on, size: 12, color: categoryColor),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      relato.ubicacion!.obtenerDireccionFormateada(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Row(
+                              children: [
+                                Icon(Icons.person, size: 12, color: AppColors.textSecondary),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    relato.autorNombre,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: visibleRelatos.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final relato = visibleRelatos[index];
-                      final isSelected = relato.id == provider.focusRelatoId;
-                      final categoryColor = AppColors.categoryColor(categoryId: relato.categoriaId);
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 2),
-                        elevation: isSelected ? 4 : 1,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: isSelected ? AppColors.primary : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: RadioListTile<String>(
-                          title: Text(
-                            relato.titulo,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              fontSize: 14,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (relato.ubicacion != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.location_on, size: 12, color: categoryColor),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          relato.ubicacion!.obtenerDireccionFormateada(),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.person, size: 12, color: AppColors.textSecondary),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        relato.autorNombre,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          value: relato.id,
-                          groupValue: provider.focusRelatoId,
-                          activeColor: AppColors.primary,
-                          dense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          onChanged: (value) {
-                            if (value != null) {
-                              // Focalizar en el provider
-                              provider.requestFocusOnRelato(value);
-                              
-                              // Centrar mapa en el relato
-                              final lat = relato.ubicacion!.latitud;
-                              final lng = relato.ubicacion!.longitud;
-                              _animatedMapMove(latlng.LatLng(lat, lng), 15.0);
-                              
-                              // Abrir overlay con el relato
-                              Future.delayed(const Duration(milliseconds: 400), () {
-                                if (mounted) {
-                                  _openRelatoOverlay(context, relato);
-                                }
-                              });
+                      value: relato.id,
+                      groupValue: provider.focusRelatoId,
+                      activeColor: AppColors.primary,
+                      dense: isSmallScreen ? false : true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: isSmallScreen ? 8 : 4),
+                      onChanged: (value) {
+                        if (value != null) {
+                          // Focalizar en el provider
+                          provider.requestFocusOnRelato(value);
+
+                          // Centrar mapa en el relato
+                          final lat = relato.ubicacion!.latitud;
+                          final lng = relato.ubicacion!.longitud;
+                          _animatedMapMove(latlng.LatLng(lat, lng), 15.0);
+
+                          // En pantallas pequeñas, cerrar la lista automáticamente
+                          if (isSmallScreen && mounted) {
+                            setState(() { _showRelatosList = false; });
+                          }
+
+                          // Abrir overlay con el relato
+                          Future.delayed(const Duration(milliseconds: 400), () {
+                            if (mounted) {
+                              _openRelatoOverlay(context, relato);
                             }
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                          });
+                        }
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -338,15 +346,27 @@ class _MapScreenState extends State<MapScreen> {
 
   // Botón flotante para mostrar/ocultar la lista en pantallas pequeñas
   Widget _buildToggleListButton(bool isSmallScreen) {
-    if (!isSmallScreen) return const SizedBox.shrink();
-    
+    if (isSmallScreen) {
+      return Positioned(
+        right: 12,
+        top: 60,
+        child: _roundIconButton(
+          icon: (_showRelatosList == true) ? Icons.list_alt : Icons.list_alt_outlined,
+          tooltip: (_showRelatosList == true) ? 'Ocultar lista' : 'Mostrar lista de relatos',
+          onTap: () => setState(() => _showRelatosList = !(_showRelatosList == true)),
+        ),
+      );
+    }
+
+    // En pantallas grandes: mostrar botón solo cuando la lista esté cerrada
+    if (_showRelatosList == true) return const SizedBox.shrink();
     return Positioned(
       right: 12,
-      top: 60,
+      top: 64,
       child: _roundIconButton(
-        icon: (_showRelatosList == true) ? Icons.list_alt : Icons.list_alt_outlined,
-        tooltip: (_showRelatosList == true) ? 'Ocultar lista' : 'Mostrar lista de relatos',
-        onTap: () => setState(() => _showRelatosList = !(_showRelatosList == true)),
+        icon: Icons.list_alt_outlined,
+        tooltip: 'Mostrar lista de relatos',
+        onTap: () => setState(() => _showRelatosList = true),
       ),
     );
   }
@@ -394,19 +414,19 @@ class _MapScreenState extends State<MapScreen> {
       _updateBounds(p);
     });
   }
-  
+
   void _updateBounds([MapProvider? provider]) {
     try {
       final bounds = _mapController.camera.visibleBounds;
       // Actualizar bounds del mapa
       // Aplicamos un ligero padding a los límites para asegurar que vemos suficientes relatos
       final padding = 0.05;
-      
+
       if (provider != null) {
         provider.setBounds(
-          s: bounds.south - padding, 
-          w: bounds.west - padding, 
-          n: bounds.north + padding, 
+          s: bounds.south - padding,
+          w: bounds.west - padding,
+          n: bounds.north + padding,
           e: bounds.east + padding,
         );
       } else {
@@ -415,9 +435,9 @@ class _MapScreenState extends State<MapScreen> {
           try {
             final p = context.read<MapProvider>();
             p.setBounds(
-              s: bounds.south - padding, 
-              w: bounds.west - padding, 
-              n: bounds.north + padding, 
+              s: bounds.south - padding,
+              w: bounds.west - padding,
+              n: bounds.north + padding,
               e: bounds.east + padding,
             );
           } catch (e) {
@@ -436,13 +456,50 @@ class _MapScreenState extends State<MapScreen> {
     return size.clamp(24, 56);
   }
 
+  // Intento robusto para obtener la ubicación actual con la mayor precisión posible
+  Future<Position> _getPrecisePosition() async {
+    // 1) Intento con la mejor precisión disponible
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+        timeLimit: const Duration(seconds: 12),
+      );
+    } catch (_) {}
+
+    // 2) Intento tomar el primer valor del stream de alta precisión
+    try {
+      final stream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+        ),
+      );
+      return await stream.first.timeout(const Duration(seconds: 14));
+    } catch (_) {}
+
+    // 3) Intento con precisión alta estándar
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (_) {}
+
+    // 4) Último recurso: última ubicación conocida
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null) return last;
+
+    // Si nada funcionó, lanzar error genérico
+    throw Exception('No se pudo obtener la ubicación actual');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<MapProvider>(
       create: (_) => MapProvider(),
       builder: (context, _) {
         final provider = context.watch<MapProvider>();
-            if (!_didProviderInit) {
+        if (!_didProviderInit) {
           _didProviderInit = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             provider.initialFetchIfNeeded();
@@ -465,7 +522,7 @@ class _MapScreenState extends State<MapScreen> {
               Future.delayed(const Duration(milliseconds: 550), () {
                 _updateBounds(provider);
               });
-              
+
               // Si viene navegación desde feed, mostrar lista lateral automáticamente
               if (toFocus != null && mounted) {
                 setState(() {
@@ -493,7 +550,7 @@ class _MapScreenState extends State<MapScreen> {
             _moveCameraToFocusIfRequested(provider);
           } catch (_) {}
         });
-        
+
         // Información del estado del mapa omitida en producción
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -515,10 +572,10 @@ class _MapScreenState extends State<MapScreen> {
                         final p = context.read<MapProvider>();
                         _updateBounds(p); // Pasar el provider directamente
                         p.setMapView(
-                              lat: _mapController.camera.center.latitude,
-                              lng: _mapController.camera.center.longitude,
-                              newZoom: _mapController.camera.zoom,
-                            );
+                          lat: _mapController.camera.center.latitude,
+                          lng: _mapController.camera.center.longitude,
+                          newZoom: _mapController.camera.zoom,
+                        );
                         // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
                         p.clearFocus();
                       } catch (e) {
@@ -530,15 +587,15 @@ class _MapScreenState extends State<MapScreen> {
                         setState(() => _zoom = newZoom);
                       }
                     }
-                        // Si el provider solicitó mover cámara por foco, ejecutar
-                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                       try {
-                         final p = context.read<MapProvider>();
-                         _moveCameraToFocusIfRequested(p);
-                       } catch (e) {
-                         // Error al acceder al provider en onMapEvent
-                       }
-                     });
+                    // Si el provider solicitó mover cámara por foco, ejecutar
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      try {
+                        final p = context.read<MapProvider>();
+                        _moveCameraToFocusIfRequested(p);
+                      } catch (e) {
+                        // Error al acceder al provider en onMapEvent
+                      }
+                    });
                   },
                   onTap: (tapPos, point) {
                     // Limpiar selección si se toca el mapa
@@ -582,6 +639,28 @@ class _MapScreenState extends State<MapScreen> {
                       computeSize: (markers) => const Size(36, 36),
                     ),
                   ),
+                  // Marcador de ubicación del usuario (punto azul)
+                  if (provider.userLocation != null || _userHere != null)
+                    MarkerLayer(markers: [
+                      Marker(
+                        point: latlng.LatLng(
+                          (_userHere?.latitude) ?? provider.userLocation!.latitude,
+                          (_userHere?.longitude) ?? provider.userLocation!.longitude,
+                        ),
+                        width: 18,
+                        height: 18,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: const [
+                              BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 2)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]),
                 ],
               ),
 
@@ -594,15 +673,15 @@ class _MapScreenState extends State<MapScreen> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final bool isSmallScreen = constraints.maxWidth < 900;
-                    
+
                     return Stack(
                       children: [
                         // Lista lateral de relatos
                         _buildRelatosList(provider, constraints),
-                        
+
                         // Botón para mostrar/ocultar lista en pantallas pequeñas
                         _buildToggleListButton(isSmallScreen),
-                        
+
                         // Botones de zoom y navegación (derecha)
                         Positioned(
                           right: (_showRelatosList == true && !isSmallScreen) ? 344 : 12, // Ajustar posición según lista
@@ -629,90 +708,77 @@ class _MapScreenState extends State<MapScreen> {
                                 },
                               ),
                               const SizedBox(height: 8),
-                               _roundIconButton(
-                                 icon: Icons.my_location,
-                                 tooltip: 'Mi ubicación',
-                                 onTap: () async {
-                         try {
-                           // Mostrar indicador de carga
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(content: Text('Obteniendo tu ubicación...'), duration: Duration(seconds: 2))
-                           );
-                           
-                           // Asegurar permisos
-                           final hasPermission = await _ensureLocationPermission(context);
-                           if (!hasPermission) return;
-                           
-                           // Estrategia de ubicación mejorada
-                           Position pos;
-                           
-                           // 1. Intentar con alta precisión primero
-                           try {
-                             pos = await Geolocator.getCurrentPosition(
-                               desiredAccuracy: LocationAccuracy.best,
-                               timeLimit: const Duration(seconds: 8),
-                             );
-                           } catch (e1) {
-                             // 2. Si falla, intentar con precisión media
-                             try {
-                               pos = await Geolocator.getCurrentPosition(
-                                 desiredAccuracy: LocationAccuracy.medium,
-                                 timeLimit: const Duration(seconds: 5),
-                               );
-                             } catch (e2) {
-                               // 3. Último recurso: obtener la última posición conocida
-                               try {
-                                 final lastPos = await Geolocator.getLastKnownPosition();
-                                 if (lastPos != null) {
-                                   pos = lastPos;
-                                   if (context.mounted) {
-                                     ScaffoldMessenger.of(context).showSnackBar(
-                                       const SnackBar(content: Text('Usando última ubicación conocida'))
-                                     );
-                                   }
-                                 } else {
-                                   throw Exception('No se pudo obtener la ubicación');
-                                 }
-                               } catch (e3) {
-                                 throw Exception('No se pudo obtener la ubicación');
-                               }
-                             }
-                           }
-                           
-                           // Verificar si la ubicación es válida
-                           if (pos.latitude == 0 && pos.longitude == 0) {
-                             throw Exception('Ubicación no válida');
-                           }
-                           
-                           // Centrar mapa en la ubicación
-                           final here = latlng.LatLng(pos.latitude, pos.longitude);
-                           _mapController.move(here, 15);
-                           
-                           // Actualizar provider
-                           try {
-                             final p = context.read<MapProvider>();
-                             // Guardar la ubicación del usuario en el provider
-                             p.userLocation = pos;
-                             p.setMapView(
-                                   lat: here.latitude,
-                                   lng: here.longitude,
-                                   newZoom: 15,
-                                 );
-                             _updateBounds(p);
-                             
-                             // Mostrar confirmación
-                             if (context.mounted) {
-                               ScaffoldMessenger.of(context).showSnackBar(
-                                 const SnackBar(content: Text('Ubicación obtenida correctamente'))
-                               );
-                             }
-                           } catch (e) {
-                             // Error al actualizar vista del mapa en mi ubicación
-                           }
-                         } catch (e) {
-                           if (!mounted) return;
-                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo obtener ubicación: $e')));
-                         }
+                              _roundIconButton(
+                                icon: Icons.my_location,
+                                tooltip: 'Mi ubicación',
+                                onTap: () async {
+                                  try {
+                                    // Mostrar indicador de carga
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Obteniendo tu ubicación...'), duration: Duration(seconds: 2))
+                                    );
+
+                                    // Asegurar permisos
+                                    final hasPermission = await _ensureLocationPermission(context);
+                                    if (!hasPermission) return;
+
+                                    // Obtener ubicación precisa con múltiples estrategias
+                                    final Position pos = await _getPrecisePosition();
+
+                                    // Verificar si la ubicación es válida
+                                    if (pos.latitude == 0 && pos.longitude == 0) {
+                                      throw Exception('Ubicación no válida');
+                                    }
+
+                                    // Des-seleccionar cualquier relato para no re-centrar
+                                    try {
+                                      final p = context.read<MapProvider>();
+                                      p.clearFocus();
+                                    } catch (_) {}
+
+                                    // Centrar mapa en la ubicación con animación y guardar punto azul
+                                    final here = latlng.LatLng(pos.latitude, pos.longitude);
+                                    setState(() { _userHere = here; });
+                                    _animatedMapMove(here, 15.5);
+
+                                    // Actualizar provider
+                                    try {
+                                      final p = context.read<MapProvider>();
+                                      // Guardar la ubicación del usuario en el provider
+                                      p.userLocation = pos;
+                                      p.setMapView(
+                                        lat: here.latitude,
+                                        lng: here.longitude,
+                                        newZoom: 15.5,
+                                      );
+                                      _updateBounds(p);
+
+                                      // Obtener dirección si hay servicio disponible
+                                      String? direccion;
+                                      try {
+                                        final getIt = GetIt.I;
+                                        if (getIt.isRegistered<IGeolocationService>()) {
+                                          final geo = getIt<IGeolocationService>();
+                                          direccion = await geo.obtenerDireccion(here.latitude, here.longitude);
+                                        }
+                                      } catch (_) {}
+
+                                      // Mostrar confirmación con dirección si disponible
+                                      if (context.mounted) {
+                                        final text = (direccion != null && direccion.isNotEmpty)
+                                            ? 'Ubicación obtenida: $direccion'
+                                            : 'Ubicación obtenida correctamente';
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(text)),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      // Error al actualizar vista del mapa en mi ubicación
+                                    }
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo obtener ubicación: $e')));
+                                  }
                                 },
                               ),
                               const SizedBox(height: 8),
@@ -727,11 +793,11 @@ class _MapScreenState extends State<MapScreen> {
                             ],
                           ),
                         ),
-                        
+
                         // Toggle cercanos (izquierda arriba)
                         Positioned(
                           left: 12,
-                          top: 12,
+                          top: isSmallScreen ? 116 : 12,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
@@ -754,7 +820,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                         ),
-                        
+
                         // Filtros por categoría (barra superior)
                         Positioned(
                           left: 12,
@@ -844,10 +910,10 @@ class _MapScreenState extends State<MapScreen> {
     // Obtener el MapProvider para verificar si el relato está seleccionado
     final provider = Provider.of<MapProvider>(context, listen: false);
     final bool isSelected = r.id == provider.focusRelatoId;
-    
+
     // Tamaño base del marcador sin amplificación excesiva
     final size = _markerSize(_zoom);
-    
+
     return Marker(
       point: latlng.LatLng(r.ubicacion!.latitud, r.ubicacion!.longitud),
       width: size,
@@ -863,9 +929,9 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
-  
+
   // Eliminado método duplicado
-  
+
   // Método para abrir el overlay de forma confiable
   void _openRelatoOverlay(BuildContext context, Relato r) {
     // Usar el método original pero con try-catch para evitar errores
@@ -873,11 +939,11 @@ class _MapScreenState extends State<MapScreen> {
       RelatoDetailOverlay.open(context, r);
     } catch (e) {
       print('ERROR al abrir overlay: $e');
-      
+
       // Intento alternativo directo
       Future.delayed(const Duration(milliseconds: 100), () {
         if (!mounted) return;
-        
+
         try {
           showModalBottomSheet(
             context: context,
@@ -918,18 +984,18 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // Eliminado método _openOverlayOnce
-  
-   // Método separado para reducir reconstrucciones innecesarias
-   Widget _buildMarkerContent(Color color, double size, bool isSelected, Relato r) {
-     return _pinIcon(color, size, isSelected);
-   }
-   
+
+  // Método separado para reducir reconstrucciones innecesarias
+  Widget _buildMarkerContent(Color color, double size, bool isSelected, Relato r) {
+    return _pinIcon(color, size, isSelected);
+  }
+
 
   // Optimización: Simplificar icono de pin para mejor rendimiento
   Widget _pinIcon(Color color, double size, bool isSelected) {
     // En dispositivos móviles o con zoom bajo, usar un icono más simple
     final bool useSimpleIcon = !kIsWeb || _zoom < 10;
-    
+
     if (useSimpleIcon) {
       return Container(
         width: size * 0.8,
@@ -951,7 +1017,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
     }
-    
+
     // Versión completa para web o zoom alto
     return Stack(
       alignment: Alignment.center,
@@ -965,110 +1031,110 @@ class _MapScreenState extends State<MapScreen> {
   }
 
 
-  
 
-   // Implementación personalizada de animación de movimiento del mapa
-   void _animatedMapMove(latlng.LatLng destLocation, double destZoom) {
-     // Obtener posición y zoom actuales
-     final latTween = Tween<double>(
-       begin: _mapController.camera.center.latitude,
-       end: destLocation.latitude,
-     );
-     final lngTween = Tween<double>(
-       begin: _mapController.camera.center.longitude,
-       end: destLocation.longitude,
-     );
-     final zoomTween = Tween<double>(
-       begin: _mapController.camera.zoom,
-       end: destZoom,
-     );
 
-     // Crear un controlador de animación
-     final controller = AnimationController(
-       duration: const Duration(milliseconds: 500),
-       vsync: const _TickerProviderImpl(),
-     );
+  // Implementación personalizada de animación de movimiento del mapa
+  void _animatedMapMove(latlng.LatLng destLocation, double destZoom) {
+    // Obtener posición y zoom actuales
+    final latTween = Tween<double>(
+      begin: _mapController.camera.center.latitude,
+      end: destLocation.latitude,
+    );
+    final lngTween = Tween<double>(
+      begin: _mapController.camera.center.longitude,
+      end: destLocation.longitude,
+    );
+    final zoomTween = Tween<double>(
+      begin: _mapController.camera.zoom,
+      end: destZoom,
+    );
 
-     // Añadir listener para actualizar el mapa en cada frame
-     controller.addListener(() {
-       final lat = latTween.evaluate(controller);
-       final lng = lngTween.evaluate(controller);
-       final zoom = zoomTween.evaluate(controller);
-       
-       _mapController.move(latlng.LatLng(lat, lng), zoom);
-     });
+    // Crear un controlador de animación
+    final controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: const _TickerProviderImpl(),
+    );
 
-     // Iniciar la animación
-     controller.forward().then((value) => controller.dispose());
-   }
-   
-   Future<bool> _ensureLocationPermission(BuildContext context) async {
-     // 1. Verificar si el servicio de ubicación está habilitado
-     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-     if (!serviceEnabled) {
-       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('El servicio de ubicación está desactivado. Por favor, actívalo.'))
-         );
-       }
-       
-       // En web, mostrar instrucciones específicas
-       if (kIsWeb && context.mounted) {
-         showDialog(
-           context: context,
-           builder: (ctx) => AlertDialog(
-             title: const Text('Activar ubicación'),
-             content: const Text(
-               'Para usar tu ubicación en web:\n'
-               '1. Asegura que tu navegador tenga permisos de ubicación\n'
-               '2. Verifica que el sitio use HTTPS\n'
-               '3. Permite el acceso cuando el navegador lo solicite'
-             ),
-             actions: [
-               TextButton(
-                 onPressed: () => Navigator.pop(ctx),
-                 child: const Text('Entendido'),
-               ),
-             ],
-           ),
-         );
-       } else {
-         // En dispositivos móviles, abrir configuración
-         await Geolocator.openLocationSettings();
-       }
-       return false;
-     }
-     
-     // 2. Verificar permisos de ubicación
-     LocationPermission permission = await Geolocator.checkPermission();
-     if (permission == LocationPermission.denied) {
-       // Solicitar permiso
-       permission = await Geolocator.requestPermission();
-       if (permission == LocationPermission.denied) {
-         if (context.mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Permiso de ubicación denegado. No podemos obtener tu ubicación.'))
-           );
-         }
-         return false;
-       }
-     }
-     
-     // 3. Manejar el caso de permiso denegado permanentemente
-     if (permission == LocationPermission.deniedForever) {
-       if (context.mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-             content: Text('Permiso de ubicación denegado permanentemente. Cambia los permisos en la configuración.'),
-             duration: Duration(seconds: 5),
-           )
-         );
-       }
-       return false;
-     }
-     
-     return true;
-   }
+    // Añadir listener para actualizar el mapa en cada frame
+    controller.addListener(() {
+      final lat = latTween.evaluate(controller);
+      final lng = lngTween.evaluate(controller);
+      final zoom = zoomTween.evaluate(controller);
+
+      _mapController.move(latlng.LatLng(lat, lng), zoom);
+    });
+
+    // Iniciar la animación
+    controller.forward().then((value) => controller.dispose());
+  }
+
+  Future<bool> _ensureLocationPermission(BuildContext context) async {
+    // 1. Verificar si el servicio de ubicación está habilitado
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('El servicio de ubicación está desactivado. Por favor, actívalo.'))
+        );
+      }
+
+      // En web, mostrar instrucciones específicas
+      if (kIsWeb && context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Activar ubicación'),
+            content: const Text(
+                'Para usar tu ubicación en web:\n'
+                    '1. Asegura que tu navegador tenga permisos de ubicación\n'
+                    '2. Verifica que el sitio use HTTPS\n'
+                    '3. Permite el acceso cuando el navegador lo solicite'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // En dispositivos móviles, abrir configuración
+        await Geolocator.openLocationSettings();
+      }
+      return false;
+    }
+
+    // 2. Verificar permisos de ubicación
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      // Solicitar permiso
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Permiso de ubicación denegado. No podemos obtener tu ubicación.'))
+          );
+        }
+        return false;
+      }
+    }
+
+    // 3. Manejar el caso de permiso denegado permanentemente
+    if (permission == LocationPermission.deniedForever) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permiso de ubicación denegado permanentemente. Cambia los permisos en la configuración.'),
+              duration: Duration(seconds: 5),
+            )
+        );
+      }
+      return false;
+    }
+
+    return true;
+  }
 }
 
 class _TrianglePainter extends CustomPainter {
@@ -1091,5 +1157,4 @@ class _TrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
 
