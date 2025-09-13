@@ -134,7 +134,7 @@ class _Content extends StatelessWidget {
                           ),
                         ),
                       );
-                      Navigator.of(context).pop(true);
+                      Navigator.of(context, rootNavigator: true).pop(true);
                     } else if (provider.errorMessage != null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(backgroundColor: AppColors.error, content: Text(provider.errorMessage!)),
