@@ -13,6 +13,7 @@ import 'package:memoria_viva_nicaragua/domain/services/i_analytics_service.dart'
 import 'package:memoria_viva_nicaragua/domain/entities/categoria.dart';
 import 'package:memoria_viva_nicaragua/domain/usecases/categorias/obtener_categorias_por_tipo_usecase.dart';
 import 'package:memoria_viva_nicaragua/domain/enums/tipos_contenido.dart';
+import 'package:memoria_viva_nicaragua/presentation/providers/relatos/relato_form_provider.dart';
 
 enum FeedFilter { recientes, populares, mis, liked }
 
@@ -31,6 +32,7 @@ class FeedProvider extends ChangeNotifier {
   List<Relato> relatos = [];
   // Fuente completa desde el stream
   List<Relato> _allRelatos = [];
+  final Map<String, int> _idToIndex = <String, int>{};
 
   // Búsqueda
   String searchQuery = '';
@@ -46,9 +48,10 @@ class FeedProvider extends ChangeNotifier {
 
   // Filtro actual
   FeedFilter filtro = FeedFilter.recientes;
+  bool filterSwitching = false;
 
-  // Paginación (simple): tamaño de página
-  int _pageSize = 20;
+  // Paginación (simple): tamaño de página (ajustado por plataforma)
+  int _pageSize = kIsWeb ? 16 : 20;
 
   // Estado de conectividad
   bool offline = false;
@@ -157,7 +160,18 @@ class FeedProvider extends ChangeNotifier {
 
     _relatosSub?.cancel();
     _relatosSub = _useCases.relatos.obtener.observe().listen((data) async {
+      // Deduplicar emisiones: si conjunto de IDs no cambió, evitar coste
+      final String prevKey = _allRelatos.isEmpty ? '' : _allRelatos.first.id;
+      final bool sameLength = data.length == _allRelatos.length;
+      bool sameIds = false;
+      if (sameLength) {
+        sameIds = true;
+        for (int i = 0; i < data.length; i++) {
+          if (data[i].id != _allRelatos[i].id) { sameIds = false; break; }
+        }
+      }
       _allRelatos = data;
+      _rebuildIndex();
       // Calcular visibles con la fuente actual (búsqueda o feed completo)
       if (filtro == FeedFilter.liked) {
         if (_currentUserId != null && _likedByMe.isEmpty) {
@@ -173,7 +187,9 @@ class FeedProvider extends ChangeNotifier {
       }
       feedLoading = false;
       _awaitingFeedForLiked = false;
-      notifyListeners();
+      if (!(sameLength && sameIds)) {
+        notifyListeners();
+      }
     }, onError: (err) {
       feedError = err.toString();
       feedLoading = false;
@@ -240,6 +256,8 @@ class FeedProvider extends ChangeNotifier {
     _pageSize = 20;
 
     filtro = value;
+    filterSwitching = true;
+    notifyListeners();
 
     // Si es filtro de "Me gusta", cargar IDs liked globalmente
     if (filtro == FeedFilter.liked) {
@@ -265,7 +283,11 @@ class FeedProvider extends ChangeNotifier {
     if (filtro != FeedFilter.liked || !_awaitingFeedForLiked) {
       relatos = _applyFilterAndSort(_activeSource());
     }
-    notifyListeners();
+    // Dar un pequeño margen para que la UI muestre skeletons y evitar jank de cambio abrupto
+    Future.microtask(() {
+      filterSwitching = false;
+      notifyListeners();
+    });
   }
 
   Future<void> refresh() async {
@@ -276,8 +298,8 @@ class FeedProvider extends ChangeNotifier {
   }
 
   Future<void> loadMore() async {
-    // Aumentar ventana de página y re-aplicar
-    _pageSize += 20;
+    // Aumentar ventana de página y re-aplicar (incremento menor en Web por peso de DOM/canvas)
+    _pageSize += (kIsWeb ? 12 : 20);
     relatos = _applyFilterAndSort(_allRelatos);
     notifyListeners();
   }
@@ -288,7 +310,7 @@ class FeedProvider extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final int idx = _allRelatos.indexWhere((r) => r.id == relatoId);
+    final int idx = _idToIndex[relatoId] ?? _allRelatos.indexWhere((r) => r.id == relatoId);
     final res = await _useCases.relatos.toggleLike.execute(relatoId: relatoId, userId: _currentUserId!);
     if (_getIt.isRegistered<IAnalyticsService>()) {
       await _getIt<IAnalyticsService>().registrarInteraccion(
@@ -309,6 +331,7 @@ class FeedProvider extends ChangeNotifier {
       final int delta = likedNow ? 1 : -1;
       final updated = r.copyWith(likes: (r.likes + delta).clamp(0, 1 << 31));
       _allRelatos[idx] = updated;
+      _idToIndex[relatoId] = idx;
       // Mantener marca efímera para icono de UI
       if (likedNow) {
         _likedByMe.add(relatoId);
@@ -385,7 +408,7 @@ class FeedProvider extends ChangeNotifier {
   }
 
   Future<void> compartir(String relatoId) async {
-    final int idx = _allRelatos.indexWhere((r) => r.id == relatoId);
+    final int idx = _idToIndex[relatoId] ?? _allRelatos.indexWhere((r) => r.id == relatoId);
     if (idx != -1) {
       _allRelatos[idx] = _allRelatos[idx].incrementarCompartidos();
       relatos = _applyFilterAndSort(_allRelatos);
@@ -408,6 +431,62 @@ class FeedProvider extends ChangeNotifier {
         notifyListeners();
       }
       feedError = res.errorOrNull?.message;
+    }
+  }
+
+  // ========= CRUD Optimista: eliminar =========
+  Future<bool> eliminarOptimista({required String relatoId, required String usuarioId}) async {
+    // Ocultar de la UI inmediatamente
+    final int idx = _idToIndex[relatoId] ?? _allRelatos.indexWhere((r) => r.id == relatoId);
+    if (idx == -1) return false;
+    final Relato backup = _allRelatos[idx];
+    _allRelatos.removeAt(idx);
+    _idToIndex.remove(relatoId);
+    _rebuildIndex(startFrom: idx);
+    relatos = _applyFilterAndSort(_allRelatos);
+    notifyListeners();
+
+    final res = await _useCases.relatos.eliminar.execute(usuarioId: usuarioId, relatoId: relatoId);
+    if (res.isFailure) {
+      // rollback
+      _allRelatos.insert(idx.clamp(0, _allRelatos.length), backup);
+      _rebuildIndex(startFrom: idx);
+      relatos = _applyFilterAndSort(_allRelatos);
+      notifyListeners();
+      feedError = res.errorOrNull?.message;
+      return false;
+    }
+    return true;
+  }
+
+  // ========= CRUD Optimista: insertar =========
+  void insertarOptimista(Relato nuevo) {
+    // Insertar al principio de la fuente completa
+    _allRelatos.insert(0, nuevo);
+    _rebuildIndex(startFrom: 0);
+    relatos = _applyFilterAndSort(_activeSource());
+    notifyListeners();
+  }
+
+  // ========= CRUD Optimista: actualizar =========
+  void actualizarOptimista(Relato actualizado) {
+    final int idx = _idToIndex[actualizado.id] ?? _allRelatos.indexWhere((r) => r.id == actualizado.id);
+    if (idx == -1) return;
+    _allRelatos[idx] = actualizado;
+    _idToIndex[actualizado.id] = idx;
+    relatos = _applyFilterAndSort(_activeSource());
+    notifyListeners();
+  }
+
+  void _rebuildIndex({int startFrom = 0}) {
+    if (startFrom <= 0) {
+      _idToIndex
+        ..clear()
+        ..addEntries(Iterable.generate(_allRelatos.length, (i) => MapEntry(_allRelatos[i].id, i)));
+      return;
+    }
+    for (int i = startFrom; i < _allRelatos.length; i++) {
+      _idToIndex[_allRelatos[i].id] = i;
     }
   }
 
@@ -469,9 +548,14 @@ class FeedProvider extends ChangeNotifier {
   }
 
   Future<void> _doSearch(String q) async {
+    final String opId = DateTime.now().microsecondsSinceEpoch.toString();
+    final localOp = opId;
+    _lastSearchOpId = opId;
     final res = await _useCases.relatos.obtener.buscar(q);
     res.when(
       success: (data) {
+        // Descartar resultados obsoletos
+        if (_lastSearchOpId != localOp) return;
         _searchResults = data;
         relatos = _applyFilterAndSort(_searchResults);
         searching = false;
@@ -482,6 +566,7 @@ class FeedProvider extends ChangeNotifier {
         notifyListeners();
       },
       failure: (f) {
+        if (_lastSearchOpId != localOp) return;
         searching = false;
         searchError = f.message;
         notifyListeners();
@@ -490,6 +575,8 @@ class FeedProvider extends ChangeNotifier {
   }
 
   List<Relato> _activeSource() => (searchQuery.trim().isNotEmpty) ? _searchResults : _allRelatos;
+
+  String? _lastSearchOpId;
 
   // ========= Categorías (autocompletado) =========
   Future<void> _loadCategorias() async {
@@ -505,6 +592,11 @@ class FeedProvider extends ChangeNotifier {
     categorias.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
     categoriasLoading = false;
     notifyListeners();
+
+    // Sembrar cache para el sheet de publicación/edición
+    try {
+      RelatoFormProvider.seedCategoriasCache(categorias);
+    } catch (_) {}
   }
 
   List<String> sugerenciasCategorias(String input) {

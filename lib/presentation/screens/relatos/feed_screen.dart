@@ -21,6 +21,123 @@ import '../../providers/media_playback_provider.dart';
 import '../../providers/navigation_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+class _KeepAlive extends StatefulWidget {
+  final Widget child;
+  const _KeepAlive({required this.child});
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+class _RelatosSkeletonSliver extends StatelessWidget {
+  final int count;
+  const _RelatosSkeletonSliver({this.count = 6});
+  @override
+  Widget build(BuildContext context) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return RepaintBoundary(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    _SkeletonBox(height: 200, radius: BorderRadius.vertical(top: Radius.circular(16))),
+                    Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SkeletonLine(widthFactor: 0.8),
+                          SizedBox(height: 10),
+                          _SkeletonLine(widthFactor: 0.6),
+                          SizedBox(height: 14),
+                          _SkeletonLine(widthFactor: 1.0),
+                          SizedBox(height: 6),
+                          _SkeletonLine(widthFactor: 0.9),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+        childCount: count,
+        addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  final double height;
+  final BorderRadius? radius;
+  const _SkeletonBox({required this.height, this.radius});
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: radius ?? BorderRadius.circular(12),
+      child: Container(
+        height: height,
+        color: AppColors.withOpacity(AppColors.primary, 0.06),
+      ),
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  final double widthFactor;
+  const _SkeletonLine({required this.widthFactor});
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: widthFactor,
+      child: _SkeletonBox(height: 14, radius: BorderRadius.circular(8)),
+    );
+  }
+}
+
+class _PlatformScrollBehavior extends ScrollBehavior {
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+    // Sin efecto glow en móvil para menor sobrecosto visual
+    return child;
+  }
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    // En web, scroll de escritorio; en móvil, física por defecto
+    return kIsWeb ? const ClampingScrollPhysics() : const BouncingScrollPhysics();
+  }
+
+  @override
+  Widget buildScrollbar(BuildContext context, Widget child, ScrollableDetails details) {
+    if (kIsWeb) {
+      return Scrollbar(thumbVisibility: true, controller: details.controller, child: child);
+    }
+    return child;
+  }
+}
+
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
 
@@ -33,6 +150,16 @@ class _FeedScreenState extends State<FeedScreen> {
   bool _loadMorePending = false;
   final ScrollController _scrollCtrl = ScrollController();
   bool _showScrollTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listener para mostrar/ocultar botón flotante de "ir arriba"
+    _scrollCtrl.addListener(() {
+      final bool show = _scrollCtrl.hasClients && _scrollCtrl.offset > 300;
+      if (show != _showScrollTop && mounted) setState(() => _showScrollTop = show);
+    });
+  }
 
   void _showReportDialog(BuildContext context, String relatoId) async {
     final controller = TextEditingController();
@@ -83,9 +210,9 @@ class _FeedScreenState extends State<FeedScreen> {
                 title: const Text('Editar'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final ok = await PublicarRelatoSheet.open(context, initialRelato: relato);
-                  if (ok == true) {
-                    await provider.refresh();
+                  final edited = await PublicarRelatoSheet.open(context, initialRelato: relato);
+                  if (edited != null) {
+                    provider.actualizarOptimista(edited);
                   }
                 },
               ),
@@ -107,17 +234,15 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   );
                   if (confirm != true) return;
-                  final usecases = UseCases.resolve();
                   final userId = provider.currentUserId;
                   if (userId == null) return;
-                  messenger.showSnackBar(const SnackBar(content: Text('Eliminando...')));
-                  final res = await usecases.relatos.eliminar.execute(usuarioId: userId, relatoId: relato.id);
+                  messenger.showSnackBar(const SnackBar(content: Text('Eliminando…')));
+                  final ok = await provider.eliminarOptimista(relatoId: relato.id, usuarioId: userId);
                   messenger.hideCurrentSnackBar();
-                  if (res.isSuccess) {
+                  if (ok) {
                     messenger.showSnackBar(const SnackBar(backgroundColor: AppColors.success, content: Text('Relato eliminado')));
-                    await provider.refresh();
                   } else {
-                    messenger.showSnackBar(SnackBar(backgroundColor: AppColors.error, content: Text(res.errorOrNull?.message ?? 'Error al eliminar')));
+                    messenger.showSnackBar(const SnackBar(backgroundColor: AppColors.error, content: Text('Error al eliminar. Se revirtió el cambio.')));
                   }
                 },
               ),
@@ -154,11 +279,6 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Listener para mostrar/ocultar botón flotante de "ir arriba"
-    _scrollCtrl.addListener(() {
-      final bool show = _scrollCtrl.hasClients && _scrollCtrl.offset > 300;
-      if (show != _showScrollTop && mounted) setState(() => _showScrollTop = show);
-    });
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => FeedProvider()..init()),
@@ -171,10 +291,12 @@ class _FeedScreenState extends State<FeedScreen> {
               children: [
                 NotificationListener<ScrollNotification>(
                   onNotification: (n) => _onScrollNotification(n, provider),
-                  child: CustomScrollView(
-                    controller: _scrollCtrl,
-                    cacheExtent: 800,
-                    slivers: [
+                  child: ScrollConfiguration(
+                    behavior: _PlatformScrollBehavior(),
+                    child: CustomScrollView(
+                      controller: _scrollCtrl,
+                      cacheExtent: kIsWeb ? 1500 : 800,
+                      slivers: [
                 SliverToBoxAdapter(
                   child: StoriesStrip(
                     eventos: provider.historias,
@@ -210,18 +332,22 @@ class _FeedScreenState extends State<FeedScreen> {
                     child: Align(
                       alignment: Alignment.centerRight,
                       child: ElevatedButton.icon(
-                        onPressed: () => PublicarRelatoSheet.open(context),
+                        onPressed: () async {
+                          final creado = await PublicarRelatoSheet.open(context);
+                          if (creado != null && context.mounted) {
+                            final feed = context.read<FeedProvider>();
+                            feed.insertarOptimista(creado);
+                            // Si el filtro activo es "Mis relatos" y el autor coincide, permanecerá visible; caso contrario, el orden se encargará
+                          }
+                        },
                         icon: const Icon(Icons.edit_outlined),
                         label: const Text('Publicar'),
                       ),
                     ),
                   ),
                 ),
-                if (provider.feedLoading || provider.searching)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
+                if (provider.feedLoading || provider.searching || provider.filterSwitching)
+                  _RelatosSkeletonSliver(count: kIsWeb ? 8 : 6)
                 else if (provider.feedError != null)
                   SliverFillRemaining(
                     hasScrollBody: false,
@@ -246,20 +372,27 @@ class _FeedScreenState extends State<FeedScreen> {
                         final bool isOwner = provider.currentUserId != null && relato.autorId == provider.currentUserId;
                         return RepaintBoundary(
                           key: ValueKey(relato.id),
-                          child: RelatoCard(
-                            relato: relato,
-                            onTap: () => RelatoDetailOverlay.open(context, relato),
-                            onLike: isOwner ? null : () async { await provider.toggleLike(relato.id); },
-                            onShare: () async {
-                              final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
-                              final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';
-                              await Share.share(message, subject: 'Relato – ${relato.titulo}');
-                              await provider.compartir(relato.id);
-                            },
-                            onReport: () => _showReportDialog(context, relato.id),
-                            showMore: showMore,
-                            onMore: showMore ? () => _showOwnerActions(context, provider, relato) : null,
-                            isLiked: provider.isLiked(relato.id),
+                          child: _KeepAlive(
+                            child: Selector<FeedProvider, bool>(
+                              selector: (ctx, p) => p.isLiked(relato.id),
+                              builder: (ctx, isLiked, __) {
+                                return RelatoCard(
+                                  relato: relato,
+                                  onTap: () => RelatoDetailOverlay.open(context, relato),
+                                  onLike: isOwner ? null : () async { await provider.toggleLike(relato.id); },
+                                  onShare: () async {
+                                    final webUrl = Uri.parse('https://memoriaviva.app/relatos/${relato.id}');
+                                    final message = '${relato.titulo}\n\n${relato.contenido.substring(0, relato.contenido.length > 120 ? 120 : relato.contenido.length)}…\n\nEnlace: $webUrl';
+                                    await Share.share(message, subject: 'Relato – ${relato.titulo}');
+                                    await provider.compartir(relato.id);
+                                  },
+                                  onReport: () => _showReportDialog(context, relato.id),
+                                  showMore: showMore,
+                                  onMore: showMore ? () => _showOwnerActions(context, provider, relato) : null,
+                                  isLiked: isLiked,
+                                );
+                              },
+                            ),
                           ),
                         );
                       },
@@ -310,7 +443,8 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                     ),
                   ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 // Botón flotante para ir al inicio
