@@ -21,7 +21,9 @@ import '../../providers/map_provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../widgets/relatos/relato_detail_overlay.dart';
 import '../../../domain/entities/relato.dart';
+import '../../../domain/value_objects/multimedia.dart';
 import '../../../domain/services/i_geolocation_service.dart';
+import '../../providers/feed_provider.dart';
 
 class MapScreen extends StatefulWidget {
   final String? focusRelatoId;
@@ -46,6 +48,18 @@ class _MapScreenState extends State<MapScreen> {
   bool _didProviderInit = false;
   bool _showRelatosList = false; // Controla la visibilidad de la lista lateral
   latlng.LatLng? _userHere; // Última ubicación del usuario para mostrar punto azul
+  bool _locating = false; // Indicador de búsqueda de ubicación
+  
+  // Accesores seguros a la cámara antes del primer render
+  latlng.LatLng _safeCameraCenter() {
+    try { return _mapController.camera.center; } catch (_) { return _center; }
+  }
+  double _safeCameraZoom() {
+    try { return _mapController.camera.zoom; } catch (_) { return _zoom; }
+  }
+  latlng.LatLngBounds? _safeVisibleBounds() {
+    try { return _mapController.camera.visibleBounds; } catch (_) { return null; }
+  }
   // Eliminando state para simplificar
   // final Set<String> _pressedMarkers = {}; // IDs de marcadores mientras están presionados (tooltip)
   // final Map<String, Timer> _pressTimers = {}; // Temporizadores por marcador para long press (tooltip)
@@ -110,7 +124,7 @@ class _MapScreenState extends State<MapScreen> {
     return Material(
       color: Colors.white,
       shape: const CircleBorder(),
-      elevation: 2,
+      elevation: kIsWeb ? 0 : 2,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
@@ -145,34 +159,44 @@ class _MapScreenState extends State<MapScreen> {
     // Filtrar relatos visibles en el mapa actual
     List<Relato> visibleRelatos = [];
     try {
-      // Verificar que el controlador esté montado antes de acceder a la cámara
-      if (_mapController.camera != null) {
-        final bounds = _mapController.camera.visibleBounds;
+      final bounds = _safeVisibleBounds();
+      if (bounds != null) {
         visibleRelatos = provider.relatos.where((r) =>
-        r.ubicacion != null && _isRelatoInBounds(r, bounds)
+          r.ubicacion != null && _isRelatoInBounds(r, bounds)
         ).toList();
       } else {
-        // Si el mapa no está listo, mostrar todos los relatos con ubicación
         visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
       }
-    } catch (e) {
-      // Si hay error obteniendo bounds, mostrar todos los relatos
+    } catch (_) {
       visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
     }
 
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      right: (_showRelatosList == true) ? 12 : -listWidth - 12,
+    return Positioned(
+      right: 12,
       top: 120,
       bottom: 12,
       width: listWidth,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        elevation: 8,
-        child: Column(
-          children: [
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          final offset = Tween<Offset>(begin: const Offset(0.05, 0), end: Offset.zero)
+              .chain(CurveTween(curve: Curves.easeOutCubic))
+              .animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        child: (_showRelatosList == true)
+            ? RepaintBoundary(
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: kIsWeb ? 0 : 2,
+                  child: Column(
+                    children: [
             // Header de la lista
             Container(
               padding: const EdgeInsets.all(16),
@@ -233,10 +257,14 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               )
-                  : ListView.separated(
+                  : ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: visibleRelatos.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
+                cacheExtent: 1200,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                addSemanticIndexes: false,
+                prototypeItem: const SizedBox(height: 96),
                 itemBuilder: (context, index) {
                   final relato = visibleRelatos[index];
                   final isSelected = relato.id == provider.focusRelatoId;
@@ -244,7 +272,7 @@ class _MapScreenState extends State<MapScreen> {
 
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 2),
-                    elevation: isSelected ? 4 : 1,
+                    elevation: isSelected ? 2 : 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: BorderSide(
@@ -339,7 +367,10 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ],
-        ),
+                  ),
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -417,17 +448,17 @@ class _MapScreenState extends State<MapScreen> {
 
   void _updateBounds([MapProvider? provider]) {
     try {
-      final bounds = _mapController.camera.visibleBounds;
+      final bounds = _safeVisibleBounds();
       // Actualizar bounds del mapa
       // Aplicamos un ligero padding a los límites para asegurar que vemos suficientes relatos
       final padding = 0.05;
 
       if (provider != null) {
         provider.setBounds(
-          s: bounds.south - padding,
-          w: bounds.west - padding,
-          n: bounds.north + padding,
-          e: bounds.east + padding,
+          s: bounds!.south - padding ?? 0,
+          w: bounds!.west - padding ?? 0,
+          n: bounds!.north + padding ?? 0,
+          e: bounds!.east + padding ?? 0,
         );
       } else {
         // Usar un callback para asegurar que el provider esté disponible
@@ -435,10 +466,10 @@ class _MapScreenState extends State<MapScreen> {
           try {
             final p = context.read<MapProvider>();
             p.setBounds(
-              s: bounds.south - padding,
-              w: bounds.west - padding,
-              n: bounds.north + padding,
-              e: bounds.east + padding,
+              s: bounds!.south - padding ?? 0,
+              w: bounds!.west - padding ?? 0,
+              n: bounds!.north + padding ?? 0,
+              e: bounds!.east + padding ?? 0,
             );
           } catch (e) {
             // Error al acceder al provider en _updateBounds
@@ -509,6 +540,11 @@ class _MapScreenState extends State<MapScreen> {
             final toFocus = widget.focusRelatoId ?? navFocus;
             if (toFocus != null) {
               provider.focusRelatoByIdOrFetch(toFocus);
+              // Forzar movimiento y un update de bounds pronto para mostrar el punto
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try { _moveCameraToFocusIfRequested(provider); } catch (_) {}
+                Future.delayed(const Duration(milliseconds: 300), () { _updateBounds(provider); });
+              });
             }
             // Consumir foco por ubicación si viene definido (prioriza centrado inmediato por lat/lng)
             final loc = nav.takeMapFocusLocation();
@@ -556,8 +592,9 @@ class _MapScreenState extends State<MapScreen> {
           backgroundColor: AppColors.background,
           body: Stack(
             children: [
-              FlutterMap(
-                mapController: _mapController,
+              RepaintBoundary(
+                child: FlutterMap(
+                  mapController: _mapController,
                 options: MapOptions(
                   initialCenter: _center,
                   initialZoom: _zoom,
@@ -567,22 +604,23 @@ class _MapScreenState extends State<MapScreen> {
                     flags: InteractiveFlag.all & ~InteractiveFlag.rotate & ~InteractiveFlag.doubleTapZoom,
                   ),
                   onMapEvent: (e) {
+                    MapProvider? p;
+                    try { p = context.read<MapProvider>(); } catch (_) {}
                     if (e is MapEventMoveEnd || e is MapEventFlingAnimationEnd || e is MapEventRotateEnd || e is MapEventDoubleTapZoomEnd) {
                       try {
-                        final p = context.read<MapProvider>();
-                        _updateBounds(p); // Pasar el provider directamente
-                        p.setMapView(
-                          lat: _mapController.camera.center.latitude,
-                          lng: _mapController.camera.center.longitude,
-                          newZoom: _mapController.camera.zoom,
-                        );
-                        // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
-                        p.clearFocus();
-                      } catch (e) {
-                        // Error al actualizar vista del mapa
-                      }
+                        if (p != null) {
+                          _updateBounds(p); // Pasar el provider directamente
+                          p.setMapView(
+                            lat: _safeCameraCenter().latitude,
+                            lng: _safeCameraCenter().longitude,
+                            newZoom: _safeCameraZoom(),
+                          );
+                          // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
+                          p.clearFocus();
+                        }
+                      } catch (_) {}
                       // Actualizar zoom local de forma segura
-                      final newZoom = _mapController.camera.zoom;
+                      final newZoom = _safeCameraZoom();
                       if (newZoom != _zoom) {
                         setState(() => _zoom = newZoom);
                       }
@@ -590,11 +628,8 @@ class _MapScreenState extends State<MapScreen> {
                     // Si el provider solicitó mover cámara por foco, ejecutar
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       try {
-                        final p = context.read<MapProvider>();
-                        _moveCameraToFocusIfRequested(p);
-                      } catch (e) {
-                        // Error al acceder al provider en onMapEvent
-                      }
+                        if (p != null) _moveCameraToFocusIfRequested(p!);
+                      } catch (_) {}
                     });
                   },
                   onTap: (tapPos, point) {
@@ -603,33 +638,49 @@ class _MapScreenState extends State<MapScreen> {
                     provider.clearFocus();
                   },
                 ),
-                children: [
+                  children: [
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.memoriaviva.app',
                     tileProvider: CancellableNetworkTileProvider(),
+                    tileDisplay: TileDisplay.fadeIn(duration: const Duration(milliseconds: 100)),
                   ),
                   // Optimización: Limitar número de marcadores renderizados simultáneamente
                   MarkerClusterLayerWidget(
                     options: MarkerClusterLayerOptions(
-                      maxClusterRadius: 70,
+                      maxClusterRadius: 60,
                       size: const Size(36, 36),
                       // Limitar marcadores renderizados según zoom SIN acceder al controller durante build
                       markers: () {
                         final rels = provider.relatos.where((r) => r.ubicacion != null);
                         final z = _zoom;
-                        final cap = z < 8 ? 80 : (z < 12 ? 140 : 240);
-                        return rels.take(cap).map((r) => _buildMarker(context, r)).toList();
+                        final cap = z < 8 ? 160 : (z < 12 ? 220 : 360);
+                        final center = _safeCameraCenter();
+                        final distance = latlng.Distance();
+                        final sorted = rels.toList()
+                          ..sort((a, b) {
+                            final da = distance.as(
+                              latlng.LengthUnit.Kilometer,
+                              latlng.LatLng(a.ubicacion!.latitud, a.ubicacion!.longitud),
+                              center,
+                            );
+                            final db = distance.as(
+                              latlng.LengthUnit.Kilometer,
+                              latlng.LatLng(b.ubicacion!.latitud, b.ubicacion!.longitud),
+                              center,
+                            );
+                            return da.compareTo(db);
+                          });
+                        return sorted.take(cap).map((r) => _buildMarker(context, r)).toList();
                       }(),
-                      disableClusteringAtZoom: 15,
-                      zoomToBoundsOnClick: false,
+                      disableClusteringAtZoom: 14,
+                      zoomToBoundsOnClick: true,
                       builder: (context, markers) {
                         final count = markers.length;
                         return Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
-                            boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 4)],
                           ),
                           child: Center(
                             child: Text('$count', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -654,14 +705,15 @@ class _MapScreenState extends State<MapScreen> {
                             color: Colors.blueAccent,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: const [
+                            boxShadow: kIsWeb ? const [] : const [
                               BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 2)),
                             ],
                           ),
                         ),
                       ),
                     ]),
-                ],
+                  ],
+                ),
               ),
 
               // Contenedor para controles responsive
@@ -686,14 +738,16 @@ class _MapScreenState extends State<MapScreen> {
                         Positioned(
                           right: (_showRelatosList == true && !isSmallScreen) ? 344 : 12, // Ajustar posición según lista
                           top: 120, // Posición fija debajo de los chips en todas las pantallas
-                          child: Column(
-                            children: [
+                          child: SizedBox(
+                            width: 52,
+                            child: Column(
+                              children: [
                               _roundIconButton(
                                 icon: Icons.add,
                                 tooltip: 'Acercar',
                                 onTap: () {
-                                  final c = _mapController.camera.center;
-                                  final z = (_mapController.camera.zoom + 1).clamp(3.0, 19.0);
+                                  final c = _safeCameraCenter();
+                                  final z = (_safeCameraZoom() + 1).clamp(3.0, 19.0);
                                   _mapController.move(c, z);
                                 },
                               ),
@@ -702,8 +756,8 @@ class _MapScreenState extends State<MapScreen> {
                                 icon: Icons.remove,
                                 tooltip: 'Alejar',
                                 onTap: () {
-                                  final c = _mapController.camera.center;
-                                  final z = (_mapController.camera.zoom - 1).clamp(3.0, 19.0);
+                                  final c = _safeCameraCenter();
+                                  final z = (_safeCameraZoom() - 1).clamp(3.0, 19.0);
                                   _mapController.move(c, z);
                                 },
                               ),
@@ -712,11 +766,9 @@ class _MapScreenState extends State<MapScreen> {
                                 icon: Icons.my_location,
                                 tooltip: 'Mi ubicación',
                                 onTap: () async {
+                                  if (_locating) return;
                                   try {
-                                    // Mostrar indicador de carga
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Obteniendo tu ubicación...'), duration: Duration(seconds: 2))
-                                    );
+                                    if (mounted) setState(() { _locating = true; });
 
                                     // Asegurar permisos
                                     final hasPermission = await _ensureLocationPermission(context);
@@ -779,6 +831,9 @@ class _MapScreenState extends State<MapScreen> {
                                     if (!mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo obtener ubicación: $e')));
                                   }
+                                  finally {
+                                    if (mounted) setState(() { _locating = false; });
+                                  }
                                 },
                               ),
                               const SizedBox(height: 8),
@@ -790,20 +845,39 @@ class _MapScreenState extends State<MapScreen> {
                                   _mapController.move(nicaragua, 6.5);
                                 },
                               ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
+                        if (_locating)
+                          Positioned(
+                            right: (_showRelatosList == true && !isSmallScreen) ? 344 : 12,
+                            top: 80,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: kIsWeb ? const [] : const [BoxShadow(color: AppColors.cardShadow, blurRadius: 3, offset: Offset(0, 1))],
+                              ),
+                              child: const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          ),
 
                         // Toggle cercanos (izquierda arriba)
                         Positioned(
                           left: 12,
                           top: isSmallScreen ? 116 : 12,
-                          child: Container(
+                          child: RepaintBoundary(child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(28),
-                              boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 8, offset: Offset(0, 2))],
+                              boxShadow: kIsWeb ? const [] : const [BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 2))],
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -818,7 +892,7 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ],
                             ),
-                          ),
+                          )),
                         ),
 
                         // Filtros por categoría (barra superior)
@@ -826,47 +900,43 @@ class _MapScreenState extends State<MapScreen> {
                           left: 12,
                           right: (_showRelatosList == true && !isSmallScreen) ? 376 : 70, // Ajustar según lista lateral
                           top: 64,
-                          child: Container(
+                          child: RepaintBoundary(child: Container(
                             height: 44,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             decoration: BoxDecoration(
                               color: AppColors.surface,
                               borderRadius: BorderRadius.circular(10),
-                              boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 8, offset: Offset(0, 2))],
                             ),
-                            child: SingleChildScrollView(
+                            child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: ChoiceChip(
-                                      label: const Text('Todos'),
-                                      selected: provider.selectedCategoriaIds.isEmpty,
-                                      onSelected: (_) {
-                                        if (provider.selectedCategoriaIds.isNotEmpty) {
-                                          provider.selectedCategoriaIds.clear();
-                                          provider.toggleNearbyOnly(provider.nearbyOnly); // retrigger fetch
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  ...provider.categorias.map((c) {
-                                    final selected = provider.selectedCategoriaIds.contains(c.id);
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8.0),
-                                      child: ChoiceChip(
-                                        label: Text(c.nombre),
-                                        selected: selected,
-                                        selectedColor: AppColors.accent,
-                                        onSelected: (_) => provider.toggleCategoria(c.id),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 0),
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: 1 + provider.categorias.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return ChoiceChip(
+                                    label: const Text('Todos'),
+                                    selected: provider.selectedCategoriaIds.isEmpty,
+                                    onSelected: (_) {
+                                      if (provider.selectedCategoriaIds.isNotEmpty) {
+                                        provider.selectedCategoriaIds.clear();
+                                        provider.toggleNearbyOnly(provider.nearbyOnly); // retrigger fetch
+                                      }
+                                    },
+                                  );
+                                }
+                                final c = provider.categorias[index - 1];
+                                final selected = provider.selectedCategoriaIds.contains(c.id);
+                                return ChoiceChip(
+                                  label: Text(c.nombre),
+                                  selected: selected,
+                                  selectedColor: AppColors.accent,
+                                  onSelected: (_) => provider.toggleCategoria(c.id),
+                                );
+                              },
                             ),
-                          ),
+                          )),
                         ),
                       ],
                     );
@@ -884,17 +954,25 @@ class _MapScreenState extends State<MapScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0,2))],
+                      boxShadow: kIsWeb ? const [] : const [BoxShadow(color: AppColors.cardShadow, blurRadius: 3, offset: Offset(0,2))],
                     ),
                     child: const Text('Offline (vista en caché)'),
                   ),
                 ),
 
-              // Loading
+              // Loading sutil
               if (provider.loading)
-                const Positioned.fill(
-                  child: IgnorePointer(
-                    child: Center(child: CircularProgressIndicator()),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      backgroundColor: AppColors.withOpacity(AppColors.primary, 0.08),
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
             ],
@@ -918,14 +996,17 @@ class _MapScreenState extends State<MapScreen> {
       point: latlng.LatLng(r.ubicacion!.latitud, r.ubicacion!.longitud),
       width: size,
       height: size,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          // Focalizar en el provider y abrir overlay
-          provider.requestFocusOnRelato(r.id);
-          _openRelatoOverlay(context, r);
-        },
-        child: _buildMarkerContent(color, size, isSelected, r),
+      child: MouseRegion(
+        onEnter: (_) => _precacheRelatoImages(context, r),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            // Focalizar en el provider y abrir overlay
+            provider.requestFocusOnRelato(r.id);
+            _openRelatoOverlay(context, r);
+          },
+          child: _buildMarkerContent(color, size, isSelected, r),
+        ),
       ),
     );
   }
@@ -934,53 +1015,52 @@ class _MapScreenState extends State<MapScreen> {
 
   // Método para abrir el overlay de forma confiable
   void _openRelatoOverlay(BuildContext context, Relato r) {
-    // Usar el método original pero con try-catch para evitar errores
+    // Usar root navigator y post-frame para evitar context desactivado
     try {
-      RelatoDetailOverlay.open(context, r);
-    } catch (e) {
-      print('ERROR al abrir overlay: $e');
-
-      // Intento alternativo directo
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (!mounted) return;
-
+      final NavigatorState rootNav = Navigator.of(context, rootNavigator: true);
+      final BuildContext rootContext = rootNav.context;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            enableDrag: true,
-            isDismissible: true,
-            barrierColor: Colors.black54,
-            backgroundColor: Colors.transparent,
-            builder: (ctx) {
-              return Material(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: Container(
-                  height: MediaQuery.of(context).size.height * 0.8,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text(r.titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-                          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                        ],
-                      ),
-                      const Divider(),
-                      Expanded(child: SingleChildScrollView(child: Text(r.contenido))),
-                    ],
+          await RelatoDetailOverlay.open(rootContext, r);
+        } catch (_) {
+          // Fallback directo si falla open
+          try {
+            showModalBottomSheet(
+              context: rootContext,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              enableDrag: true,
+              isDismissible: true,
+              barrierColor: Colors.black54,
+              backgroundColor: Colors.transparent,
+              builder: (ctx) {
+                return Material(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  child: Container(
+                    height: MediaQuery.of(rootContext).size.height * 0.8,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(r.titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                          ],
+                        ),
+                        const Divider(),
+                        Expanded(child: SingleChildScrollView(child: Text(r.contenido))),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          );
-        } catch (e2) {
-          print('ERROR en intento alternativo: $e2');
+                );
+              },
+            );
+          } catch (_) {}
         }
       });
-    }
+    } catch (_) {}
   }
 
   // Eliminado método _openOverlayOnce
@@ -990,11 +1070,20 @@ class _MapScreenState extends State<MapScreen> {
     return _pinIcon(color, size, isSelected);
   }
 
+  void _precacheRelatoImages(BuildContext context, Relato r) {
+    if (!kIsWeb) return;
+    try {
+      final images = r.multimedia.where((m) => m.tipo == TipoMultimedia.imagen).take(3);
+      for (final m in images) {
+        precacheImage(CachedNetworkImageProvider(m.url), context);
+      }
+    } catch (_) {}
+  }
 
   // Optimización: Simplificar icono de pin para mejor rendimiento
   Widget _pinIcon(Color color, double size, bool isSelected) {
     // En dispositivos móviles o con zoom bajo, usar un icono más simple
-    final bool useSimpleIcon = !kIsWeb || _zoom < 10;
+    final bool useSimpleIcon = !kIsWeb || _zoom < 13;
 
     if (useSimpleIcon) {
       return Container(
@@ -1037,29 +1126,30 @@ class _MapScreenState extends State<MapScreen> {
   void _animatedMapMove(latlng.LatLng destLocation, double destZoom) {
     // Obtener posición y zoom actuales
     final latTween = Tween<double>(
-      begin: _mapController.camera.center.latitude,
+      begin: _safeCameraCenter().latitude,
       end: destLocation.latitude,
     );
     final lngTween = Tween<double>(
-      begin: _mapController.camera.center.longitude,
+      begin: _safeCameraCenter().longitude,
       end: destLocation.longitude,
     );
     final zoomTween = Tween<double>(
-      begin: _mapController.camera.zoom,
+      begin: _safeCameraZoom(),
       end: destZoom,
     );
 
     // Crear un controlador de animación
     final controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 380),
       vsync: const _TickerProviderImpl(),
     );
+    final curved = CurvedAnimation(parent: controller, curve: Curves.easeOutCubic);
 
     // Añadir listener para actualizar el mapa en cada frame
     controller.addListener(() {
-      final lat = latTween.evaluate(controller);
-      final lng = lngTween.evaluate(controller);
-      final zoom = zoomTween.evaluate(controller);
+      final lat = latTween.evaluate(curved);
+      final lng = lngTween.evaluate(curved);
+      final zoom = zoomTween.evaluate(curved);
 
       _mapController.move(latlng.LatLng(lat, lng), zoom);
     });

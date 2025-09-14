@@ -27,8 +27,11 @@ class RelatoDetailOverlay extends StatelessWidget {
       final media = context.read<MediaPlaybackProvider>();
       await media.pauseScope('card', relatoId: relato?.id ?? relatoId);
     } catch (_) {}
+    // Usar navigator raíz para evitar context desactivado
+    final NavigatorState rootNav = Navigator.of(context, rootNavigator: true);
+    final BuildContext rootContext = rootNav.context;
     // Primero cerrar cualquier bottom sheet existente para evitar conflictos
-    Navigator.of(context, rootNavigator: true).popUntil((route) {
+    rootNav.popUntil((route) {
       return route.isFirst || (!route.willHandlePopInternally && !route.hasActiveRouteBelow);
     });
     
@@ -36,15 +39,16 @@ class RelatoDetailOverlay extends StatelessWidget {
     await Future.delayed(const Duration(milliseconds: 50));
     
     // Ahora abrir el nuevo overlay
-    if (!context.mounted) return;
+    // Usar el contexto del root navigator; evita fallos por context desactivado
     FeedProvider? feedProvider;
     try {
-      feedProvider = context.read<FeedProvider>();
+      feedProvider = rootContext.read<FeedProvider>();
     } catch (_) {
       feedProvider = null;
     }
     await showModalBottomSheet(
-      context: context,
+      context: rootContext,
+      useRootNavigator: true,
       isScrollControlled: true,
       enableDrag: true,
       isDismissible: true,
@@ -210,24 +214,25 @@ class _DetailContent extends StatelessWidget {
                                         );
                                       }
                                       
+                                      // Resolver root navigator/context para cambiar de tab y mostrar mensaje
+                                      final rootNav = Navigator.of(context, rootNavigator: true);
+                                      final rootCtx = rootNav.context;
+                                      
                                       // Cerrar overlay
                                       Navigator.of(context).pop();
                                       
-                                      // Pequeña espera y cambiar al mapa
-                                      Future.delayed(const Duration(milliseconds: 100), () {
-                                        if (!context.mounted) return;
-                                        
-                                        // Cambiar al tab del mapa
-                                        nav.setIndex(1);
-                                        
-                                        // Mostrar mensaje de confirmación
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Mostrando "${r.titulo}" en el mapa'),
-                                            duration: const Duration(seconds: 2),
-                                            backgroundColor: AppColors.primary,
-                                          )
-                                        );
+                                      // Cambiar al tab del mapa en el siguiente frame (sin depender del contexto del overlay)
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        try { nav.setIndex(1); } catch (_) {}
+                                        try {
+                                          ScaffoldMessenger.of(rootCtx).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Mostrando "${r.titulo}" en el mapa'),
+                                              duration: const Duration(seconds: 2),
+                                              backgroundColor: AppColors.primary,
+                                            ),
+                                          );
+                                        } catch (_) {}
                                       });
                                     }
                                   : null,
@@ -485,15 +490,22 @@ class _MediaCarouselState extends State<_MediaCarousel> {
                 maxScale: 4.0,
                 panEnabled: false,
                 scaleEnabled: false,
-                child: CachedNetworkImage(
-                  imageUrl: m.url,
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                  placeholder: (c, _) => Container(color: AppColors.surfaceVariant),
-                  errorWidget: (c, _, __) => Container(
-                    color: AppColors.surfaceVariant,
-                    child: const Center(child: Icon(Icons.broken_image_outlined)),
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+                    final int targetW = (constraints.maxWidth * devicePixelRatio).clamp(360.0, 2000.0).round();
+                    return CachedNetworkImage(
+                      imageUrl: m.url,
+                      memCacheWidth: targetW,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.center,
+                      placeholder: (c, _) => Container(color: AppColors.surfaceVariant),
+                      errorWidget: (c, _, __) => Container(
+                        color: AppColors.surfaceVariant,
+                        child: const Center(child: Icon(Icons.broken_image_outlined)),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

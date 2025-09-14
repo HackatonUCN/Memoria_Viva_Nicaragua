@@ -66,6 +66,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.memoriaviva.app',
                 tileProvider: CancellableNetworkTileProvider(),
+                tileDisplay: TileDisplay.fadeIn(duration: const Duration(milliseconds: 100)),
               ),
               if (_selected != null)
                 MarkerLayer(
