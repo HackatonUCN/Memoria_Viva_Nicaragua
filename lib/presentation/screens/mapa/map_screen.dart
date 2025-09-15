@@ -154,7 +154,7 @@ class _MapScreenState extends State<MapScreen> {
   // Widget para la lista lateral de relatos
   Widget _buildRelatosList(MapProvider provider, BoxConstraints constraints) {
     final bool isSmallScreen = constraints.maxWidth < 900;
-    final double listWidth = isSmallScreen ? constraints.maxWidth * 0.92 : 320;
+    final double listWidth = isSmallScreen ? constraints.maxWidth * 0.78 : 320;
 
     // Filtrar relatos visibles en el mapa actual
     List<Relato> visibleRelatos = [];
@@ -162,7 +162,7 @@ class _MapScreenState extends State<MapScreen> {
       final bounds = _safeVisibleBounds();
       if (bounds != null) {
         visibleRelatos = provider.relatos.where((r) =>
-          r.ubicacion != null && _isRelatoInBounds(r, bounds)
+        r.ubicacion != null && _isRelatoInBounds(r, bounds)
         ).toList();
       } else {
         visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
@@ -171,6 +171,147 @@ class _MapScreenState extends State<MapScreen> {
       visibleRelatos = provider.relatos.where((r) => r.ubicacion != null).toList();
     }
 
+    // En pantallas pequeñas, mostrar como bottom sheet para no tapar controles superiores
+    if (isSmallScreen) {
+      final double sheetHeight = (constraints.maxHeight * 0.62).clamp(320.0, 560.0);
+      return Positioned(
+        left: 12,
+        right: 12,
+        bottom: 12,
+        height: sheetHeight,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            final offset = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
+                .chain(CurveTween(curve: Curves.easeOutCubic))
+                .animate(animation);
+            return FadeTransition(opacity: animation, child: SlideTransition(position: offset, child: child));
+          },
+          child: (_showRelatosList == true)
+              ? RepaintBoundary(
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    elevation: kIsWeb ? 0 : 2,
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.list_alt, color: Colors.white, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Relatos (${visibleRelatos.length})',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                                onPressed: () => setState(() => _showRelatosList = false),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: visibleRelatos.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.search_off, size: 48, color: AppColors.textSecondary),
+                                        SizedBox(height: 8),
+                                        Text('No hay relatos en esta área', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+                                        SizedBox(height: 4),
+                                        Text('Mueve el mapa para explorar', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.all(8),
+                                  itemCount: visibleRelatos.length,
+                                  cacheExtent: 1200,
+                                  addAutomaticKeepAlives: false,
+                                  addRepaintBoundaries: true,
+                                  addSemanticIndexes: false,
+                                  prototypeItem: const SizedBox(height: 96),
+                                  itemBuilder: (context, index) {
+                                    final relato = visibleRelatos[index];
+                                    final isSelected = relato.id == provider.focusRelatoId;
+                                    final categoryColor = AppColors.categoryColor(categoryId: relato.categoriaId);
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(vertical: 2),
+                                      elevation: isSelected ? 2 : 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: BorderSide(color: isSelected ? AppColors.primary : Colors.transparent, width: 2),
+                                      ),
+                                      child: RadioListTile<String>(
+                                        title: Text(relato.titulo, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 15)),
+                                        subtitle: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (relato.ubicacion != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 4),
+                                                child: Row(children: [
+                                                  Icon(Icons.location_on, size: 12, color: categoryColor),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(child: Text(relato.ubicacion!.obtenerDireccionFormateada(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
+                                                ]),
+                                              ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
+                                              child: Row(children: [
+                                                const Icon(Icons.person, size: 12, color: AppColors.textSecondary),
+                                                const SizedBox(width: 4),
+                                                Expanded(child: Text(relato.autorNombre, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                                              ]),
+                                            ),
+                                          ],
+                                        ),
+                                        value: relato.id,
+                                        groupValue: provider.focusRelatoId,
+                                        activeColor: AppColors.primary,
+                                        dense: false,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            provider.requestFocusOnRelato(value);
+                                            final lat = relato.ubicacion!.latitud;
+                                            final lng = relato.ubicacion!.longitud;
+                                            _animatedMapMove(latlng.LatLng(lat, lng), 15.0);
+                                            if (mounted) setState(() { _showRelatosList = false; });
+                                            Future.delayed(const Duration(milliseconds: 400), () { if (mounted) _openRelatoOverlay(this.context, relato); });
+                                          }
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      );
+    }
+
+    // Pantallas grandes: panel lateral derecho
     return Positioned(
       right: 12,
       top: 120,
@@ -191,13 +332,12 @@ class _MapScreenState extends State<MapScreen> {
         },
         child: (_showRelatosList == true)
             ? RepaintBoundary(
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
                   elevation: kIsWeb ? 0 : 2,
-                  child: Column(
-                    children: [
-            // Header de la lista
+        child: Column(
+          children: [
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -257,14 +397,14 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               )
-                  : ListView.builder(
+                            : ListView.builder(
                 padding: const EdgeInsets.all(8),
                 itemCount: visibleRelatos.length,
-                cacheExtent: 1200,
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
-                addSemanticIndexes: false,
-                prototypeItem: const SizedBox(height: 96),
+                              cacheExtent: 1200,
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              addSemanticIndexes: false,
+                              prototypeItem: const SizedBox(height: 96),
                 itemBuilder: (context, index) {
                   final relato = visibleRelatos[index];
                   final isSelected = relato.id == provider.focusRelatoId;
@@ -272,7 +412,7 @@ class _MapScreenState extends State<MapScreen> {
 
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 2),
-                    elevation: isSelected ? 2 : 0,
+                                  elevation: isSelected ? 2 : 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: BorderSide(
@@ -356,7 +496,7 @@ class _MapScreenState extends State<MapScreen> {
                           // Abrir overlay con el relato
                           Future.delayed(const Duration(milliseconds: 400), () {
                             if (mounted) {
-                              _openRelatoOverlay(context, relato);
+                                            _openRelatoOverlay(this.context, relato);
                             }
                           });
                         }
@@ -367,7 +507,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ],
-                  ),
+        ),
                 ),
               )
             : const SizedBox.shrink(),
@@ -594,7 +734,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               RepaintBoundary(
                 child: FlutterMap(
-                  mapController: _mapController,
+                mapController: _mapController,
                 options: MapOptions(
                   initialCenter: _center,
                   initialZoom: _zoom,
@@ -609,15 +749,15 @@ class _MapScreenState extends State<MapScreen> {
                     if (e is MapEventMoveEnd || e is MapEventFlingAnimationEnd || e is MapEventRotateEnd || e is MapEventDoubleTapZoomEnd) {
                       try {
                         if (p != null) {
-                          _updateBounds(p); // Pasar el provider directamente
-                          p.setMapView(
+                        _updateBounds(p); // Pasar el provider directamente
+                        p.setMapView(
                             lat: _safeCameraCenter().latitude,
                             lng: _safeCameraCenter().longitude,
                             newZoom: _safeCameraZoom(),
-                          );
-                          // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
-                          p.clearFocus();
-                        }
+                        );
+                        // Si el usuario movió manualmente el mapa, despejar foco para evitar re-centrado continuo
+                        p.clearFocus();
+                      }
                       } catch (_) {}
                       // Actualizar zoom local de forma segura
                       final newZoom = _safeCameraZoom();
@@ -638,7 +778,7 @@ class _MapScreenState extends State<MapScreen> {
                     provider.clearFocus();
                   },
                 ),
-                  children: [
+                children: [
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.memoriaviva.app',
@@ -712,7 +852,7 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                       ),
                     ]),
-                  ],
+                ],
                 ),
               ),
 
@@ -740,8 +880,8 @@ class _MapScreenState extends State<MapScreen> {
                           top: 120, // Posición fija debajo de los chips en todas las pantallas
                           child: SizedBox(
                             width: 52,
-                            child: Column(
-                              children: [
+                          child: Column(
+                            children: [
                               _roundIconButton(
                                 icon: Icons.add,
                                 tooltip: 'Acercar',
@@ -845,9 +985,9 @@ class _MapScreenState extends State<MapScreen> {
                                   _mapController.move(nicaragua, 6.5);
                                 },
                               ),
-                              ],
-                            ),
+                            ],
                           ),
+                        ),
                         ),
                         if (_locating)
                           Positioned(
@@ -916,26 +1056,26 @@ class _MapScreenState extends State<MapScreen> {
                               itemBuilder: (context, index) {
                                 if (index == 0) {
                                   return ChoiceChip(
-                                    label: const Text('Todos'),
-                                    selected: provider.selectedCategoriaIds.isEmpty,
-                                    onSelected: (_) {
-                                      if (provider.selectedCategoriaIds.isNotEmpty) {
-                                        provider.selectedCategoriaIds.clear();
-                                        provider.toggleNearbyOnly(provider.nearbyOnly); // retrigger fetch
-                                      }
-                                    },
+                                      label: const Text('Todos'),
+                                      selected: provider.selectedCategoriaIds.isEmpty,
+                                      onSelected: (_) {
+                                        if (provider.selectedCategoriaIds.isNotEmpty) {
+                                          provider.selectedCategoriaIds.clear();
+                                          provider.toggleNearbyOnly(provider.nearbyOnly); // retrigger fetch
+                                        }
+                                      },
                                   );
                                 }
                                 final c = provider.categorias[index - 1];
-                                final selected = provider.selectedCategoriaIds.contains(c.id);
+                                    final selected = provider.selectedCategoriaIds.contains(c.id);
                                 return ChoiceChip(
-                                  label: Text(c.nombre),
-                                  selected: selected,
-                                  selectedColor: AppColors.accent,
-                                  onSelected: (_) => provider.toggleCategoria(c.id),
-                                );
+                                        label: Text(c.nombre),
+                                        selected: selected,
+                                        selectedColor: AppColors.accent,
+                                        onSelected: (_) => provider.toggleCategoria(c.id),
+                                    );
                               },
-                            ),
+                              ),
                           )),
                         ),
                       ],
@@ -998,14 +1138,14 @@ class _MapScreenState extends State<MapScreen> {
       height: size,
       child: MouseRegion(
         onEnter: (_) => _precacheRelatoImages(context, r),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            // Focalizar en el provider y abrir overlay
-            provider.requestFocusOnRelato(r.id);
-            _openRelatoOverlay(context, r);
-          },
-          child: _buildMarkerContent(color, size, isSelected, r),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          // Focalizar en el provider y abrir overlay
+          provider.requestFocusOnRelato(r.id);
+          _openRelatoOverlay(context, r);
+        },
+        child: _buildMarkerContent(color, size, isSelected, r),
         ),
       ),
     );
@@ -1015,48 +1155,49 @@ class _MapScreenState extends State<MapScreen> {
 
   // Método para abrir el overlay de forma confiable
   void _openRelatoOverlay(BuildContext context, Relato r) {
-    // Usar root navigator y post-frame para evitar context desactivado
+    // Usar SIEMPRE el contexto del MapScreen (montado) para resolver el root navigator
+        if (!mounted) return;
     try {
-      final NavigatorState rootNav = Navigator.of(context, rootNavigator: true);
+      final NavigatorState rootNav = Navigator.of(this.context, rootNavigator: true);
       final BuildContext rootContext = rootNav.context;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await RelatoDetailOverlay.open(rootContext, r);
         } catch (_) {
           // Fallback directo si falla open
-          try {
-            showModalBottomSheet(
+        try {
+          showModalBottomSheet(
               context: rootContext,
               useRootNavigator: true,
-              isScrollControlled: true,
-              enableDrag: true,
-              isDismissible: true,
-              barrierColor: Colors.black54,
-              backgroundColor: Colors.transparent,
-              builder: (ctx) {
-                return Material(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: Container(
+            isScrollControlled: true,
+            enableDrag: true,
+            isDismissible: true,
+            barrierColor: Colors.black54,
+            backgroundColor: Colors.transparent,
+            builder: (ctx) {
+              return Material(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                child: Container(
                     height: MediaQuery.of(rootContext).size.height * 0.8,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text(r.titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-                            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                          ],
-                        ),
-                        const Divider(),
-                        Expanded(child: SingleChildScrollView(child: Text(r.contenido))),
-                      ],
-                    ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(r.titulo, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                          IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        ],
+                      ),
+                      const Divider(),
+                      Expanded(child: SingleChildScrollView(child: Text(r.contenido))),
+                    ],
                   ),
-                );
-              },
-            );
+                ),
+              );
+            },
+          );
           } catch (_) {}
         }
       });
