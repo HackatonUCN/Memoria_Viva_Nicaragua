@@ -60,15 +60,18 @@ class RelatoCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.cardShadow,
-                  blurRadius: 14,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 8),
-                )
-              ],
-              border: Border.all(color: AppColors.withOpacity(AppColors.primary, 0.05)),
+              boxShadow: kIsWeb
+                  ? const []
+                  : [
+                      BoxShadow(
+                        color: AppColors.cardShadow,
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 8),
+                      )
+                    ],
+              // Borde sutil con color de acento; ancho 1 para eficiencia
+              border: Border.all(color: AppColors.withOpacity(AppColors.accent, 0.18), width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +174,29 @@ class RelatoCard extends StatelessWidget {
   }
 }
 
+String _cloudinaryScaled(String url, {required int width}) {
+  try {
+    final uri = Uri.parse(url);
+    if (!uri.host.contains('res.cloudinary.com')) return url;
+    final segments = List<String>.from(uri.pathSegments);
+    final uploadIndex = segments.indexOf('upload');
+    if (uploadIndex == -1) return url;
+    // Insert transformation preserving existing ones
+    final String transform = 'f_auto,q_auto,w_$width';
+    if (uploadIndex + 1 < segments.length && segments[uploadIndex + 1].isNotEmpty && !segments[uploadIndex + 1].contains(',')) {
+      segments.insert(uploadIndex + 1, transform);
+    } else if (uploadIndex + 1 < segments.length) {
+      segments[uploadIndex + 1] = '${segments[uploadIndex + 1]},$transform';
+    } else {
+      segments.add(transform);
+    }
+    final newUri = uri.replace(pathSegments: segments);
+    return newUri.toString();
+  } catch (_) {
+    return url;
+  }
+}
+
 class _ActionIcon extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -244,12 +270,34 @@ class _MediaPreview extends StatelessWidget {
                   aspectRatio: 4 / 3,
                   child: Hero(
                     tag: 'relato_media_${media.url}',
-                    child: CachedNetworkImage(
-                      imageUrl: media.url,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
-                      placeholder: (c, _) => Container(color: AppColors.background),
-                      errorWidget: (c, _, __) => Container(color: AppColors.background, child: const Icon(Icons.broken_image_outlined)),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+                        final int targetW = (constraints.maxWidth * devicePixelRatio).clamp(360.0, 1600.0).round();
+                        final String url = _cloudinaryScaled(media.url, width: targetW);
+                        Widget image = CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                          fadeInDuration: const Duration(milliseconds: 160),
+                          fadeOutDuration: const Duration(milliseconds: 120),
+                          placeholder: (c, _) => Container(color: AppColors.background),
+                          errorWidget: (c, _, __) => Container(color: AppColors.background, child: const Icon(Icons.broken_image_outlined)),
+                          memCacheWidth: targetW,
+                        );
+                        if (kIsWeb) {
+                          image = MouseRegion(
+                            onEnter: (_) {
+                              // Precargar versión más grande al hover para minimizar jank al abrir overlay
+                              final int preW = (targetW * 1.5).clamp(360, 2000).toInt();
+                              final String preUrl = _cloudinaryScaled(media.url, width: preW);
+                              precacheImage(CachedNetworkImageProvider(preUrl), context);
+                            },
+                            child: image,
+                          );
+                        }
+                        return image;
+                      },
                     ),
                   ),
                 ),
@@ -258,7 +306,7 @@ class _MediaPreview extends StatelessWidget {
           ),
         );
       case TipoMultimedia.video:
-        return _CardVideoPreview(key: ValueKey('card_video_${media.url}'), url: media.url);
+        return _LazyCardVideoPreview(key: ValueKey('card_video_${media.url}'), url: media.url);
       case TipoMultimedia.audio:
         return _InlineAudioPlayer(key: ValueKey('card_audio_${media.url}'), url: media.url);
     }
@@ -393,11 +441,52 @@ class _CardVideoPreview extends StatefulWidget {
   State<_CardVideoPreview> createState() => _CardVideoPreviewState();
 }
 
+class _LazyCardVideoPreview extends StatefulWidget {
+  final String url;
+  const _LazyCardVideoPreview({super.key, required this.url});
+
+  @override
+  State<_LazyCardVideoPreview> createState() => _LazyCardVideoPreviewState();
+}
+
+class _LazyCardVideoPreviewState extends State<_LazyCardVideoPreview> with AutomaticKeepAliveClientMixin {
+  bool _activated = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_activated) {
+      return _CardVideoPreview(url: widget.url, key: ValueKey('active_${widget.url}'));
+    }
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(height: 200, color: AppColors.background),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.black54, foregroundColor: Colors.white),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Cargar video'),
+            onPressed: () {
+              setState(() => _activated = true);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeepAliveClientMixin {
   late final VideoPlayerController _controller;
   bool _initialized = false;
   bool _muted = true;
   String? _handlerKey;
+  MediaPlaybackProvider? _media;
   bool _isSeeking = false;
   Timer? _resumeDebounce;
   bool _wasPlayingBeforeSeek = false;
@@ -448,21 +537,23 @@ class _CardVideoPreviewState extends State<_CardVideoPreview> with AutomaticKeep
       _dbgLogIfChanged(prefix: 'Card');
     });
     
-    // Registrar pausa global con ámbito 'card'
-    final media = context.read<MediaPlaybackProvider>();
-    _handlerKey = media.registerHandler(
-      scope: 'card',
-      sourceId: widget.url,
-      onPause: () async { await _controller.pause(); },
-      tipo: 'video',
-    );
+    // Registrar pausa global con ámbito 'card' sin leer provider en dispose
+    try {
+      _media = context.read<MediaPlaybackProvider>();
+      _handlerKey = _media!.registerHandler(
+        scope: 'card',
+        sourceId: widget.url,
+        onPause: () async { await _controller.pause(); },
+        tipo: 'video',
+      );
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _resumeDebounce?.cancel();
     if (_handlerKey != null) {
-      context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!);
+      _media?.unregisterHandlerByKey(_handlerKey!);
     }
     _controller.dispose();
     super.dispose();
@@ -814,13 +905,15 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> with AutomaticKe
         if (d != null && mounted) setState(() => _duration = d);
       });
       // Registrar pausa global con ámbito 'card'
-      final media = context.read<MediaPlaybackProvider>();
-      _handlerKey = media.registerHandler(
-        scope: 'card',
-        sourceId: widget.url,
-        onPause: () async { await _player.pause(); },
-        tipo: 'audio',
-      );
+      try {
+        final media = context.read<MediaPlaybackProvider>();
+        _handlerKey = media.registerHandler(
+          scope: 'card',
+          sourceId: widget.url,
+          onPause: () async { await _player.pause(); },
+          tipo: 'audio',
+        );
+      } catch (_) {}
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -832,7 +925,7 @@ class _InlineAudioPlayerState extends State<_InlineAudioPlayer> with AutomaticKe
     _durSub?.cancel();
     _resumeDebounce?.cancel();
     if (_handlerKey != null) {
-      context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!);
+      try { context.read<MediaPlaybackProvider>().unregisterHandlerByKey(_handlerKey!); } catch (_) {}
     }
     _player.dispose();
     super.dispose();

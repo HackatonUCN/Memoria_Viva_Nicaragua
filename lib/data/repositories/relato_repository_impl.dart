@@ -231,16 +231,27 @@ class RelatoRepositoryImpl implements IRelatoRepository {
       
       // Subir archivos multimedia si hay nuevos
       final multimedia = await _procesarMultimedia(relato);
-      
-      // Crear el modelo con la multimedia actualizada y la fecha de actualización
-      final relatoActualizado = relato.copyWith(
-        multimedia: multimedia ?? relato.multimedia,
-        fechaActualizacion: DateTime.now().toUtc(),
-      );
-      
-      // Convertir a modelo y guardar
-      final relatoModel = RelatoModel.fromDomain(relatoActualizado);
-      await _firestoreDataSource.save(relatoModel);
+
+      // Preparar payload mínimo permitido por reglas para actualización
+      final ubicacionMap = relato.ubicacion != null
+          ? UbicacionModel.fromDomain(relato.ubicacion!).toMap()
+          : null;
+      final multimediaList = (multimedia ?? relato.multimedia)
+          .map((m) => MultimediaModel.fromDomain(m).toMap())
+          .toList();
+
+      final Map<String, dynamic> updateData = {
+        'titulo': relato.titulo,
+        'contenido': relato.contenido,
+        'categoriaId': relato.categoriaId,
+        'categoriaNombre': relato.categoriaNombre,
+        'etiquetas': relato.etiquetas,
+        'ubicacion': ubicacionMap,
+        'multimedia': multimediaList,
+        'fechaActualizacion': FieldValue.serverTimestamp(),
+      };
+
+      await _firestoreDataSource.update(id: relato.id, data: updateData);
     });
   }
 

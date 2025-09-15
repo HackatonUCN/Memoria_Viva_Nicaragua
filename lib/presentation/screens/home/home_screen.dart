@@ -13,6 +13,7 @@ import '../relatos/publicar_relato_sheet.dart';
 import '../../widgets/relatos/relato_detail_overlay.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
+import '../eventos/eventos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String title;
@@ -253,9 +254,7 @@ class _EventosTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Eventos', style: AppTypography.textTheme.headlineMedium),
-    );
+    return const EventosScreen();
   }
 }
 

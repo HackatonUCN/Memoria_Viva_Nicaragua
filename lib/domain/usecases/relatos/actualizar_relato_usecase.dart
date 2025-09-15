@@ -166,8 +166,8 @@ class ActualizarRelatoUseCase {
         rethrow;
       }
 
-      // Guardar el relato actualizado
-      await _relatoRepository.guardarRelato(relatoActualizado);
+      // Guardar el relato actualizado (ruta de actualización, no creación)
+      await _relatoRepository.actualizarRelato(relatoActualizado);
       return Success<void, Failure>(null);
     } catch (e) {
       final failure = mapExceptionToFailure(e);

@@ -15,18 +15,25 @@ import '../../widgets/relatos/ubicacion_selector.dart';
 class PublicarRelatoSheet extends StatelessWidget {
   const PublicarRelatoSheet({super.key});
 
-  static Future<bool?> open(BuildContext context, {Relato? initialRelato}) async {
-    final result = await showModalBottomSheet<bool>(
+  static Future<Relato?> open(BuildContext context, {Relato? initialRelato}) async {
+    final result = await showModalBottomSheet<Relato?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withOpacity(0.2),
+      useRootNavigator: false,
       builder: (ctx) {
         return ChangeNotifierProvider(
           create: (_) => RelatoFormProvider()
             ..init()
             ..loadRelatoForEditIfNeeded(initialRelato),
-          child: const _SheetScaffold(),
+          child: WillPopScope(
+            onWillPop: () async {
+              // Evita pops reentrantes que disparan !_debugLocked
+              return true;
+            },
+            child: const _SheetScaffold(),
+          ),
         );
       },
     );
@@ -95,7 +102,9 @@ class _Content extends StatelessWidget {
             child: Row(
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    Navigator.of(context).pop(null);
+                  },
                   child: const Text('Cancelar', style: TextStyle(color: AppColors.textLight)),
                 ),
                 Expanded(
@@ -134,7 +143,21 @@ class _Content extends StatelessWidget {
                           ),
                         ),
                       );
-                      Navigator.of(context, rootNavigator: true).pop(true);
+                      // Devolver relato mínimo para UI optimista (crear o editar) y cerrar el sheet de forma segura
+                      Relato? salida;
+                      if (provider.isEditing) {
+                        salida = provider.relatoEditadoMinimo();
+                      } else {
+                        // Preferir el relato real creado si está disponible para evitar duplicados
+                        salida = provider.lastCreatedRelato ?? provider.relatoConstruidoMinimo();
+                      }
+                      final nav = Navigator.of(context);
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!context.mounted) return;
+                        if (await nav.maybePop(salida) == false) {
+                          // Fallback por si ya se cerró
+                        }
+                      });
                     } else if (provider.errorMessage != null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(backgroundColor: AppColors.error, content: Text(provider.errorMessage!)),
@@ -142,7 +165,18 @@ class _Content extends StatelessWidget {
                     }
                   } : null,
                   child: provider.isPublishing
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(provider.isEditing ? 'Guardando…' : 'Publicando…'),
+                          ],
+                        )
                       : Text(provider.isEditing ? 'Guardar cambios' : 'Publicar'),
                 )
               ],
