@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
@@ -46,6 +47,7 @@ class MapProvider extends ChangeNotifier {
 
   // Debounce para fetch al mover/zoom
   Timer? _debounce;
+  DateTime _lastBoundsAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Foco de relato (para centrar y resaltar)
   String? focusRelatoId;
@@ -108,11 +110,26 @@ class MapProvider extends ChangeNotifier {
         (e - east!).abs() < epsilon) {
       return;
     }
+
+    // Calcular magnitud del movimiento (aprox km) para ajustar debounce
+    double moveKm = 0;
+    try {
+      if (south != null && north != null && west != null && east != null) {
+        final prevLat = (south! + north!) / 2.0;
+        final prevLng = (west! + east!) / 2.0;
+        final lat = (s + n) / 2.0;
+        final lng = (w + e) / 2.0;
+        final latKm = ((lat - prevLat).abs()) * 111.0;
+        final lngKm = ((lng - prevLng).abs()) * (111.0 * (cos(lat * 3.1415926535 / 180.0)).abs().clamp(0.2, 1.0));
+        moveKm = latKm + lngKm;
+      }
+    } catch (_) {}
+
     south = s;
     west = w;
     north = n;
     east = e;
-    _debouncedFetch();
+    _debouncedFetch(dynamicDelayMs: moveKm < 3 ? 260 : 520);
   }
 
   void toggleNearbyOnly(bool value) {
@@ -223,13 +240,14 @@ class MapProvider extends ChangeNotifier {
   // El método takeCameraMoveRequest ya no se usa porque ahora accedemos directamente
   // a _cameraMoveRequested desde MapScreen
 
-  void _debouncedFetch({bool force = false}) {
+  void _debouncedFetch({bool force = false, int? dynamicDelayMs}) {
     if (kDebugMode) {
       // ignore: avoid_print
       print('DEBUG: MapProvider._debouncedFetch - force=$force');
     }
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 550), () {
+    final int delayMs = dynamicDelayMs ?? 450;
+    _debounce = Timer(Duration(milliseconds: delayMs), () {
       if (kDebugMode) {
         // ignore: avoid_print
         print('DEBUG: Ejecutando fetch después del debounce');
@@ -249,10 +267,18 @@ class MapProvider extends ChangeNotifier {
     }
   }
 
+  double _roundToGrid(double value, double grid) => (value / grid).roundToDouble() * grid;
+
   String _cacheKey() {
     if (south == null || west == null || north == null || east == null) return 'map:none';
+    // Cuadrícula más gruesa para mejores aciertos en caché
+    final grid = 0.1; // ~11km latitud
+    final s = _roundToGrid(south!, grid).toStringAsFixed(1);
+    final w = _roundToGrid(west!, grid).toStringAsFixed(1);
+    final n = _roundToGrid(north!, grid).toStringAsFixed(1);
+    final e = _roundToGrid(east!, grid).toStringAsFixed(1);
     final z = zoom.toStringAsFixed(1);
-    return 'map:bounds:${south!.toStringAsFixed(3)},${west!.toStringAsFixed(3)},${north!.toStringAsFixed(3)},${east!.toStringAsFixed(3)}:z=$z:nearby=$nearbyOnly:r=$radioKm';
+    return 'map:grid:$s,$w,$n,$e:z=$z:nearby=$nearbyOnly:r=$radioKm';
   }
 
   Future<void> _fetch({bool force = false}) async {
@@ -285,6 +311,8 @@ class MapProvider extends ChangeNotifier {
           relatos = cached;
           loading = false;
           notifyListeners();
+          // SWR: refrescar en background sin bloquear UI
+          unawaited(_revalidateInBackground());
           return;
         }
       }
@@ -299,7 +327,7 @@ class MapProvider extends ChangeNotifier {
     final double currentZoom = zoom;
     final int dynamicLimit = currentZoom < 8
         ? 120
-        : (currentZoom < 12 ? 200 : 300);
+        : (currentZoom < 12 ? 220 : 400);
 
     final res = await _useCases.relatos.obtener.enBounds(
       south: south!, west: west!, north: north!, east: east!, limit: dynamicLimit,
@@ -329,8 +357,17 @@ class MapProvider extends ChangeNotifier {
       try {
         if (_getIt.isRegistered<ICacheService>()) {
           final cache = _getIt<ICacheService>();
-          await cache.set<List<Relato>>(_cacheKey(), relatos, ttlSeconds: 60, tag: 'map');
-          print('DEBUG: Guardados ${relatos.length} relatos en caché');
+          await cache.set<List<Relato>>(_cacheKey(), relatos, ttlSeconds: 90, tag: 'map');
+          // Prefetch de vecindades: guardar también una clave expandida (~1.2x)
+          final expand = 0.1; // 10% por lado
+          if (south != null && west != null && north != null && east != null) {
+            final s2 = south! - (north! - south!) * expand;
+            final w2 = west! - (east! - west!) * expand;
+            final n2 = north! + (north! - south!) * expand;
+            final e2 = east! + (east! - west!) * expand;
+            final key2 = 'map:prefetch:${s2.toStringAsFixed(2)},${w2.toStringAsFixed(2)},${n2.toStringAsFixed(2)},${e2.toStringAsFixed(2)}:z=${zoom.toStringAsFixed(0)}:nearby=$nearbyOnly:r=$radioKm';
+            await cache.set<List<Relato>>(key2, relatos, ttlSeconds: 60, tag: 'map');
+          }
         }
       } catch (e) {
         print('DEBUG: Error al guardar en caché: $e');
@@ -399,6 +436,33 @@ class MapProvider extends ChangeNotifier {
     }
     _debouncedFetch(force: true);
     notifyListeners();
+  }
+
+  Future<void> _revalidateInBackground() async {
+    try {
+      final double currentZoom = zoom;
+      final int dynamicLimit = currentZoom < 8
+          ? 120
+          : (currentZoom < 12 ? 220 : 400);
+      final res = await _useCases.relatos.obtener.enBounds(
+        south: south!, west: west!, north: north!, east: east!, limit: dynamicLimit,
+      );
+      final data = res.valueOrNull;
+      if (data != null) {
+        var list = data.where((r) => r.ubicacion != null).toList();
+        if (selectedCategoriaIds.isNotEmpty) {
+          list = list.where((r) => selectedCategoriaIds.contains(r.categoriaId)).toList();
+        }
+        relatos = list;
+        try {
+          if (_getIt.isRegistered<ICacheService>()) {
+            final cache = _getIt<ICacheService>();
+            await cache.set<List<Relato>>(_cacheKey(), relatos, ttlSeconds: 90, tag: 'map');
+          }
+        } catch (_) {}
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 }
 
