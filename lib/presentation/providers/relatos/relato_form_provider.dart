@@ -20,9 +20,11 @@ import '../../../domain/validators/contenido_validator.dart';
 import '../../../domain/enums/tipos_contenido.dart';
 import '../../../domain/value_objects/multimedia.dart';
 import '../../../domain/failures/failures.dart';
+import '../../../domain/failures/result.dart';
 import '../../../domain/services/i_connectivity_service.dart';
 import '../../../domain/services/i_geolocation_service.dart';
 import '../../../data/datasources/impl/cloudinary_storage_datasource_impl.dart';
+import '../../../domain/value_objects/ubicacion.dart';
 
 enum UploadStatus { queued, uploading, done, error, cancelled }
 
@@ -62,6 +64,15 @@ class RelatoFormProvider extends ChangeNotifier {
   List<Categoria> categorias = [];
   bool categoriasLoading = false;
   String? categoriasError;
+  static List<Categoria> _memCacheCategorias = [];
+  static DateTime? _memCacheAt;
+  static const Duration _memCacheTtl = Duration(minutes: 10);
+
+  // Semilla de cache desde otras capas (por ejemplo FeedProvider)
+  static void seedCategoriasCache(List<Categoria> cats) {
+    _memCacheCategorias = List.of(cats);
+    _memCacheAt = DateTime.now();
+  }
 
   // Ubicación elegida o null
   String? departamento;
@@ -77,10 +88,12 @@ class RelatoFormProvider extends ChangeNotifier {
   String? errorMessage;
   bool get hasPendingUploads => uploads.any((u) => u.status == UploadStatus.queued || u.status == UploadStatus.uploading);
   bool lastPublishOffline = false;
+  Relato? lastCreatedRelato;
 
   // Modo edición
   bool isEditing = false;
   String? relatoId;
+  Relato? _originalRelato;
 
   // Herramientas
   final ImagePicker _picker = ImagePicker();
@@ -90,31 +103,73 @@ class RelatoFormProvider extends ChangeNotifier {
   String? _currentUserId;
   StreamSubscription<List<Categoria>>? _catsSub;
   final Map<String, http.Client> _clientsByUpload = {};
+  bool _isDisposed = false;
+
+  void _notify() {
+    if (!_isDisposed) {
+      try { notifyListeners(); } catch (_) {}
+    }
+  }
 
   Future<void> init() async {
-    // Cargar usuario actual
-    final current = await _useCases.auth.getCurrentUser.execute();
-    _currentUserId = current.valueOrNull?.id;
+    // Cargar usuario actual en segundo plano
+    // ignore: discarded_futures
+    _ensureCurrentUser();
 
-    // Cargar categorías de tipo relato
+    // Cargar categorías con cache en memoria y refresh en background
     categoriasLoading = true;
     categoriasError = null;
-    notifyListeners();
+    _notify();
+
+    final bool cacheFresh = _memCacheCategorias.isNotEmpty && (_memCacheAt != null) && DateTime.now().difference(_memCacheAt!) < _memCacheTtl;
+    if (cacheFresh) {
+      categorias = List.of(_memCacheCategorias);
+      categoriasLoading = false;
+      _notify();
+      // Refresh en background sin bloquear UI
+      // ignore: discarded_futures
+      _refreshCategorias();
+      return;
+    }
+
+    await _refreshCategorias();
+  }
+
+  Future<void> _refreshCategorias() async {
     try {
       final uc = _getIt<ObtenerCategoriasPorTipoUseCase>();
-      final res = await uc.execute(TipoContenido.relato);
-      categorias = res.valueOrNull ?? [];
-      categorias.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      final res = await uc.execute(TipoContenido.relato).timeout(const Duration(seconds: 8));
+      final data = res.valueOrNull ?? _memCacheCategorias;
+      categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      _memCacheCategorias = List.of(categorias);
+      _memCacheAt = DateTime.now();
       _catsSub?.cancel();
       _catsSub = uc.observe(TipoContenido.relato).listen((data) {
         categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
-        notifyListeners();
+        _memCacheCategorias = List.of(categorias);
+        _memCacheAt = DateTime.now();
+        _notify();
       });
+      categoriasLoading = false;
+      categoriasError = null;
+      _notify();
+    } on TimeoutException {
+      // Mantener cache si existe, mostrar sin bloquear
+      if (_memCacheCategorias.isNotEmpty) {
+        categorias = List.of(_memCacheCategorias);
+        categoriasLoading = false;
+        categoriasError = null;
+        _notify();
+      } else {
+        categoriasLoading = false;
+        categoriasError = 'Tiempo de espera al cargar categorías';
+        _notify();
+      }
     } catch (e) {
       categoriasError = e.toString();
+      categoriasLoading = false;
+      _notify();
     }
-    categoriasLoading = false;
-    notifyListeners();
   }
 
   // Helper para inicializar edición si viene un relato
@@ -126,6 +181,7 @@ class RelatoFormProvider extends ChangeNotifier {
   void loadRelatoForEdit(Relato relato) {
     isEditing = true;
     relatoId = relato.id;
+    _originalRelato = relato;
     titulo = relato.titulo;
     contenido = relato.contenido;
     categoriaId = relato.categoriaId;
@@ -150,6 +206,7 @@ class RelatoFormProvider extends ChangeNotifier {
   void dispose() {
     _catsSub?.cancel();
     _recorder.dispose();
+    _isDisposed = true;
     super.dispose();
   }
 
@@ -430,6 +487,7 @@ class RelatoFormProvider extends ChangeNotifier {
   // Publicación
   Future<bool> publicar() async {
     if (isPublishing) return false;
+    await _ensureCurrentUser();
     if (!formularioValido) {
       errorMessage = 'Completa título, contenido y categoría.';
       notifyListeners();
@@ -519,6 +577,11 @@ class RelatoFormProvider extends ChangeNotifier {
         }
       }
       lastPublishOffline = queuedOffline;
+      if (!isEditing && res.isSuccess) {
+        // Guardar el relato creado real para UI optimista sin duplicados
+        final created = (res as Result<Relato, Failure>).valueOrNull;
+        lastCreatedRelato = created;
+      }
       if (res.isFailure && !queuedOffline) {
         errorMessage = res.errorOrNull?.message ?? 'No se pudo publicar el relato.';
         notifyListeners();
@@ -534,6 +597,122 @@ class RelatoFormProvider extends ChangeNotifier {
       debugPrint('[RELATO_FORM][ERROR] $e');
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> _ensureCurrentUser() async {
+    if (_currentUserId == null || _currentUserId!.isEmpty) {
+      final current = await _useCases.auth.getCurrentUser.execute();
+      _currentUserId = current.valueOrNull?.id;
+    }
+  }
+
+  // Construye un Relato mínimo usando el estado del formulario para UI optimista
+  Relato? relatoConstruidoMinimo() {
+    try {
+      if (_currentUserId == null || categoriaId == null) return null;
+      // Recolectar URLs ya subidas
+      final imagenes = uploads
+          .where((u) => u.tipo == TipoMultimedia.imagen && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
+      final audios = uploads
+          .where((u) => u.tipo == TipoMultimedia.audio && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
+      final videos = uploads
+          .where((u) => u.tipo == TipoMultimedia.video && u.status == UploadStatus.done && (u.url?.isNotEmpty ?? false))
+          .map((u) => u.url!)
+          .toList();
+
+      final List<Multimedia> multimedia = [];
+      for (final url in imagenes) {
+        multimedia.add(Multimedia(url: url, tipo: TipoMultimedia.imagen));
+      }
+      if (audios.isNotEmpty) {
+        multimedia.add(Multimedia(url: audios.first, tipo: TipoMultimedia.audio));
+      }
+      if (videos.isNotEmpty) {
+        multimedia.add(Multimedia(url: videos.first, tipo: TipoMultimedia.video));
+      }
+
+      // Resolver nombre de categoría seleccionado
+      String catNombre = 'Relato';
+      for (final c in categorias) {
+        if (c.id == categoriaId) { catNombre = c.nombre; break; }
+      }
+      return Relato.crear(
+        titulo: titulo.trim(),
+        contenido: contenido.trim(),
+        autorId: _currentUserId!,
+        autorNombre: 'Yo',
+        categoriaId: categoriaId!,
+        categoriaNombre: catNombre,
+        ubicacion: (departamento != null && municipio != null)
+            ? Ubicacion(
+                latitud: latitud ?? 0,
+                longitud: longitud ?? 0,
+                departamento: departamento!,
+                municipio: municipio!,
+              )
+            : null,
+        multimedia: multimedia,
+        etiquetas: List.of(etiquetas),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Construye una versión editada mínima conservando el mismo ID
+  Relato? relatoEditadoMinimo() {
+    try {
+      if (!isEditing || relatoId == null || _originalRelato == null || categoriaId == null) return null;
+      final Relato base = _originalRelato!;
+
+      // Resolver nombre de categoría actual
+      String categoriaNombreFinal = base.categoriaNombre;
+      final String selCatId = categoriaId!;
+      for (final c in categorias) {
+        if (c.id == selCatId) { categoriaNombreFinal = c.nombre; break; }
+      }
+
+      // Resolver ubicación (si el usuario cambió)
+      Ubicacion? ubic;
+      if (departamento != null && municipio != null) {
+        ubic = Ubicacion(
+          latitud: latitud ?? base.ubicacion?.latitud ?? 0,
+          longitud: longitud ?? base.ubicacion?.longitud ?? 0,
+          departamento: departamento!,
+          municipio: municipio!,
+        );
+      } else {
+        ubic = base.ubicacion;
+      }
+
+      return Relato(
+        id: base.id,
+        titulo: titulo.trim(),
+        contenido: contenido.trim(),
+        autorId: base.autorId,
+        autorNombre: base.autorNombre,
+        categoriaId: selCatId,
+        categoriaNombre: categoriaNombreFinal,
+        fechaCreacion: base.fechaCreacion,
+        fechaActualizacion: DateTime.now().toUtc(),
+        ubicacion: ubic,
+        multimedia: base.multimedia,
+        etiquetas: List.of(etiquetas.isEmpty ? base.etiquetas : etiquetas),
+        estado: base.estado,
+        reportes: base.reportes,
+        procesado: base.procesado,
+        likes: base.likes,
+        compartidos: base.compartidos,
+        eliminado: base.eliminado,
+        fechaEliminacion: base.fechaEliminacion,
+      );
+    } catch (_) {
+      return null;
     }
   }
 }

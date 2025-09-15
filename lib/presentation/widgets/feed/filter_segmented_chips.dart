@@ -13,10 +13,10 @@ class FilterSegmentedChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<FeedProvider>();
+    final filtro = context.select<FeedProvider, FeedFilter>((p) => p.filtro);
 
     Widget chip(String label, FeedFilter value, {bool enabled = true}) {
-      final selected = provider.filtro == value;
+      final selected = filtro == value;
       return Semantics(
         button: true,
         selected: selected,
@@ -24,7 +24,15 @@ class FilterSegmentedChips extends StatelessWidget {
         child: ChoiceChip(
           label: Text(label, style: AppTypography.textTheme.labelLarge),
           selected: selected,
-          onSelected: enabled ? (_) => provider.changeFilter(value) : null,
+          onSelected: enabled
+              ? (_) {
+                  // Evitar bloquear el hilo de UI: delegar cambio tras frame
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    final p = context.read<FeedProvider>();
+                    p.setFiltro(value);
+                  });
+                }
+              : null,
           selectedColor: AppColors.primary,
           labelStyle: TextStyle(color: selected ? AppColors.textLight : AppColors.textPrimary),
           backgroundColor: AppColors.surface,

@@ -7,7 +7,6 @@ import '../../bloc/splash/splash_state.dart';
 import '../../widgets/splash/animated_logo.dart';
 import '../../widgets/splash/cultural_background.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../widgets/debug/remote_config_debug_panel.dart';
 import '../../providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -111,7 +110,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 builder: (context, state) {
                   return Column(
                     children: [
-                      const RemoteConfigDebugPanel(),
                       if (state.status == SplashStatus.loading)
                         const CircularProgressIndicator(),
                       if (state.error != null)

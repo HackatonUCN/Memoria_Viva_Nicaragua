@@ -2,68 +2,77 @@
 
 ¡Gracias por tu interés en contribuir a Memoria Viva Nicaragua! 🎉
 
-## 📝 Proceso de Contribución
+## 📝 Flujo de trabajo
 
-1. Fork del repositorio
-2. Crear una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit de tus cambios (`git commit -m 'Add: AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abrir un Pull Request
+1. Haz Fork del repositorio
+2. Crea una rama descriptiva: `feat/nombre-corto` o `fix/bug-descriptivo`
+3. Implementa y garantiza que pasa el análisis y las pruebas
+4. Commit siguiendo Conventional Commits
+5. Push a tu fork y abre un Pull Request (PR)
 
-## 📋 Convenciones de Código
+## ✅ Checklist para Pull Requests
+
+- [ ] Sigue la guía de estilo (Effective Dart) y formato (`dart format .`)
+- [ ] Linter sin errores: `flutter analyze`
+- [ ] Pruebas pasan: `flutter test`
+- [ ] Incluye tests para lo nuevo o cambiado
+- [ ] Actualiza documentación (README/ENVIRONMENT si aplica)
+- [ ] No incluye secretos ni archivos ignorados (.env, keys privadas)
+
+## 📋 Convenciones
 
 ### Estilo de Código
-- Seguimos [Effective Dart](https://dart.dev/guides/language/effective-dart)
-- Usamos el formatter de Dart (`dart format .`)
-- Mantenemos un máximo de 80 caracteres por línea
+- Effective Dart: `https://dart.dev/guides/language/effective-dart`
+- Mantén funciones y clases pequeñas, nombres descriptivos y sin abreviaturas crípticas
+- Evita anidaciones profundas; usa early-returns
 
-### Convenciones de Commit
-Usamos [Conventional Commits](https://www.conventionalcommits.org/):
+### Commits (Conventional Commits)
+- `feat:` nueva funcionalidad
+- `fix:` corrección de bug
+- `docs:` documentación
+- `style:` formato (sin cambios de lógica)
+- `refactor:` cambio interno sin cambiar comportamiento
+- `test:` pruebas añadidas/ajustadas
+- `chore:` herramientas/infraestructura
 
-- `feat:` Nueva característica
-- `fix:` Corrección de bug
-- `docs:` Cambios en documentación
-- `style:` Cambios de formato
-- `refactor:` Refactorización de código
-- `test:` Añadir o modificar tests
-- `chore:` Cambios en el proceso de build o herramientas
+### Ramas
+- `main`: estable/producción
+- `develop`: integración de desarrollo
+- `feat/*`, `fix/*`, `chore/*`, `refactor/*` según corresponda
 
-### Estructura de Branches
-- `main`: Producción
-- `develop`: Desarrollo
-- `feature/*`: Nuevas características
-- `bugfix/*`: Correcciones
-- `hotfix/*`: Correcciones urgentes
+## 🧪 Pruebas
 
-## 🧪 Testing
-
-- Escribe tests para todo el código nuevo
-- Mantén la cobertura de tests > 80%
-- Ejecuta `flutter test` antes de commit
+- Cubre lógica de negocio en `domain` y `data`
+- Usa `mocktail`/`fake_cloud_firestore` donde aplique
+- Objetivo de cobertura: ≥ 80%
+- Comandos:
+  ```bash
+  flutter analyze
+  flutter test
+  ```
 
 ## 📱 UI/UX
 
-- Sigue el Material Design 3
-- Usa los colores definidos en `lib/core/theme`
-- Asegura que la UI sea responsive
-- Implementa modo oscuro
+- Sigue Material Design 3 y la guía de estilo del proyecto (colores/tipografías)
+- Usa `flutter_screenutil` y patrones responsive
+- Respeta accesibilidad (contraste, tamaños de toque, textos escalables)
 
 ## 🔒 Seguridad
 
-- No expongas información sensible
-- No comitees archivos de configuración
-- Usa variables de entorno para secrets
+- No subas `.env` ni secretos; usa `--dart-define` para variables
+- Revisa que las reglas de Firestore/Storage sean estrictas
+- Evita logs con datos sensibles
 
 ## 📝 Documentación
 
-- Documenta todas las clases y métodos públicos
-- Mantén el README actualizado
-- Añade ejemplos de uso cuando sea relevante
+- Documenta clases y funciones públicas
+- Actualiza el README y el CHANGELOG cuando corresponda
+- Añade ejemplos de uso para componentes complejos
 
-## ❓ ¿Preguntas?
+## ❓ Soporte y dudas
 
-¿Tienes dudas? Abre un issue o contacta al equipo.
+Abre un issue describiendo el contexto, comportamiento esperado y pasos para reproducir. Etiqueta con `bug`, `enhancement` o `question`.
 
 ## 📜 Código de Conducta
 
-Este proyecto sigue el [Código de Conducta de Contributor Covenant](https://www.contributor-covenant.org/es/version/2/0/code_of_conduct/).
+Este proyecto sigue el [Contributor Covenant 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/). Al participar aceptas cumplir sus lineamientos.

@@ -9,7 +9,9 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Necesitamos acceso a tu biblioteca para seleccionar imágenes.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Usamos tu ubicación para asociar el relato al lugar donde ocurrió.</string>
+    <string>Usamos tu ubicación para centrar el mapa y mostrar relatos cercanos.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Necesitamos tu ubicación para mejorar la experiencia en el mapa.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

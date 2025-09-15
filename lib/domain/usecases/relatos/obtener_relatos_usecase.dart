@@ -93,4 +93,26 @@ class ObtenerRelatosUseCase {
   Stream<List<Relato>> observePorCategoria(String categoriaId) {
     return _relatoRepository.observarRelatosPorCategoria(categoriaId);
   }
+
+  /// Obtiene relatos dentro de límites geográficos visibles (bounding box)
+  UseCaseResult<List<Relato>> enBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async {
+    try {
+      final data = await _relatoRepository.obtenerRelatosEnBounds(
+        south: south,
+        west: west,
+        north: north,
+        east: east,
+        limit: limit,
+      );
+      return Success<List<Relato>, Failure>(data);
+    } catch (e) {
+      return FailureResult<List<Relato>, Failure>(mapExceptionToFailure(e));
+    }
+  }
 }

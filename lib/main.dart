@@ -13,6 +13,7 @@ import 'presentation/screens/splash/splash_screen.dart';
 import 'presentation/bloc/splash/splash_bloc.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/navigation_provider.dart';
+import 'presentation/providers/media_playback_provider.dart';
 // Importamos RouteObserver para las animaciones
 import 'config/app_router.dart';
 import 'package:url_strategy/url_strategy.dart';
@@ -58,6 +59,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<NavigationProvider>(
           create: (context) => NavigationProvider(),
         ),
+        ChangeNotifierProvider<MediaPlaybackProvider>(
+          create: (context) => MediaPlaybackProvider(),
+        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(375, 812), // Tamaño de diseño base (iPhone X)
@@ -68,7 +72,7 @@ class MyApp extends StatelessWidget {
             title: 'Memoria Viva Nicaragua',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.light, // Forzamos tema claro para consistencia
+            themeMode: ThemeMode.light,
             debugShowCheckedModeBanner: false,
             // Registramos el observador de rutas para controlar las animaciones
             navigatorObservers: [LoginScreen.routeObserver],

@@ -8,19 +8,23 @@ import '../../../core/theme/app_typography.dart';
 import '../../widgets/drawer/app_drawer.dart';
 import '../../widgets/responsive/responsive_layout.dart';
 import '../relatos/feed_screen.dart';
+import '../mapa/map_screen.dart';
 import '../relatos/publicar_relato_sheet.dart';
 import '../../widgets/relatos/relato_detail_overlay.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
+import '../eventos/eventos_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String title;
   final int initialIndex;
+  final String? mapFocusRelatoId;
 
   const HomeScreen({
     super.key,
     required this.title,
     this.initialIndex = 0,
+    this.mapFocusRelatoId,
   });
 
   @override
@@ -28,7 +32,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _pageIndex = 0;
   final List<CurvedNavigationBarItem> _navigationItems = [];
   late final SidebarXController _controller;
 
@@ -39,9 +42,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _controller = SidebarXController(selectedIndex: 0, extended: true);
     _initNavigationItems();
-    _pageIndex = widget.initialIndex;
-    // Manejo simple de argumento deeplink {'relatoId': id}
+    // Sincronizar índice del provider con la ruta inicial y manejar deeplink {'relatoId': id}
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<NavigationProvider>().setIndex(widget.initialIndex);
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is Map && args['relatoId'] is String) {
         final String id = args['relatoId'] as String;
@@ -52,12 +56,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _initNavigationItems() {
+    final selected = widget.initialIndex;
     _navigationItems.addAll([
-      _buildNavItem(Icons.home_outlined, 'Inicio', 0),
-      _buildNavItem(Icons.map_outlined, 'Mapa', 1),
-      _buildNavItem(Icons.add_circle_outline, '', 2),
-      _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3),
-      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4),
+      _buildNavItem(Icons.home_outlined, 'Inicio', 0, selected),
+      _buildNavItem(Icons.map_outlined, 'Mapa', 1, selected),
+      _buildNavItem(Icons.add_circle_outline, '', 2, selected),
+      _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3, selected),
+      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4, selected),
     ]);
   }
 
@@ -88,21 +93,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _isHandlingNavigation = true;
     final nav = context.read<NavigationProvider>();
     nav.setIndex(index);
-    setState(() {
-      _pageIndex = index;
-      _updateNavigationItems();
-    });
     _isHandlingNavigation = false;
   }
 
   void _updateNavigationItems() {
     _navigationItems.clear();
+    final selected = context.read<NavigationProvider>().selectedIndex;
     _navigationItems.addAll([
-      _buildNavItem(Icons.home_outlined, 'Inicio', 0),
-      _buildNavItem(Icons.map_outlined, 'Mapa', 1),
-      _buildNavItem(Icons.add_circle_outline, '', 2),
-      _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3),
-      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4),
+      _buildNavItem(Icons.home_outlined, 'Inicio', 0, selected),
+      _buildNavItem(Icons.map_outlined, 'Mapa', 1, selected),
+      _buildNavItem(Icons.add_circle_outline, '', 2, selected),
+      _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3, selected),
+      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4, selected),
     ]);
   }
 
@@ -119,8 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  CurvedNavigationBarItem _buildNavItem(IconData icon, String label, int index) {
-    final bool isSelected = _pageIndex == index;
+  CurvedNavigationBarItem _buildNavItem(IconData icon, String label, int index, int selectedIndex) {
+    final bool isSelected = selectedIndex == index;
     return CurvedNavigationBarItem(
       child: _buildIcon(icon, isSelected),
       label: label,
@@ -156,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               bottomNavigationBar: AnimatedNavigationBar(
                 currentIndex: context.watch<NavigationProvider>().selectedIndex,
-                items: _navigationItems,
+                items: _buildNavItemsForCurrent(),
                 onTap: _handleNavigationBarTap,
               ),
               body: _buildMainContent(),
@@ -190,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: AnimatedNavigationBar(
         currentIndex: context.watch<NavigationProvider>().selectedIndex,
-        items: _navigationItems,
+        items: _buildNavItemsForCurrent(),
         onTap: _handleNavigationBarTap,
       ),
       body: _buildMainContent(),
@@ -199,16 +201,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMainContent() {
     final currentIndex = context.watch<NavigationProvider>().selectedIndex;
+    final focusId = context.watch<NavigationProvider>().mapFocusRelatoId;
     return IndexedStack(
       index: currentIndex,
-      children: const [
-        FeedScreen(),
-        _MapaTab(),
-        _PublicarTab(),
-        _EventosTab(),
-        _BibliotecaTab(),
+      children: [
+        const FeedScreen(),
+        MapScreen(focusRelatoId: focusId),
+        const _PublicarTab(),
+        const _EventosTab(),
+        const _BibliotecaTab(),
       ],
     );
+  }
+
+  List<CurvedNavigationBarItem> _buildNavItemsForCurrent() {
+    final selected = context.watch<NavigationProvider>().selectedIndex;
+    return [
+      _buildNavItem(Icons.home_outlined, 'Inicio', 0, selected),
+      _buildNavItem(Icons.map_outlined, 'Mapa', 1, selected),
+      _buildNavItem(Icons.add_circle_outline, '', 2, selected),
+      _buildNavItem(Icons.calendar_month_outlined, 'Eventos', 3, selected),
+      _buildNavItem(Icons.menu_book_outlined, 'Biblioteca', 4, selected),
+    ];
   }
 
   @override
@@ -222,16 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 
-class _MapaTab extends StatelessWidget {
-  const _MapaTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text('Mapa', style: AppTypography.textTheme.headlineMedium),
-    );
-  }
-}
+// Map tab reemplazado por MapScreen
 
 class _PublicarTab extends StatelessWidget {
   const _PublicarTab();
@@ -249,9 +254,7 @@ class _EventosTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Eventos', style: AppTypography.textTheme.headlineMedium),
-    );
+    return const EventosScreen();
   }
 }
 

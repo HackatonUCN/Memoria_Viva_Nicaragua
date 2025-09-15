@@ -14,6 +14,14 @@ class _RelatoRepoStub implements IRelatoRepository {
   Relato? ultimo;
   @override
   Future<void> guardarRelato(Relato relato) async { ultimo = relato; }
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async => <Relato>[];
   @override noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

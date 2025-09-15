@@ -129,6 +129,23 @@ class RelatoModel extends ContentModel<Relato> {
 
   /// Crea una instancia de RelatoModel desde un Map de Firestore
   factory RelatoModel.fromMap(Map<String, dynamic> map) {
+    // Tolerar valores nulos o con otros tipos en timestamps (ej. serverTimestamp pendiente)
+    Timestamp _toTs(dynamic v, {Timestamp? fallback}) {
+      if (v == null) return fallback ?? Timestamp.now();
+      if (v is Timestamp) return v;
+      if (v is DateTime) return Timestamp.fromDate(v);
+      if (v is int) return Timestamp.fromMillisecondsSinceEpoch(v);
+      if (v is double) return Timestamp.fromMillisecondsSinceEpoch(v.toInt());
+      if (v is String) {
+        try { return Timestamp.fromDate(DateTime.parse(v)); } catch (_) {}
+      }
+      return fallback ?? Timestamp.now();
+    }
+
+    final dynamic fcRaw = map['fechaCreacion'];
+    final dynamic faRaw = map['fechaActualizacion'];
+    final dynamic feRaw = map['fechaEliminacion'];
+
     return RelatoModel(
       id: map['id'] as String,
       titulo: map['titulo'] as String,
@@ -145,15 +162,15 @@ class RelatoModel extends ContentModel<Relato> {
               .toList() ??
           [],
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
-      fechaCreacion: map['fechaCreacion'] as Timestamp,
-      fechaActualizacion: map['fechaActualizacion'] as Timestamp,
+      fechaCreacion: _toTs(fcRaw),
+      fechaActualizacion: _toTs(faRaw),
       estado: map['estado'] as String? ?? 'activo',
       reportes: map['reportes'] as int? ?? 0,
       procesado: map['procesado'] as bool? ?? false,
       likes: map['likes'] as int? ?? 0,
       compartidos: map['compartidos'] as int? ?? 0,
       eliminado: map['eliminado'] as bool? ?? false,
-      fechaEliminacion: map['fechaEliminacion'] as Timestamp?,
+      fechaEliminacion: feRaw == null ? null : _toTs(feRaw),
     );
   }
 

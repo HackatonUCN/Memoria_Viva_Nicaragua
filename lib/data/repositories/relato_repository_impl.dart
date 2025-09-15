@@ -231,16 +231,27 @@ class RelatoRepositoryImpl implements IRelatoRepository {
       
       // Subir archivos multimedia si hay nuevos
       final multimedia = await _procesarMultimedia(relato);
-      
-      // Crear el modelo con la multimedia actualizada y la fecha de actualización
-      final relatoActualizado = relato.copyWith(
-        multimedia: multimedia ?? relato.multimedia,
-        fechaActualizacion: DateTime.now().toUtc(),
-      );
-      
-      // Convertir a modelo y guardar
-      final relatoModel = RelatoModel.fromDomain(relatoActualizado);
-      await _firestoreDataSource.save(relatoModel);
+
+      // Preparar payload mínimo permitido por reglas para actualización
+      final ubicacionMap = relato.ubicacion != null
+          ? UbicacionModel.fromDomain(relato.ubicacion!).toMap()
+          : null;
+      final multimediaList = (multimedia ?? relato.multimedia)
+          .map((m) => MultimediaModel.fromDomain(m).toMap())
+          .toList();
+
+      final Map<String, dynamic> updateData = {
+        'titulo': relato.titulo,
+        'contenido': relato.contenido,
+        'categoriaId': relato.categoriaId,
+        'categoriaNombre': relato.categoriaNombre,
+        'etiquetas': relato.etiquetas,
+        'ubicacion': ubicacionMap,
+        'multimedia': multimediaList,
+        'fechaActualizacion': FieldValue.serverTimestamp(),
+      };
+
+      await _firestoreDataSource.update(id: relato.id, data: updateData);
     });
   }
 
@@ -597,6 +608,52 @@ class RelatoRepositoryImpl implements IRelatoRepository {
           .toList();
       
       return similares;
+    });
+  }
+
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async {
+    return await _handleExceptions(() async {
+      // Validación simple de límites
+      if (south > north || west > east) {
+        throw RelatoException('Bounds inválidos: (south,north,west,east)=($south,$north,$west,$east)');
+      }
+
+      // Firestore no permite múltiples rangos en distintos campos.
+      // Estrategia: reducir el universo base usando filtros discretos y un orden predecible.
+      // 1) Filtrar solo documentos que tienen ubicación (bandera o campos presentes)
+      final base = await _firestoreDataSource.query(
+        filters: {
+          'eliminado': false,
+          'estado': EstadoModeracion.activo.value,
+        },
+        // Evitar orderBy para no requerir índice compuesto
+        limit: limit * 3,
+      );
+
+      final resultados = <Relato>[];
+      for (final m in base) {
+        final r = m.toDomain();
+        final u = r.ubicacion;
+        // Solo incluir relatos con ubicación válida dentro de los bounds
+        if (u != null && 
+            u.latitud >= south && u.latitud <= north &&
+            u.longitud >= west && u.longitud <= east) {
+          resultados.add(r);
+        }
+      }
+
+      // Si aún excede el límite solicitado, recortar
+      if (resultados.length > limit) {
+        return resultados.take(limit).toList();
+      }
+      return resultados;
     });
   }
 

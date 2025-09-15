@@ -142,6 +142,15 @@ class _RelatoRepositoryFake implements IRelatoRepository {
 
   @override
   Future<void> moderarRelato(String id, EstadoModeracion estado) async {}
+
+  @override
+  Future<List<Relato>> obtenerRelatosEnBounds({
+    required double south,
+    required double west,
+    required double north,
+    required double east,
+    int limit = 200,
+  }) async => <Relato>[];
 }
 
 class _CategoriaRepositoryFake implements ICategoriaRepository {

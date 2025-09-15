@@ -30,14 +30,14 @@ class AppColors {
   static const Color warning = maiz;                   // Amarillo maíz
   static const Color info = primary;                   // Azul primario
 
-  // Colores para categorías
-  static const Color historiaColor = cacao;            // Historias en café cacao
-  static const Color tradicionColor = jade;            // Tradiciones en verde jade
-  static const Color gastronomiaColor = tierra;        // Gastronomía en rojo tierra
-  static const Color artesaniaColor = ceramica;        // Artesanías en tono cerámica
-  static const Color leyendaColor = Color(0xFF6D4C41); // Leyendas en café oscuro
-  static const Color danzaColor = Color(0xFFAD1457);   // Danzas en rojo violeta
-  static const Color musicaColor = Color(0xFF1E88E5);  // Música en azul cielo
+  // Colores para categorías (afinados para armonizar con primario/acento en light y dark)
+  static const Color historiaColor = Color(0xFFDAA520);     // Historia: dorado (goldenrod)
+  static const Color tradicionColor = Color(0xFF2A9D8F);    // Tradición: verde-azulado (teal)
+  static const Color gastronomiaColor = Color(0xFFE76F51);  // Gastronomía: coral cálido
+  static const Color artesaniaColor = Color(0xFFC97C5D);    // Artesanía: terracota
+  static const Color leyendaColor = Color(0xFF7E57C2);      // Leyenda: púrpura místico
+  static const Color danzaColor = Color(0xFFD81B60);        // Danza: fucsia intenso
+  static const Color musicaColor = Color(0xFF1E88E5);       // Música: azul vibrante
 
   // Colores para el modo oscuro
   static const Color darkBackground = Color(0xFF121212);
@@ -45,6 +45,46 @@ class AppColors {
   static const Color darkSurfaceVariant = Color(0xFF2D2D2D);
   static const Color darkTextPrimary = Color(0xFFF5F5F5);
   static const Color darkTextSecondary = Color(0xFFB0B0B0);
+
+  // Elementos de UI en modo oscuro
+  static const Color darkCardShadow = Color(0x66000000);     // Sombra de tarjetas en dark
+  static const Color darkDivider = Color(0xFF2E2E2E);         // Divisores en dark
+  static const Color darkInputBorder = darkTextSecondary;     // Bordes de inputs en dark
+  static const Color darkInputFocused = accent;               // Input con foco en dark
+  static const Color darkNavigationInactive = darkTextSecondary; // Navegación inactiva en dark
+  static const Color darkNavigationActive = accent;           // Navegación activa en dark
+
+  // Fallback de colores por categoría (IDs del seed)
+  static const Map<String, Color> categoryFallbacks = {
+    'relato_tradiciones': Color(0xFF2A9D8F),
+    'relato_costumbres': Color(0xFFF4A261),
+    'saber_recetas': Color(0xFFFF7043),
+    'evento_festividades': Color(0xFFF57C00),
+    'relato_leyendas_mitos': Color(0xFF7E57C2),
+    'relato_historia_oral': Color(0xFFDAA520),
+    'relato_personajes': Color(0xFF8D6E63),
+    'relato_memorias_comunitarias': Color(0xFF66BB6A),
+    'saber_dichos_refranes': Color(0xFFFFB300),
+    'saber_artesanias': Color(0xFFC97C5D),
+    'saber_medicina_tradicional': Color(0xFF2E7D32),
+    'saber_gastronomia': Color(0xFFE76F51),
+    'saber_agricultura': Color(0xFF7CB342),
+    'saber_musica_danza': Color(0xFF1E88E5),
+    'saber_juegos_tradicionales': Color(0xFF26C6DA),
+  };
+
+  /// Devuelve el color de categoría usando hexadecimal (si viene de Firestore) o fallback por id
+  static Color categoryColor({required String categoryId, String? hex}) {
+    if (hex != null && hex.isNotEmpty) {
+      String value = hex;
+      if (value.startsWith('#')) value = value.substring(1);
+      if (value.length == 6) value = 'FF$value';
+      try {
+        return Color(int.parse(value, radix: 16));
+      } catch (_) {}
+    }
+    return categoryFallbacks[categoryId] ?? accent;
+  }
 
   // Gradientes culturales
   static const LinearGradient nicaraguaGradient = LinearGradient(
