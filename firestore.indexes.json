@@ -10,6 +10,15 @@
       ]
     },
     {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaCreacion", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "relatos",
       "queryScope": "COLLECTION",
       "fields": [
@@ -121,6 +130,68 @@
         { "fieldPath": "categoriaPadreId", "order": "ASCENDING" },
         { "fieldPath": "activa", "order": "ASCENDING" },
         { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "categoriaId", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ubicacion.departamento", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ubicacion.municipio", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fechaFin", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" },
+        { "fieldPath": "fechaFin", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" }
       ]
     }
   ],
