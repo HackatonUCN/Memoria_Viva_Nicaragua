@@ -455,6 +455,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     scale: _showScrollTop ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 150),
                     child: FloatingActionButton(
+                      heroTag: "feed_scroll_top",
                       mini: true,
                       tooltip: 'Ir al inicio',
                       onPressed: () => _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),

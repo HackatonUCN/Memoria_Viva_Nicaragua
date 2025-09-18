@@ -1,5 +1,6 @@
 /// Departamentos de Nicaragua
 enum Departamento {
+  nacional('Nacional'), // Para eventos de toda Nicaragua
   boaco('Boaco'),
   carazo('Carazo'),
   chinandega('Chinandega'),
@@ -35,6 +36,9 @@ enum Departamento {
 
 /// Municipios por departamento
 const municipiosPorDepartamento = {
+  'nacional': [
+    'Nicaragua', // Para eventos que abarcan todo el país
+  ],
   'managua': [
     'Managua',
     'Ciudad Sandino',
