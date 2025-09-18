@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/errors/exception.dart';
 import '../../domain/entities/evento_cultural.dart';
@@ -10,7 +11,6 @@ import '../../domain/exceptions/evento_exception.dart';
 import '../../domain/repositories/evento_cultural_repository.dart';
 import '../../domain/value_objects/ubicacion.dart';
 import '../../domain/value_objects/multimedia.dart';
-import '../../domain/aggregates/evento_cultural_aggregate.dart' as agg;
 import '../datasources/firestore_datasource.dart';
 import '../datasources/firebase_storage_datasource.dart';
 import '../models/content/content_model.dart';
@@ -29,6 +29,7 @@ class EventoCulturalRepositoryImpl implements IEventoCulturalRepository {
 
   /// Fuente de datos para Storage
   final FirebaseStorageDataSource _storageDataSource;
+
 
   /// Colecciones
   static const String _eventosCollection = 'eventos_culturales';
@@ -313,13 +314,20 @@ class EventoCulturalRepositoryImpl implements IEventoCulturalRepository {
   @override
   Future<List<SugerenciaEvento>> obtenerSugerenciasPendientes() async {
     return await _handleExceptions(() async {
+      debugPrint('[REPO_SUGERENCIAS] Consultando sugerencias pendientes...');
       final models = await _firestoreSugerencias.query(
         filters: {'estado': 'pendiente'},
         orderBy: 'fechaCreacion',
         descending: true,
         limit: 100,
       );
-      return models.map((m) => m.toDomain()).toList();
+      debugPrint('[REPO_SUGERENCIAS] Encontrados ${models.length} documentos');
+      for (int i = 0; i < models.length; i++) {
+        debugPrint('[REPO_SUGERENCIAS][$i] id=${models[i].id} nombre="${models[i].nombre}" estado=${models[i].estado}');
+      }
+      final sugerencias = models.map((m) => m.toDomain()).toList();
+      debugPrint('[REPO_SUGERENCIAS] Convertidas ${sugerencias.length} sugerencias a dominio');
+      return sugerencias;
     });
   }
 
@@ -367,6 +375,7 @@ class EventoCulturalRepositoryImpl implements IEventoCulturalRepository {
       final sugerencia = sugerenciaModel.toDomain();
 
       // Construir evento a partir de sugerencia
+      // El autor del evento es quien lo sugirió, no el admin que lo aprobó
       final nuevoEvento = EventoCultural(
         id: sugerencia.eventoId ?? sugerencia.id,
         titulo: sugerencia.nombre,
@@ -382,8 +391,8 @@ class EventoCulturalRepositoryImpl implements IEventoCulturalRepository {
         frecuencia: sugerencia.frecuencia,
         organizador: sugerencia.organizador,
         contacto: sugerencia.contacto,
-        creadoPorId: adminId,
-        creadoPorNombre: 'Administrador',
+        creadoPorId: sugerencia.sugeridoPorId,  // Autor original de la sugerencia
+        creadoPorNombre: sugerencia.sugeridoPorNombre,  // Nombre del autor original
         fechaCreacion: DateTime.now().toUtc(),
         fechaActualizacion: DateTime.now().toUtc(),
       );
