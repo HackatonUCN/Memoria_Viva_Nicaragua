@@ -193,6 +193,16 @@
         { "fieldPath": "fechaFin", "order": "ASCENDING" },
         { "fieldPath": "eliminado", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "eventos_culturales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eliminado", "order": "ASCENDING" },
+        { "fieldPath": "fechaInicio", "order": "ASCENDING" },
+        { "fieldPath": "fechaFin", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
