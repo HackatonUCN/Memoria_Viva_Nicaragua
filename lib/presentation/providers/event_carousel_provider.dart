@@ -31,13 +31,28 @@ class EventCarouselProvider extends ChangeNotifier {
     loading = true;
     error = null;
     notifyListeners();
-    final res = await _useCases.carruselPorCategoria.execute(
-      categoriaId: _selectedCategoryId,
-    );
-    res.when(
-      success: (data) => eventsForCarousel = data,
-      failure: (f) => error = f.message,
-    );
+    debugPrint('[EVENT_CAROUSEL] Cargando eventos, categoría: $_selectedCategoryId');
+    
+    try {
+      final res = await _useCases.carruselPorCategoria.execute(
+        categoriaId: _selectedCategoryId,
+      ).timeout(const Duration(seconds: 15));
+      
+      res.when(
+        success: (data) {
+          eventsForCarousel = data;
+          debugPrint('[EVENT_CAROUSEL] Cargados ${data.length} eventos');
+        },
+        failure: (f) {
+          error = f.message;
+          debugPrint('[EVENT_CAROUSEL] Error: ${f.message}');
+        },
+      );
+    } catch (e) {
+      error = 'Error de conexión: $e';
+      debugPrint('[EVENT_CAROUSEL] Error de timeout/conexión: $e');
+    }
+    
     loading = false;
     notifyListeners();
   }

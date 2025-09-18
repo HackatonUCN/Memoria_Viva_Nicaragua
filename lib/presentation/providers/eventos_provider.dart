@@ -47,17 +47,22 @@ class EventosProvider extends ChangeNotifier {
       final user = authProvider.user;
       _currentUserId = user?.id;
       _isAdmin = user?.esAdmin ?? false;
+      debugPrint('[EVENTOS_PROVIDER][INIT] userId=${_currentUserId} isAdmin=${_isAdmin} (from authProvider)');
     } else {
       final me = await UseCases.resolve().auth.getCurrentUser.execute();
       final user = me.valueOrNull;
       _currentUserId = user?.id;
       _isAdmin = user?.esAdmin ?? false;
+      debugPrint('[EVENTOS_PROVIDER][INIT] userId=${_currentUserId} isAdmin=${_isAdmin} (from getCurrentUser)');
     }
 
     await _loadInitialEventos();
     _observeEventos();
     if (_isAdmin) {
+      debugPrint('[EVENTOS_PROVIDER][INIT] Es admin, cargando sugerencias...');
       await loadSugerenciasPendientes();
+    } else {
+      debugPrint('[EVENTOS_PROVIDER][INIT] No es admin, saltando sugerencias');
     }
   }
 
@@ -238,15 +243,36 @@ class EventosProvider extends ChangeNotifier {
 
   // Sugerencias
   Future<void> loadSugerenciasPendientes() async {
-    if (!_isAdmin) return;
+    if (!_isAdmin) {
+      debugPrint('[SUGERENCIAS] No es admin, saltando carga');
+      return;
+    }
+    debugPrint('[SUGERENCIAS] Iniciando carga de sugerencias pendientes...');
     sugerenciasLoading = true;
     sugerenciasError = null;
     notifyListeners();
-    final res = await _useCases.obtenerSugerenciasPendientes.execute();
-    res.when(
-      success: (data) => sugerenciasPendientes = data,
-      failure: (f) => sugerenciasError = f.message,
-    );
+    
+    try {
+      final res = await _useCases.obtenerSugerenciasPendientes.execute();
+      debugPrint('[SUGERENCIAS] Resultado: isSuccess=${res.isSuccess}');
+      res.when(
+        success: (data) {
+          sugerenciasPendientes = data;
+          debugPrint('[SUGERENCIAS] Cargadas ${data.length} sugerencias pendientes');
+          for (int i = 0; i < data.length; i++) {
+            debugPrint('[SUGERENCIAS][$i] id=${data[i].id} nombre="${data[i].nombre}" estado=${data[i].estado}');
+          }
+        },
+        failure: (f) {
+          sugerenciasError = f.message;
+          debugPrint('[SUGERENCIAS] Error: ${f.message}');
+        },
+      );
+    } catch (e) {
+      sugerenciasError = 'Error inesperado: $e';
+      debugPrint('[SUGERENCIAS] Excepción: $e');
+    }
+    
     sugerenciasLoading = false;
     notifyListeners();
   }
