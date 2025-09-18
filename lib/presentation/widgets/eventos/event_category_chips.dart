@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -34,11 +35,22 @@ class _EventCategoryChipsState extends State<EventCategoryChips> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // Trae solo categorías del tipo eventos usando el caso de uso
-      final res = await _obtenerCategoriasPorTipo.execute(TipoContenido.evento);
-      final List<Categoria> all = res.valueOrNull ?? [];
-      _categorias = all.take(widget.maxRecent).toList();
+      // Trae solo categorías del tipo eventos usando el caso de uso con timeout
+      final res = await _obtenerCategoriasPorTipo.execute(TipoContenido.evento)
+          .timeout(const Duration(seconds: 10));
+      
+      res.when(
+        success: (data) {
+          _categorias = data.take(widget.maxRecent).toList();
+          debugPrint('[EVENT_CATEGORY_CHIPS] Cargadas ${_categorias.length} categorías');
+        },
+        failure: (f) {
+          _error = f.message;
+          debugPrint('[EVENT_CATEGORY_CHIPS] Error del UseCase: $_error');
+        },
+      );
     } catch (e) {
+      debugPrint('[EVENT_CATEGORY_CHIPS] Error: $e');
       _error = e.toString();
     } finally {
       if (mounted) setState(() { _loading = false; });

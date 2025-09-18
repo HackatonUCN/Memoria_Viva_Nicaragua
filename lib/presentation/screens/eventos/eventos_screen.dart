@@ -5,12 +5,12 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../utils/date_formatter.dart';
 import '../../providers/eventos_provider.dart';
 import '../../providers/event_carousel_provider.dart';
 import '../../providers/event_list_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../widgets/eventos/evento_detail_overlay.dart';
-import 'evento_detail_screen.dart';
 import '../../widgets/eventos/evento_card.dart';
 import '../../widgets/eventos/evento_square_card.dart';
 import '../../widgets/eventos/event_category_chips.dart';
@@ -158,7 +158,15 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: provider.refresh,
+          onRefresh: () async {
+            await Future.wait([
+              context.read<EventosProvider>().refresh(),
+              context.read<EventCarouselProvider>().refresh(),
+              context.read<EventListProvider>().refresh(),
+            ]);
+            final c = context.read<CalendarProvider>();
+            c.setFocusedDay(c.focusedDay);
+          },
           child: Stack(
             children: [
               CustomScrollView(
@@ -193,7 +201,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                   SliverToBoxAdapter(
                     child: SizedBox(
                       height: 160,
-                      child: provider.loading
+                      child: carousel.loading
                           ? ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -206,11 +214,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemBuilder: (ctx, i) => EventoSquareCard(
                                 evento: headerEventos[i],
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => EventoDetailScreen(evento: headerEventos[i]),
-                                  ),
-                                ),
+                                onTap: () => EventoDetailOverlay.open(context, headerEventos[i]),
                               ),
                               separatorBuilder: (_, __) => const SizedBox(width: 12),
                               itemCount: headerEventos.length,
@@ -428,11 +432,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                           final e = listProv.eventsForList[index];
                           return EventoCard(
                             evento: e,
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => EventoDetailScreen(evento: e),
-                              ),
-                            ),
+                            onTap: () => EventoDetailOverlay.open(context, e),
                             isAdmin: isAdmin,
                             onEdit: isAdmin
                                 ? () async {
@@ -496,6 +496,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                   scale: _showScrollTop ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 150),
                   child: FloatingActionButton(
+                    heroTag: "eventos_scroll_top",
                     mini: true,
                     tooltip: 'Ir al inicio',
                     onPressed: () => _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),
@@ -564,12 +565,12 @@ class _AgendaList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
         final e = eventos[i];
-        final horaIni = TimeOfDay.fromDateTime(e.fechaInicio).format(context);
-        final horaFin = TimeOfDay.fromDateTime(e.fechaFin).format(context);
+        final fechaFormateada = DateFormatter.formatEventDateRange(e.fechaInicio, e.fechaFin);
         return _AgendaCard(
+          eventoId: e.id,
           title: e.titulo,
           subtitle: '${e.ubicacion.municipio}, ${e.ubicacion.departamento}',
-          time: '$horaIni - $horaFin',
+          time: fechaFormateada,
           organizador: e.organizador,
           onTap: () {
             onDebugTap?.call();
@@ -647,6 +648,7 @@ class _QuickFiltersRow extends StatelessWidget {
 }
 
 class _AgendaCard extends StatelessWidget {
+  final String eventoId;
   final String title;
   final String subtitle;
   final String time;
@@ -655,6 +657,7 @@ class _AgendaCard extends StatelessWidget {
   final List<PopupMenuEntry<String>> Function(BuildContext context)? menuBuilder;
 
   const _AgendaCard({
+    required this.eventoId,
     required this.title,
     required this.subtitle,
     required this.time,
@@ -665,8 +668,13 @@ class _AgendaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final eventosProvider = context.watch<EventosProvider>();
+    final isUpdating = eventosProvider.isEventUpdating(eventoId);
+    final isDeleting = eventosProvider.isEventDeleting(eventoId);
+    final isLoading = isUpdating || isDeleting;
+
     return InkWell(
-      onTap: onTap,
+      onTap: isLoading ? null : onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
@@ -675,7 +683,9 @@ class _AgendaCard extends StatelessWidget {
           boxShadow: [BoxShadow(color: AppColors.cardShadow, blurRadius: 12, offset: const Offset(0, 6))],
         ),
         padding: const EdgeInsets.all(12),
-        child: Row(
+        child: Stack(
+          children: [
+            Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -759,6 +769,41 @@ class _AgendaCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
               ),
             ],
+            ],
+            ),
+            // Loading overlay
+            if (isLoading)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryDark),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          isUpdating ? 'Actualizando...' : 'Eliminando...',
+                          style: AppTypography.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
