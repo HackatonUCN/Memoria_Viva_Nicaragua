@@ -65,6 +65,10 @@ import '../../../domain/usecases/eventos/obtener_eventos_usecase.dart';
 import '../../../domain/usecases/eventos/buscar_eventos_usecase.dart';
 import '../../../domain/usecases/eventos/crear_sugerencia_usecase.dart';
 import '../../../domain/usecases/eventos/procesar_sugerencia_usecase.dart';
+import '../../../domain/usecases/eventos/obtener_sugerencias_pendientes_usecase.dart';
+import '../../../domain/usecases/eventos/obtener_eventos_carrusel_por_categoria_usecase.dart';
+import '../../../domain/usecases/eventos/obtener_eventos_por_rango_y_busqueda_usecase.dart';
+import '../../../domain/usecases/eventos/obtener_marcadores_por_mes_usecase.dart';
 // Casos de uso - Categorías
 import '../../../domain/usecases/categorias/obtener_categorias_usecase.dart';
 import '../../../domain/usecases/categorias/obtener_categorias_por_tipo_usecase.dart';
@@ -216,6 +220,12 @@ class DomainModule {
         ));
     getIt.registerFactory<ObtenerEventosUseCase>(() => ObtenerEventosUseCase(getIt<IEventoCulturalRepository>()));
     getIt.registerFactory<BuscarEventosUseCase>(() => BuscarEventosUseCase(getIt<IEventoCulturalRepository>()));
+    getIt.registerFactory<ObtenerEventosCarruselPorCategoriaUseCase>(() =>
+        ObtenerEventosCarruselPorCategoriaUseCase(getIt<IEventoCulturalRepository>()));
+    getIt.registerFactory<ObtenerEventosPorRangoYBusquedaUseCase>(() =>
+        ObtenerEventosPorRangoYBusquedaUseCase(getIt<IEventoCulturalRepository>()));
+    getIt.registerFactory<ObtenerMarcadoresPorMesUseCase>(() =>
+        ObtenerMarcadoresPorMesUseCase(getIt<IEventoCulturalRepository>()));
     getIt.registerFactory<CrearSugerenciaUseCase>(() => CrearSugerenciaUseCase(
           getIt<IEventoCulturalRepository>(),
           getIt<ICategoriaRepository>(),
@@ -226,6 +236,8 @@ class DomainModule {
           getIt<IEventoCulturalRepository>(),
           getIt<IUserRepository>(),
         ));
+    getIt.registerFactory<ObtenerSugerenciasPendientesUseCase>(
+        () => ObtenerSugerenciasPendientesUseCase(getIt<IEventoCulturalRepository>()));
 
     // Categorías
     getIt.registerFactory<ObtenerCategoriasUseCase>(() => ObtenerCategoriasUseCase(getIt<ICategoriaRepository>()));
