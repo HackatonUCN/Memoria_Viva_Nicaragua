@@ -153,182 +153,326 @@ class _DetailContent extends StatelessWidget {
     return CustomScrollView(
       controller: controller,
       slivers: [
+        // Imágenes del evento
         if (e.imagenes.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               child: _MediaCarousel(multimedia: e.imagenes),
             ),
           ),
+        
+        // Contenido principal
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(e.titulo, style: AppTypography.storyTitle),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.event, size: 18, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Text(
-                      _formatFechaEvento(e.fechaInicio, e.fechaFin),
-                      style: AppTypography.metadata.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(Icons.place_outlined, size: 18, color: AppColors.textSecondary),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        e.ubicacion.obtenerDireccionFormateada(),
-                        style: AppTypography.metadata.copyWith(color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-                if (e.esRecurrente && e.frecuencia != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(Icons.repeat, size: 18, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Evento ${e.frecuencia}',
-                        style: AppTypography.metadata.copyWith(color: AppColors.textSecondary),
-                      ),
-                    ],
+                // Título del evento
+                Text(
+                  e.titulo, 
+                  style: AppTypography.storyTitle.copyWith(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-                const SizedBox(height: 12),
-                Text(e.descripcion, style: AppTypography.storyContent),
-                const SizedBox(height: 12),
-                _categoriaChip(context, e.categoriaId, e.categoriaNombre),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: [
-                    Builder(
-                      builder: (context) {
-                        final bool canViewOnMap = true; // Eventos siempre tienen ubicación
-                        return Tooltip(
-                          message: 'Ver en el mapa',
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              // Obtener el NavigationProvider antes de cerrar  
-                              final nav = context.read<NavigationProvider>();
-                              
-                               // Establecer datos de navegación ANTES de cambiar de pantalla
-                               nav.setMapFocusRelatoId(e.id);
-                               nav.setMapFocusLocation(
-                                lat: e.ubicacion.latitud,
-                                lng: e.ubicacion.longitud,
-                                radiusKm: 3, // Radio más específico para mejor centrado
-                              );
-                              
-                              // Resolver root navigator/context para cambiar de tab y mostrar mensaje
-                              final rootNav = Navigator.of(context, rootNavigator: true);
-                              final rootCtx = rootNav.context;
-                              
-                              // Cerrar overlay
-                              Navigator.of(context).pop();
-                              
-                              // Cambiar al tab del mapa en el siguiente frame
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                try { nav.setIndex(1); } catch (_) {}
-                                try {
-                                  ScaffoldMessenger.of(rootCtx).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Mostrando "${e.titulo}" en el mapa'),
-                                      duration: const Duration(seconds: 2),
-                                      backgroundColor: AppColors.primary,
-                                    ),
-                                  );
-                                } catch (_) {}
-                              });
-                            },
-                            icon: const Icon(Icons.map_outlined),
-                            label: const Text('Ver en el mapa'),
-                          ),
-                        );
-                      },
-                    ),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        IconButton(
-                          tooltip: 'Compartir',
-                          icon: const Icon(Icons.ios_share_outlined),
-                          onPressed: () async {
-                            final webUrl = Uri.parse('https://memoriaviva.app/eventos/${e.id}');
-                            final resumen = e.descripcion.length > 120 ? e.descripcion.substring(0, 120) + '…' : e.descripcion;
-                            final message = '${e.titulo}\n\n$resumen\n\nFecha: ${_formatFechaEvento(e.fechaInicio, e.fechaFin)}\n\nEnlace: $webUrl';
-                            await Share.share(message, subject: 'Evento – ${e.titulo}');
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.withOpacity(AppColors.primary, 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Información del organizador',
-                        style: AppTypography.textTheme.titleMedium?.copyWith(
-                          color: AppColors.primaryDark,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              e.organizador,
-                              style: AppTypography.textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (e.contacto != null && e.contacto!.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(Icons.contact_mail_outlined, size: 18, color: AppColors.textSecondary),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                e.contacto!,
-                                style: AppTypography.textTheme.bodyMedium,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+
+                // Información principal del evento
+                _buildEventInfoCard(context, e),
+                const SizedBox(height: 20),
+
+                // Descripción
+                _buildDescriptionSection(context, e),
+                const SizedBox(height: 20),
+
+                // Categoría
+                _buildCategorySection(context, e),
+                const SizedBox(height: 24),
+
+                // Información del organizador
+                _buildOrganizerSection(context, e),
+                const SizedBox(height: 24),
+
+                // Botones de acción
+                _buildActionButtons(context, e),
                 const SizedBox(height: 16),
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEventInfoCard(BuildContext context, EventoCultural e) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          // Fecha
+          _buildInfoRow(
+            icon: Icons.event,
+            title: 'Fecha y hora',
+            content: _formatFechaEvento(e.fechaInicio, e.fechaFin),
+          ),
+          const SizedBox(height: 12),
+          
+          // Ubicación
+          _buildInfoRow(
+            icon: Icons.place_outlined,
+            title: 'Ubicación',
+            content: e.ubicacion.obtenerDireccionFormateada(),
+          ),
+          
+          // Frecuencia (si es recurrente)
+          if (e.esRecurrente && e.frecuencia != null) ...[
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              icon: Icons.repeat,
+              title: 'Frecuencia',
+              content: 'Evento ${e.frecuencia}',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String content,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: AppColors.primary,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTypography.textTheme.labelMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                content,
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionSection(BuildContext context, EventoCultural e) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Descripción',
+          style: AppTypography.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppColors.primary.withOpacity(0.1),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            e.descripcion,
+            style: AppTypography.storyContent.copyWith(
+              height: 1.6,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategorySection(BuildContext context, EventoCultural e) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Categoría',
+          style: AppTypography.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _categoriaChip(context, e.categoriaId, e.categoriaNombre),
+      ],
+    );
+  }
+
+  Widget _buildOrganizerSection(BuildContext context, EventoCultural e) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Organizador',
+            style: AppTypography.textTheme.titleMedium?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.person_outline,
+                size: 20,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  e.organizador,
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (e.contacto != null && e.contacto!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.contact_mail_outlined,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    e.contacto!,
+                    style: AppTypography.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context, EventoCultural e) {
+    return Row(
+      children: [
+        // Botón Ver en el mapa
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () {
+              // Obtener el NavigationProvider antes de cerrar  
+              final nav = context.read<NavigationProvider>();
+              
+               // Establecer datos de navegación ANTES de cambiar de pantalla
+               nav.setMapFocusRelatoId(e.id);
+               nav.setMapFocusLocation(
+                lat: e.ubicacion.latitud,
+                lng: e.ubicacion.longitud,
+                radiusKm: 3, // Radio más específico para mejor centrado
+              );
+              
+              // Resolver root navigator/context para cambiar de tab y mostrar mensaje
+              final rootNav = Navigator.of(context, rootNavigator: true);
+              final rootCtx = rootNav.context;
+              
+              // Cerrar overlay
+              Navigator.of(context).pop();
+              
+              // Cambiar al tab del mapa en el siguiente frame
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try { nav.setIndex(1); } catch (_) {}
+                try {
+                  ScaffoldMessenger.of(rootCtx).showSnackBar(
+                    SnackBar(
+                      content: Text('Mostrando "${e.titulo}" en el mapa'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                } catch (_) {}
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Ver en el mapa'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        
+        // Botón Compartir
+        ElevatedButton(
+          onPressed: () async {
+            final webUrl = Uri.parse('https://memoriaviva.app/eventos/${e.id}');
+            final resumen = e.descripcion.length > 120 ? e.descripcion.substring(0, 120) + '…' : e.descripcion;
+            final message = '${e.titulo}\n\n$resumen\n\nFecha: ${_formatFechaEvento(e.fechaInicio, e.fechaFin)}\n\nEnlace: $webUrl';
+            await Share.share(message, subject: 'Evento – ${e.titulo}');
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.surfaceVariant,
+            foregroundColor: AppColors.primary,
+            padding: const EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Icon(Icons.ios_share_outlined),
         ),
       ],
     );
@@ -362,10 +506,23 @@ class _DetailContent extends StatelessWidget {
     final Color chipColor = AppColors.categoryColor(categoryId: categoriaId);
     final bool isDark = (Theme.of(context).brightness == Brightness.dark);
     final Color textColor = isDark ? AppColors.darkTextPrimary : AppColors.primaryDark;
-    return Chip(
-      label: Text('Categoría: $categoriaNombre', style: AppTypography.textTheme.labelMedium?.copyWith(color: textColor)),
-      backgroundColor: AppColors.withOpacity(chipColor, 0.15),
-      shape: StadiumBorder(side: BorderSide(color: AppColors.withOpacity(chipColor, 0.5))),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.withOpacity(chipColor, 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.withOpacity(chipColor, 0.5),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        categoriaNombre,
+        style: AppTypography.textTheme.labelMedium?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

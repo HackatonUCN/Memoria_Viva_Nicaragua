@@ -8,6 +8,9 @@ import '../../../core/di/service_locator.dart';
 import '../../../domain/entities/evento_cultural.dart';
 import '../../../domain/entities/categoria.dart';
 import '../../../domain/repositories/categoria_repository.dart';
+import '../../../utils/date_formatter.dart';
+import '../../providers/eventos_provider.dart';
+import 'package:provider/provider.dart';
 
 class EventoCard extends StatelessWidget {
   final EventoCultural evento;
@@ -29,13 +32,17 @@ class EventoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImage = evento.imagenes.isNotEmpty;
     final String? imageUrl = hasImage ? evento.imagenes.first.url : null;
+    final eventosProvider = context.watch<EventosProvider>();
+    final isUpdating = eventosProvider.isEventUpdating(evento.id);
+    final isDeleting = eventosProvider.isEventDeleting(evento.id);
+    final isLoading = isUpdating || isDeleting;
 
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 840),
         child: InkWell(
-          onTap: onTap,
+          onTap: isLoading ? null : onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -54,9 +61,11 @@ class EventoCard extends StatelessWidget {
                     ],
               border: Border.all(color: AppColors.withOpacity(AppColors.accent, 0.04), width: 2),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 if (imageUrl != null)
                   ClipRRect(
                     borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
@@ -66,14 +75,17 @@ class EventoCard extends StatelessWidget {
                         final int targetW = (constraints.maxWidth * dpr).clamp(360.0, 1600.0).round();
                         return AspectRatio(
                           aspectRatio: 4 / 3,
-                          child: CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            memCacheWidth: targetW,
-                            placeholder: (c, _) => Container(color: AppColors.background),
-                            errorWidget: (c, _, __) => Container(
-                              color: AppColors.background,
-                              child: const Icon(Icons.broken_image_outlined),
+                          child: Container(
+                            color: AppColors.surfaceVariant,
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.contain,
+                              memCacheWidth: targetW,
+                              placeholder: (c, _) => Container(color: AppColors.background),
+                              errorWidget: (c, _, __) => Container(
+                                color: AppColors.background,
+                                child: const Icon(Icons.broken_image_outlined),
+                              ),
                             ),
                           ),
                         );
@@ -120,9 +132,13 @@ class EventoCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.event_rounded, size: 16, color: AppColors.textSecondary),
                           const SizedBox(width: 6),
-                          Text(
-                            _formatEventTimeRange(context, evento.fechaInicio, evento.fechaFin),
-                            style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                          Expanded(
+                            child: Text(
+                              DateFormatter.formatEventDateRange(evento.fechaInicio, evento.fechaFin),
+                              style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
@@ -186,6 +202,37 @@ class EventoCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                  ],
+                ),
+                // Loading overlay
+                if (isLoading)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryDark),
+                              strokeWidth: 3,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              isUpdating ? 'Actualizando...' : 'Eliminando...',
+                              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -194,15 +241,6 @@ class EventoCard extends StatelessWidget {
     );
   }
 
-  String _formatEventTimeRange(BuildContext context, DateTime start, DateTime end) {
-    final timeOfDayStart = TimeOfDay.fromDateTime(start.toLocal());
-    final timeOfDayEnd = TimeOfDay.fromDateTime(end.toLocal());
-    final s = timeOfDayStart.format(context);
-    final e = timeOfDayEnd.format(context);
-    final sameDay = start.toLocal().year == end.toLocal().year && start.toLocal().month == end.toLocal().month && start.toLocal().day == end.toLocal().day;
-    if (sameDay) return '$s - $e';
-    return '${start.toLocal().day}/${start.toLocal().month} $s - ${end.toLocal().day}/${end.toLocal().month} $e';
-  }
 }
 
 class _EventCategoryChip extends StatelessWidget {
@@ -246,5 +284,7 @@ class _EventCategoryChip extends StatelessWidget {
     );
   }
 }
+
+
 
 
