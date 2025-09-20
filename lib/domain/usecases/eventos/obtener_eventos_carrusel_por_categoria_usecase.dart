@@ -1,4 +1,5 @@
 import '../../entities/evento_cultural.dart';
+import 'dart:async';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../failures/result.dart';
 import '../../failures/failures.dart';
@@ -9,17 +10,26 @@ import '../../failures/exception_mapper.dart';
 /// Ordena: próximos primero por fecha ascendente y luego pasados por fecha descendente.
 class ObtenerEventosCarruselPorCategoriaUseCase {
   final IEventoCulturalRepository _eventoRepository;
+  static final Map<String, UseCaseResult<List<EventoCultural>>> _inFlight = <String, UseCaseResult<List<EventoCultural>>>{};
 
   ObtenerEventosCarruselPorCategoriaUseCase(this._eventoRepository);
 
-  UseCaseResult<List<EventoCultural>> execute({String? categoriaId, DateTime? referencia}) async {
+  UseCaseResult<List<EventoCultural>> execute({String? categoriaId, DateTime? referencia, bool preferCache = false, int? pageSize}) async {
     try {
       final DateTime now = referencia ?? DateTime.now();
       final DateTime startOfDay = DateTime(now.year, now.month, now.day);
       final DateTime start = startOfDay.subtract(const Duration(days: 7));
       final DateTime end = startOfDay.add(const Duration(days: 1)).add(const Duration(days: 7));
+      
+      // Sin coalescing por ahora para evitar deadlocks
+      return await _executeFetch(start: start, end: end, now: now, categoriaId: categoriaId);
+    } catch (e) {
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
+    }
+  }
 
-      // Traer por rango para reducir volumen y luego aplicar categoría si corresponde
+  Future<Result<List<EventoCultural>, Failure>> _executeFetch({required DateTime start, required DateTime end, required DateTime now, String? categoriaId}) async {
+    try {
       final List<EventoCultural> enRango = await _eventoRepository.obtenerEventosPorRangoFecha(
         inicio: start,
         fin: end,

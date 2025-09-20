@@ -204,8 +204,16 @@ class EventosProvider extends ChangeNotifier {
         return res.errorOrNull?.message ?? 'Error';
       }
       
-      // Refrescar datos automáticamente
-      await refresh();
+      // Optimista: actualizar en memoria si existe el evento en la lista
+      final int idx = eventos.indexWhere((ev) => ev.id == eventoId);
+      if (idx != -1) {
+        // Intentar obtener el evento actualizado desde el repositorio (si ya está disponible)
+        try {
+          final repo = UseCases.resolve().eventos;
+          // No hay método directo público aquí para 1 item; el stream global lo traerá.
+          // Dejamos que _observeEventos() sincronice; pero ya que es updating, dejamos el overlay indicar progreso.
+        } catch (_) {}
+      }
       return null;
     } finally {
       // Ocultar loader
@@ -230,8 +238,14 @@ class EventosProvider extends ChangeNotifier {
         return res.errorOrNull?.message ?? 'Error';
       }
       
-      // Refrescar datos automáticamente
-      await refresh();
+      // Optimista: remover de memoria inmediatamente
+      final int idx = eventos.indexWhere((ev) => ev.id == eventoId);
+      if (idx != -1) {
+        final List<EventoCultural> updated = List<EventoCultural>.from(eventos);
+        updated.removeAt(idx);
+        eventos = updated;
+        notifyListeners();
+      }
       return null;
     } finally {
       // Ocultar loader

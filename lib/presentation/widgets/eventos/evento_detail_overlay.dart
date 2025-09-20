@@ -52,10 +52,10 @@ class EventoDetailOverlay extends StatelessWidget {
       isScrollControlled: true,
       enableDrag: true,
       isDismissible: true,
-      barrierColor: AppColors.withOpacity(AppColors.primaryDark, 0.6),
+      barrierColor: AppColors.withOpacity(AppColors.primaryDark, 0.45),
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final content = _OverlayScaffold(evento: evento, eventoId: eventoId);
+        final content = _FadeIn(child: _OverlayScaffold(evento: evento, eventoId: eventoId));
         if (eventosProvider != null) {
           // Inyectar el EventosProvider existente
           return ChangeNotifierProvider<EventosProvider>.value(
@@ -116,6 +116,37 @@ class _OverlayScaffold extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _FadeIn extends StatefulWidget {
+  final Widget child;
+  const _FadeIn({required this.child});
+  @override
+  State<_FadeIn> createState() => _FadeInState();
+}
+
+class _FadeInState extends State<_FadeIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 160));
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }
 

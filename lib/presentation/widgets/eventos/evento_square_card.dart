@@ -9,8 +9,19 @@ class EventoSquareCard extends StatelessWidget {
   final EventoCultural evento;
   final double size;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final bool isAdmin;
 
-  const EventoSquareCard({super.key, required this.evento, this.size = 140, this.onTap});
+  const EventoSquareCard({
+    super.key, 
+    required this.evento, 
+    this.size = 140, 
+    this.onTap,
+    this.onEdit,
+    this.onDelete,
+    this.isAdmin = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +45,10 @@ class EventoSquareCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (image != null)
-                CachedNetworkImage(imageUrl: image, fit: BoxFit.cover)
+                Hero(
+                  tag: 'evento_media_$image',
+                  child: CachedNetworkImage(imageUrl: image, fit: BoxFit.cover),
+                )
               else
                 Container(color: AppColors.background),
               Container(
@@ -96,6 +110,30 @@ class EventoSquareCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // Menú de administrador en la esquina superior derecha
+              if (isAdmin)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: PopupMenuButton<String>(
+                    onSelected: (v) {
+                      if (v == 'edit') onEdit?.call();
+                      if (v == 'delete') onDelete?.call();
+                    },
+                    itemBuilder: (ctx) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Editar')),
+                      PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                    ],
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.more_vert, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

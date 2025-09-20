@@ -1,4 +1,5 @@
 import '../../entities/evento_cultural.dart';
+import 'dart:async';
 import '../../repositories/evento_cultural_repository.dart';
 import '../../failures/result.dart';
 import '../../failures/failures.dart';
@@ -8,6 +9,7 @@ import '../../failures/exception_mapper.dart';
 /// La categoría no aplica a esta lista según los criterios de aceptación.
 class ObtenerEventosPorRangoYBusquedaUseCase {
   final IEventoCulturalRepository _eventoRepository;
+  static final Map<String, UseCaseResult<List<EventoCultural>>> _inFlight = <String, UseCaseResult<List<EventoCultural>>>{};
 
   ObtenerEventosPorRangoYBusquedaUseCase(this._eventoRepository);
 
@@ -15,14 +17,30 @@ class ObtenerEventosPorRangoYBusquedaUseCase {
     required DateTime inicio,
     required DateTime fin,
     String? texto,
+    int? pageSize,
+    Object? pageCursor,
+    bool preferCache = false,
   }) async {
+    try {
+      final String q = (texto ?? '').trim().toLowerCase();
+      
+      // Sin coalescing por ahora para evitar deadlocks
+      return await _executeFetch(
+        inicio: inicio,
+        fin: fin,
+        q: q,
+      );
+    } catch (e) {
+      return FailureResult<List<EventoCultural>, Failure>(mapExceptionToFailure(e));
+    }
+  }
+
+  Future<Result<List<EventoCultural>, Failure>> _executeFetch({required DateTime inicio, required DateTime fin, required String q}) async {
     try {
       final List<EventoCultural> enRango = await _eventoRepository.obtenerEventosPorRangoFecha(
         inicio: inicio,
         fin: fin,
       );
-
-      final String q = (texto ?? '').trim().toLowerCase();
       final bool hasQuery = q.isNotEmpty;
       List<EventoCultural> filtered = enRango.where((e) => !e.eliminado).toList();
       if (hasQuery) {

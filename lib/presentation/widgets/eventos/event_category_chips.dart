@@ -7,6 +7,7 @@ import '../../../domain/entities/categoria.dart';
 import '../../../domain/enums/tipos_contenido.dart';
 import '../../../domain/usecases/categorias/obtener_categorias_por_tipo_usecase.dart';
 import '../../../core/di/service_locator.dart';
+import '../../screens/eventos/evento_form_sheet.dart';
 
 class EventCategoryChips extends StatefulWidget {
   final String? selectedCategoryId;
@@ -35,13 +36,15 @@ class _EventCategoryChipsState extends State<EventCategoryChips> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // Trae solo categorías del tipo eventos usando el caso de uso con timeout
+      // Trae solo categorías del tipo eventos usando el caso de uso con timeout ampliado
       final res = await _obtenerCategoriasPorTipo.execute(TipoContenido.evento)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 30));
       
       res.when(
         success: (data) {
           _categorias = data.take(widget.maxRecent).toList();
+          // Sembrar cache para acelerar la apertura del EventoFormSheet
+          try { EventoFormProvider.seedCategoriasCache(data); } catch (_) {}
           debugPrint('[EVENT_CATEGORY_CHIPS] Cargadas ${_categorias.length} categorías');
         },
         failure: (f) {

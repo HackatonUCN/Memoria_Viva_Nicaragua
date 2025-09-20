@@ -45,7 +45,7 @@ class EventoFormSheet extends StatelessWidget {
           create: (_) => EventoFormProvider()..init(initial: initial),
           child: WillPopScope(
             onWillPop: () async => true,
-            child: _SheetScaffold(publicarDirecto: publicarDirecto, initial: initial),
+            child: _FadeIn(child: _SheetScaffold(publicarDirecto: publicarDirecto, initial: initial)),
           ),
         );
       },
@@ -58,6 +58,37 @@ class EventoFormSheet extends StatelessWidget {
     // Este widget se usa a través del método estático open().
     // Retornar un placeholder evita errores si se llegara a insertar en el árbol.
     return const SizedBox.shrink();
+  }
+}
+
+class _FadeIn extends StatefulWidget {
+  final Widget child;
+  const _FadeIn({required this.child});
+  @override
+  State<_FadeIn> createState() => _FadeInState();
+}
+
+class _FadeInState extends State<_FadeIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 160));
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: _opacity, child: widget.child);
   }
 }
 
@@ -419,13 +450,9 @@ class _CategoriaDropdown extends StatelessWidget {
           color: AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
         ),
-        child: const Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+        child: Row(
+          children: const [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
             SizedBox(width: 12),
             Text('Cargando categorías...'),
           ],
@@ -466,10 +493,7 @@ class _CategoriaDropdown extends StatelessWidget {
         ),
       ),
       items: provider.categorias
-          .map((c) => DropdownMenuItem<String>(
-        value: c.id,
-        child: Text(c.nombre),
-      ))
+          .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.nombre)))
           .toList(),
       onChanged: provider.setCategoria,
       validator: (_) => provider.categoriaValida ? null : 'Selecciona una categoría',
@@ -669,7 +693,7 @@ class _FechasSelector extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    '${provider.fechaInicio.day}/${provider.fechaInicio.month}/${provider.fechaInicio.year}',
+                    '${provider.fechaInicio.day.toString().padLeft(2,'0')}/${provider.fechaInicio.month.toString().padLeft(2,'0')}/${provider.fechaInicio.year}',
                   ),
                 ),
               ),
@@ -687,7 +711,7 @@ class _FechasSelector extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    '${provider.fechaFin.day}/${provider.fechaFin.month}/${provider.fechaFin.year}',
+                    '${provider.fechaFin.day.toString().padLeft(2,'0')}/${provider.fechaFin.month.toString().padLeft(2,'0')}/${provider.fechaFin.year}',
                   ),
                 ),
               ),
@@ -1016,6 +1040,14 @@ class EventoFormProvider extends ChangeNotifier {
   List<Categoria> categorias = [];
   bool categoriasLoading = false;
   String? categoriasError;
+  // Cache en memoria compartida (similar a RelatoFormProvider)
+  static List<Categoria> _memCacheCategorias = [];
+  static DateTime? _memCacheAt;
+  static const Duration _memCacheTtl = Duration(minutes: 10);
+  static void seedCategoriasCache(List<Categoria> cats) {
+    _memCacheCategorias = List.of(cats);
+    _memCacheAt = DateTime.now();
+  }
 
   // Estado
   bool isSaving = false;
@@ -1081,7 +1113,7 @@ class EventoFormProvider extends ChangeNotifier {
       }
     }
 
-    await _loadCategorias();
+    await _initCategoriasWithCache();
   }
 
   Future<void> _loadCategorias() async {
@@ -1107,6 +1139,60 @@ class EventoFormProvider extends ChangeNotifier {
 
     categoriasLoading = false;
     notifyListeners();
+  }
+
+  Future<void> _initCategoriasWithCache() async {
+    categoriasLoading = true;
+    categoriasError = null;
+    notifyListeners();
+
+    final bool cacheFresh = _memCacheCategorias.isNotEmpty && (_memCacheAt != null) && DateTime.now().difference(_memCacheAt!) < _memCacheTtl;
+    if (cacheFresh) {
+      categorias = List.of(_memCacheCategorias);
+      categoriasLoading = false;
+      notifyListeners();
+      // Refresh en background sin bloquear la UI
+      // ignore: discarded_futures
+      _refreshCategorias();
+      return;
+    }
+    await _refreshCategorias();
+  }
+
+  Future<void> _refreshCategorias() async {
+    try {
+      final uc = GetIt.I<ObtenerCategoriasPorTipoUseCase>();
+      final res = await uc.execute(TipoContenido.evento).timeout(const Duration(seconds: 8));
+      final data = res.valueOrNull ?? _memCacheCategorias;
+      categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      _memCacheCategorias = List.of(categorias);
+      _memCacheAt = DateTime.now();
+      _catsSub?.cancel();
+      _catsSub = uc.observe(TipoContenido.evento).listen((list) {
+        categorias = List.of(list)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+        _memCacheCategorias = List.of(categorias);
+        _memCacheAt = DateTime.now();
+        notifyListeners();
+      });
+      categoriasLoading = false;
+      categoriasError = null;
+      notifyListeners();
+    } on TimeoutException {
+      if (_memCacheCategorias.isNotEmpty) {
+        categorias = List.of(_memCacheCategorias);
+        categoriasLoading = false;
+        categoriasError = null;
+        notifyListeners();
+      } else {
+        categoriasLoading = false;
+        categoriasError = 'Tiempo de espera al cargar categorías';
+        notifyListeners();
+      }
+    } catch (e) {
+      categoriasError = e.toString();
+      categoriasLoading = false;
+      notifyListeners();
+    }
   }
 
   void setTitulo(String value) {
@@ -1237,6 +1323,7 @@ class EventoFormProvider extends ChangeNotifier {
   final ImagePicker _picker = ImagePicker();
   String? _currentUserId;
   final Map<String, http.Client> _clientsByUpload = {};
+  StreamSubscription<List<Categoria>>? _catsSub;
 
   Future<void> addImagenDesdeGaleria() async {
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
@@ -1530,5 +1617,15 @@ class EventoFormProvider extends ChangeNotifier {
         departamentoValido &&
         municipioValido &&
         frecuenciaValida;
+  }
+
+  @override
+  void dispose() {
+    _catsSub?.cancel();
+    for (final c in _clientsByUpload.values) {
+      try { c.close(); } catch (_) {}
+    }
+    _clientsByUpload.clear();
+    super.dispose();
   }
 }

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -10,6 +13,7 @@ import '../../providers/eventos_provider.dart';
 import '../../providers/event_carousel_provider.dart';
 import '../../providers/event_list_provider.dart';
 import '../../providers/calendar_provider.dart';
+import '../../../core/utils/responsive_helper.dart';
 import '../../widgets/eventos/evento_detail_overlay.dart';
 import '../../widgets/eventos/evento_card.dart';
 import '../../widgets/eventos/evento_square_card.dart';
@@ -18,6 +22,46 @@ import '../../widgets/common/empty_view.dart';
 import '../../widgets/common/error_view.dart';
 import 'evento_form_sheet.dart';
 import 'moderacion_sugerencias_screen.dart';
+import 'package:get_it/get_it.dart';
+import '../../../domain/repositories/evento_cultural_repository.dart';
+
+class _KeepAlive extends StatefulWidget {
+  final Widget child;
+  const _KeepAlive({required this.child});
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+class _PlatformScrollBehavior extends ScrollBehavior {
+  @override
+  Widget buildOverscrollIndicator(BuildContext context, Widget child, ScrollableDetails details) {
+    return child;
+  }
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return kIsWeb ? const ClampingScrollPhysics() : const BouncingScrollPhysics();
+  }
+
+  @override
+  Widget buildScrollbar(BuildContext context, Widget child, ScrollableDetails details) {
+    if (kIsWeb) {
+      return Scrollbar(thumbVisibility: true, controller: details.controller, child: child);
+    }
+    return child;
+  }
+}
 
 class EventosScreen extends StatelessWidget {
   const EventosScreen({super.key});
@@ -50,6 +94,9 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
   bool _showScrollTop = false;
   String _searchQuery = '';
   _QuickRange? _activeQuickRange;
+  Timer? _calendarDebounce;
+  Timer? _categoryDebounce;
+  String? _categoryUiSelected;
 
   @override
   void initState() {
@@ -92,7 +139,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
         cal.setFocusedDay(DateTime(now.year, now.month, 1));
       }
     });
-    list.setVisibleRange(_computeVisibleRange(cal));
+    _setVisibleRangeDebounced(cal);
   }
 
   DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -102,6 +149,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
   DateTime _startOfNextMonth(DateTime d) => (d.month == 12) ? DateTime(d.year + 1, 1, 1) : DateTime(d.year, d.month + 1, 1);
 
   DateTimeRange _computeVisibleRange(CalendarProvider cal) {
+    // Quick ranges específicos
     if (_activeQuickRange == _QuickRange.hoy) {
       final s = _startOfDay(cal.selectedDay);
       return DateTimeRange(start: s, end: s.add(const Duration(days: 1)));
@@ -110,6 +158,8 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
       final s0 = _startOfDay(DateTime.now().add(const Duration(days: 1)));
       return DateTimeRange(start: s0, end: s0.add(const Duration(days: 1)));
     }
+    
+    // Rangos por formato de calendario (semana, mes) - PRIORIDAD sobre día seleccionado
     if (cal.format == CalendarFormat.week) {
       final s = _startOfWeek(cal.focusedDay);
       return DateTimeRange(start: s, end: s.add(const Duration(days: 7)));
@@ -118,10 +168,32 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
       final s = _startOfWeek(cal.focusedDay);
       return DateTimeRange(start: s, end: s.add(const Duration(days: 14)));
     }
-    // Mes
+    if (cal.format == CalendarFormat.month) {
+      // Para vista de mes, usar el mes del focusedDay (mes que se está viendo)
     final m0 = _startOfMonth(cal.focusedDay);
     final m1 = _startOfNextMonth(cal.focusedDay);
     return DateTimeRange(start: m0, end: m1);
+    }
+    
+    // Si no hay quick range activo y no es vista de rango, usar día seleccionado específico
+    if (_activeQuickRange == null) {
+      final s = _startOfDay(cal.selectedDay);
+      return DateTimeRange(start: s, end: s.add(const Duration(days: 1)));
+    }
+    
+    // Fallback a mes
+    final m0 = _startOfMonth(cal.focusedDay);
+    final m1 = _startOfNextMonth(cal.focusedDay);
+    return DateTimeRange(start: m0, end: m1);
+  }
+
+  void _setVisibleRangeDebounced(CalendarProvider cal) {
+    _calendarDebounce?.cancel();
+    final range = _computeVisibleRange(cal);
+    _calendarDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      context.read<EventListProvider>().setVisibleRange(range);
+    });
   }
 
   String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
@@ -146,12 +218,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
 
   @override
   Widget build(BuildContext context) {
-    final eventosAdmin = context.watch<EventosProvider>();
-    final isAdmin = eventosAdmin.isAdmin;
-    final cal = context.watch<CalendarProvider>();
-    final carousel = context.watch<EventCarouselProvider>();
-    final listProv = context.watch<EventListProvider>();
-    final List headerEventos = carousel.eventsForCarousel;
+    final isAdmin = context.select<EventosProvider, bool>((p) => p.isAdmin);
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -169,8 +236,12 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
           },
           child: Stack(
             children: [
-              CustomScrollView(
+              ScrollConfiguration(
+                behavior: _PlatformScrollBehavior(),
+                child: CustomScrollView(
+                  key: const PageStorageKey('eventos_scroll'),
                 controller: _scrollCtrl,
+                  cacheExtent: kIsWeb ? 1500 : 800,
                 slivers: [
                   // Header: título
                   SliverToBoxAdapter(
@@ -191,9 +262,22 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: EventCategoryChips(
-                        selectedCategoryId: carousel.selectedCategoryId,
-                        onChanged: (id) => context.read<EventCarouselProvider>().setSelectedCategory(id),
+                      child: Consumer<EventCarouselProvider>(
+                        builder: (_, carousel, __) {
+                          final selected = _categoryUiSelected ?? carousel.selectedCategoryId;
+                          return EventCategoryChips(
+                            selectedCategoryId: selected,
+                            onChanged: (id) {
+                              setState(() => _categoryUiSelected = id);
+                              _categoryDebounce?.cancel();
+                              _categoryDebounce = Timer(const Duration(milliseconds: 150), () {
+                                if (!mounted) return;
+                                context.read<EventCarouselProvider>().setSelectedCategory(id);
+                                setState(() => _categoryUiSelected = null);
+                              });
+                            },
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -201,23 +285,75 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                   SliverToBoxAdapter(
                     child: SizedBox(
                       height: 160,
-                      child: carousel.loading
-                          ? ListView.separated(
+                        child: Consumer<EventCarouselProvider>(
+                          builder: (ctx, carousel, __) {
+                            final headerEventos = carousel.eventsForCarousel;
+                            if (carousel.loading) {
+                            return ListView.separated(
+                                key: const PageStorageKey('eventos_carousel'),
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemBuilder: (_, __) => Container(width: 140, height: 140, decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16))),
                               separatorBuilder: (_, __) => const SizedBox(width: 12),
                               itemCount: 6,
-                            )
-                          : ListView.separated(
+                              );
+                            }
+                            return ListView.separated(
+                              key: const PageStorageKey('eventos_carousel'),
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(horizontal: 16),
-                              itemBuilder: (ctx, i) => EventoSquareCard(
+                              itemBuilder: (itemCtx, i) => RepaintBoundary(
+                                key: ValueKey('carousel_${headerEventos[i].id}'),
+                                child: _KeepAlive(
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: EventoSquareCard(
                                 evento: headerEventos[i],
                                 onTap: () => EventoDetailOverlay.open(context, headerEventos[i]),
+                                    isAdmin: isAdmin,
+                                    onEdit: isAdmin
+                                        ? () async {
+                                          final res = await EventoFormSheet.open(context, initial: headerEventos[i], publicarDirecto: true);
+                                          if (res?.success == true) {
+                                            try {
+                                              final repo = GetIt.I<IEventoCulturalRepository>();
+                                              final updated = await repo.observarEventoPorId(headerEventos[i].id).first;
+                                              if (updated != null) {
+                                                context.read<EventCarouselProvider>().upsertEvent(updated);
+                                                context.read<EventListProvider>().upsertEvent(updated);
+                                              } else {
+                                                context.read<EventCarouselProvider>().upsertEvent(headerEventos[i]);
+                                                context.read<EventListProvider>().upsertEvent(headerEventos[i]);
+                                              }
+                                            } catch (_) {
+                                              context.read<EventCarouselProvider>().upsertEvent(headerEventos[i]);
+                                              context.read<EventListProvider>().upsertEvent(headerEventos[i]);
+                                            }
+                                          } else if (res?.errorMessage != null) {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: AppColors.error, content: Text(res!.errorMessage!)));
+                                          }
+                                        }
+                                        : null,
+                                    onDelete: isAdmin
+                                        ? () async {
+                                          context.read<EventCarouselProvider>().removeEventById(headerEventos[i].id);
+                                          context.read<EventListProvider>().removeEventById(headerEventos[i].id);
+                                          final err = await context.read<EventosProvider>().eliminarEvento(headerEventos[i].id);
+                                          if (err != null) {
+                                            context.read<EventCarouselProvider>().upsertEvent(headerEventos[i]);
+                                            context.read<EventListProvider>().upsertEvent(headerEventos[i]);
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: AppColors.error, content: Text(err)));
+                                          }
+                                        }
+                                        : null,
+                                  ),
+                                ),
+                                ),
                               ),
                               separatorBuilder: (_, __) => const SizedBox(width: 12),
                               itemCount: headerEventos.length,
+                            );
+                          },
                             ),
                     ),
                   ),
@@ -231,7 +367,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                           TextField(
                             onChanged: (v) {
                               setState(() => _searchQuery = v);
-                              listProv.setSearchText(v);
+                                context.read<EventListProvider>().setSearchText(v);
                             },
                             decoration: const InputDecoration(
                               prefixIcon: Icon(Icons.search),
@@ -244,7 +380,7 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                           Container(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(AppSpacing.radiusMd), border: Border.all(color: AppColors.inputBorder.withOpacity(0.5))),
-                            child: _QuickFiltersRow(onSelect: (r) => _onQuickSelect(r, cal, listProv)),
+                            child: _QuickFiltersRow(onSelect: (r) => _onQuickSelect(r, context.read<CalendarProvider>(), context.read<EventListProvider>())),
                           ),
                         ],
                       ),
@@ -252,16 +388,29 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                   ),
                   // Calendario con selector de vista
                   SliverToBoxAdapter(
-                    child: Container(
-                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: TableCalendar(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: ResponsiveHelper.getContentWidth(context),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: kIsWeb ? 8 : 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                                child: Consumer<CalendarProvider>(
+                                  builder: (ctx, cal, __) => TableCalendar(
                           firstDay: DateTime.now().subtract(const Duration(days: 365)),
                           lastDay: DateTime.now().add(const Duration(days: 365)),
                           focusedDay: cal.focusedDay,
@@ -269,18 +418,21 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                           onDaySelected: (d, f) {
                             cal.setSelectedDay(d);
                             cal.setFocusedDay(f);
-                            setState(() { _activeQuickRange = _QuickRange.hoy; });
-                            listProv.setVisibleRange(_computeVisibleRange(cal));
+                                      // Si selecciona el día de hoy, usar quick range hoy
+                                      // Si selecciona otro día, usar null para mostrar solo ese día
+                                      final bool isToday = isSameDay(d, DateTime.now());
+                                      setState(() { _activeQuickRange = isToday ? _QuickRange.hoy : null; });
+                                      _setVisibleRangeDebounced(cal);
                           },
                           onPageChanged: (f) {
                             cal.setFocusedDay(f);
                             setState(() { _activeQuickRange = null; });
-                            listProv.setVisibleRange(_computeVisibleRange(cal));
+                                      _setVisibleRangeDebounced(cal);
                           },
                           onFormatChanged: (f) {
                             cal.setFormat(f);
                             setState(() { _activeQuickRange = null; });
-                            listProv.setVisibleRange(_computeVisibleRange(cal));
+                                      _setVisibleRangeDebounced(cal);
                           },
                           calendarFormat: cal.format,
                           locale: 'es_ES',
@@ -343,9 +495,13 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                             CalendarFormat.twoWeeks: 'Quincena',
                             CalendarFormat.month: 'Mes',
                           },
+                                  ),
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ),
                   ),
                   // Botones de acción (Sugerir/Publicar + Moderación)
                   SliverToBoxAdapter(
@@ -388,24 +544,60 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                       ),
                     ),
                   ),
-                  // Lista de eventos
-                  if (listProv.loading)
-                    SliverList(
+                    // Lista de eventos + estados
+                    Consumer<EventListProvider>(
+                      builder: (ctx, listProv, __) {
+                        if (listProv.loading) {
+                          return SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          child: Container(height: 220, decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(16))),
+                                child: Container(
+                                  height: 220,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        Container(width: 72, height: 56, decoration: BoxDecoration(color: AppColors.withOpacity(AppColors.primary, 0.06), borderRadius: BorderRadius.circular(12))),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(height: 16, width: double.infinity, decoration: BoxDecoration(color: AppColors.withOpacity(AppColors.primary, 0.06), borderRadius: BorderRadius.circular(8))),
+                                              const SizedBox(height: 8),
+                                              FractionallySizedBox(
+                                                widthFactor: 0.7,
+                                                child: Container(height: 14, decoration: BoxDecoration(color: AppColors.withOpacity(AppColors.primary, 0.06), borderRadius: BorderRadius.circular(8))),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              FractionallySizedBox(
+                                                widthFactor: 0.4,
+                                                child: Container(height: 12, decoration: BoxDecoration(color: AppColors.withOpacity(AppColors.primary, 0.06), borderRadius: BorderRadius.circular(8))),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                         ),
                         childCount: 6,
                       ),
-                    )
-                  else if (listProv.error != null)
-                    SliverFillRemaining(
+                          );
+                        } else if (listProv.error != null) {
+                          return SliverFillRemaining(
                       hasScrollBody: false,
                       child: ErrorView(message: listProv.error!, onRetry: listProv.refresh),
-                    )
-                  else if (listProv.eventsForList.isEmpty)
-                    SliverFillRemaining(
+                          );
+                        } else if (listProv.eventsForList.isEmpty) {
+                          return SliverFillRemaining(
                       hasScrollBody: false,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -424,44 +616,109 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                           ),
                         ],
                       ),
-                    )
-                  else ...[
-                    SliverList(
+                          );
+                        }
+                        return SliverList(
+                          key: const PageStorageKey('eventos_list'),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final e = listProv.eventsForList[index];
-                          return EventoCard(
+                              return RepaintBoundary(
+                                key: ValueKey(e.id),
+                                child: _KeepAlive(
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: EventoCard(
                             evento: e,
                             onTap: () => EventoDetailOverlay.open(context, e),
                             isAdmin: isAdmin,
                             onEdit: isAdmin
                                 ? () async {
-                                    await EventoFormSheet.open(context, initial: e, publicarDirecto: true);
+                                    final res = await EventoFormSheet.open(context, initial: e, publicarDirecto: true);
+                                    if (res?.success == true) {
+                                      try {
+                                        final repo = GetIt.I<IEventoCulturalRepository>();
+                                        final updated = await repo.observarEventoPorId(e.id).first;
+                                        if (updated != null) {
+                                          context.read<EventListProvider>().upsertEvent(updated);
+                                        } else {
+                                          context.read<EventListProvider>().upsertEvent(e);
+                                        }
+                                      } catch (_) {
+                                        context.read<EventListProvider>().upsertEvent(e);
+                                      }
+                                    } else if (res?.errorMessage != null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: AppColors.error, content: Text(res!.errorMessage!)));
+                                    }
                                   }
                                 : null,
                             onDelete: isAdmin
                                 ? () async {
+                                    context.read<EventListProvider>().removeEventById(e.id);
                                     final err = await context.read<EventosProvider>().eliminarEvento(e.id);
                                     if (err != null) {
+                                      context.read<EventListProvider>().upsertEvent(e);
                                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: AppColors.error, content: Text(err)));
                                     }
                                   }
                                 : null,
+                                    ),
+                                  ),
+                                ),
                           );
                         },
                         childCount: listProv.eventsForList.length,
                       ),
+                        );
+                      },
                     ),
+                    // Footer con resumen de resultados y rango
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
                         child: Column(
+                            key: ValueKey('footer_${DateTime.now().millisecondsSinceEpoch ~/ 250}'),
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Resultados: ${listProv.eventsForList.length}', style: AppTypography.textTheme.labelMedium),
+                              Consumer2<EventListProvider, CalendarProvider>(
+                                builder: (ctx, listProv, cal, __) {
+                                  final count = listProv.eventsForList.length;
+                                  final hasSearch = _searchQuery.trim().isNotEmpty;
+                                  
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text('Resultados: $count', style: AppTypography.textTheme.labelMedium),
+                                          if (hasSearch) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.accent.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+                                              ),
+                                              child: Text(
+                                                'Búsqueda global',
+                                                style: AppTypography.textTheme.labelSmall?.copyWith(
+                                                  color: AppColors.accent,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                             const SizedBox(height: 4),
+                                      if (!hasSearch) ...[
                             Builder(
-                              builder: (ctx) {
+                                          builder: (context) {
                                 final range = _computeVisibleRange(cal);
                                 final String rangoLabel = () {
                                   if (_activeQuickRange == _QuickRange.hoy) {
@@ -478,15 +735,33 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                                   }
                                   return 'Rango: ${_formatMonth(range.start)}';
                                 }();
-                                return Text(rangoLabel, style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary));
-                              },
-                            ),
-                          ],
+                                            return Text(
+                                              rangoLabel, 
+                                              key: ValueKey(rangoLabel), 
+                                              style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)
+                                            );
+                                          },
+                                        ),
+                                      ] else ...[
+                                        Text(
+                                          'Buscando en todos los eventos: "$_searchQuery"',
+                                          style: AppTypography.textTheme.bodySmall?.copyWith(
+                                            color: AppColors.accent,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ],
                 ],
+                ),
               ),
               // Botón flotante Ir al inicio
               Positioned(

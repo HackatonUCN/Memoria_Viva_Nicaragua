@@ -77,14 +77,17 @@ class EventoCard extends StatelessWidget {
                           aspectRatio: 4 / 3,
                           child: Container(
                             color: AppColors.surfaceVariant,
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.contain,
-                              memCacheWidth: targetW,
-                              placeholder: (c, _) => Container(color: AppColors.background),
-                              errorWidget: (c, _, __) => Container(
-                                color: AppColors.background,
-                                child: const Icon(Icons.broken_image_outlined),
+                            child: Hero(
+                              tag: 'evento_media_$imageUrl',
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.contain,
+                                memCacheWidth: targetW,
+                                placeholder: (c, _) => Container(color: AppColors.background),
+                                errorWidget: (c, _, __) => Container(
+                                  color: AppColors.background,
+                                  child: const Icon(Icons.broken_image_outlined),
+                                ),
                               ),
                             ),
                           ),
