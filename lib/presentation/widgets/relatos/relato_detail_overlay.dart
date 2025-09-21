@@ -521,6 +521,9 @@ class _MediaCarouselState extends State<_MediaCarousel> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: _AudioPlayerCard(key: ValueKey('overlay_audio_${m.url}'), url: m.url),
         );
+      case TipoMultimedia.documento:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 }

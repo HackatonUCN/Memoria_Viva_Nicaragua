@@ -309,6 +309,9 @@ class _MediaPreview extends StatelessWidget {
         return _LazyCardVideoPreview(key: ValueKey('card_video_${media.url}'), url: media.url);
       case TipoMultimedia.audio:
         return _InlineAudioPlayer(key: ValueKey('card_audio_${media.url}'), url: media.url);
+      case TipoMultimedia.documento:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 }
