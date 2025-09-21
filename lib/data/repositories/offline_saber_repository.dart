@@ -15,7 +15,9 @@ class OfflineSaberRepository implements ISaberPopularRepository {
   Future<void> actualizarSaber(SaberPopular saber) async {
     try {
       await _remote.actualizarSaber(saber);
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OFFLINE_SABER][ENQUEUE_UPDATE] id=' + saber.id + ' reason=' + e.toString());
       await _queue.enqueue(SyncOperation(
         id: 'saber:update:${saber.id}:${DateTime.now().microsecondsSinceEpoch}',
         resource: 'saber',
@@ -49,7 +51,9 @@ class OfflineSaberRepository implements ISaberPopularRepository {
   Future<void> guardarSaber(SaberPopular saber) async {
     try {
       await _remote.guardarSaber(saber);
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[OFFLINE_SABER][ENQUEUE_CREATE] id=' + saber.id + ' reason=' + e.toString());
       await _queue.enqueue(SyncOperation(
         id: 'saber:create:${saber.id}:${DateTime.now().microsecondsSinceEpoch}',
         resource: 'saber',

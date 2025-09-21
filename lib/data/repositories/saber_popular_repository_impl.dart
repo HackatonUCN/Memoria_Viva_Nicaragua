@@ -178,11 +178,17 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
   Future<void> guardarSaber(SaberPopular saber) async {
     await _handleExceptions(() async {
       // Verificar si ya existe un saber similar para evitar duplicados
-      final saberesSimilares = await buscarSaberesSimilares(
-        titulo: saber.titulo,
-        categoriaId: saber.categoriaId,
-      );
-      
+      // Si no hay permisos de lectura (permission-denied), continuar sin bloquear la creación
+      List<SaberPopular> saberesSimilares = const [];
+      try {
+        saberesSimilares = await buscarSaberesSimilares(
+          titulo: saber.titulo,
+          categoriaId: saber.categoriaId,
+        );
+      } catch (_) {
+        // ignore: avoid_print
+        print('[SABER_REPO][DUP_CHECK_SKIPPED] read-permission denied or error. Continuing with save.');
+      }
       if (saberesSimilares.isNotEmpty) {
         throw SaberDuplicadoException('Ya existe un saber similar con el título "${saber.titulo}" en la misma categoría.');
       }
@@ -192,12 +198,12 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
         _validarUbicacionNicaragua(saber.ubicacion!);
       }
       
-      // Procesar y validar imágenes
-      final imagenes = await _procesarImagenes(saber.imagenes, saber.id);
+      // Procesar y validar multimedia
+      final multimediaProcesada = await _procesarMultimedia(saber.multimedia, saber.id);
       
       // Crear el modelo para guardar
       final saberModel = SaberPopularModel.fromDomain(
-        saber.copyWith(imagenes: imagenes),
+        saber.copyWith(imagenes: multimediaProcesada),
       );
       
       // Guardar en Firestore
@@ -224,13 +230,13 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
         _validarUbicacionNicaragua(saber.ubicacion!);
       }
       
-      // Procesar y validar imágenes
-      final imagenes = await _procesarImagenes(saber.imagenes, saber.id);
+      // Procesar y validar multimedia
+      final multimediaProcesada = await _procesarMultimedia(saber.multimedia, saber.id);
       
       // Crear el modelo para actualizar
       final saberModel = SaberPopularModel.fromDomain(
         saber.copyWith(
-          imagenes: imagenes,
+          imagenes: multimediaProcesada,
           fechaActualizacion: DateTime.now().toUtc(),
         ),
       );
@@ -553,66 +559,79 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
     }
   }
 
-  /// Procesa las imágenes del saber popular
-  Future<List<Multimedia>> _procesarImagenes(List<Multimedia> imagenes, String saberId) async {
-    // Validar cantidad máxima de imágenes
-    const int maxImagenes = 5;
-    if (imagenes.length > maxImagenes) {
-      throw SaberMediaException.limiteExcedido();
-    }
+  /// Procesa multimedia del saber popular (imagen, audio, video, documento)
+  Future<List<Multimedia>> _procesarMultimedia(List<Multimedia> items, String saberId) async {
+    if (items.isEmpty) return items;
+    final List<Multimedia> procesadas = [];
     
-    final List<Multimedia> imagenesProcessadas = [];
-    
-    for (final imagen in imagenes) {
-      // Si la imagen ya tiene URL, mantenerla
-      if (imagen.url.startsWith('http')) {
-        imagenesProcessadas.add(imagen);
+    for (final item in items) {
+      // Mantener URLs ya subidas
+      if (item.url.startsWith('http')) {
+        procesadas.add(item);
         continue;
       }
-      
-      // Si es una imagen local, subirla a Firebase Storage
-      if (imagen.url.startsWith('file://')) {
-        final file = File(imagen.url.replaceFirst('file://', ''));
-        
-        // Validar tamaño máximo (5MB)
+
+      if (item.url.startsWith('file://')) {
+        final file = File(item.url.replaceFirst('file://', ''));
         final fileSize = await file.length();
-        const int maxSize = 5 * 1024 * 1024; // 5MB
         
-        if (fileSize > maxSize) {
-          throw SaberMediaException.tamanoExcedido(imagen.url);
+        // Límites por tipo
+        String contentType;
+        String prefix;
+        int maxSize;
+        switch (item.tipo) {
+          case TipoMultimedia.imagen:
+            contentType = 'image/jpeg';
+            prefix = 'img_';
+            maxSize = 5 * 1024 * 1024; // 5MB
+            break;
+          case TipoMultimedia.audio:
+            contentType = 'audio/mpeg';
+            prefix = 'aud_';
+            maxSize = 20 * 1024 * 1024; // 20MB
+            break;
+          case TipoMultimedia.video:
+            contentType = 'video/mp4';
+            prefix = 'vid_';
+            maxSize = 100 * 1024 * 1024; // 100MB
+            break;
+          case TipoMultimedia.documento:
+            contentType = 'application/octet-stream';
+            prefix = 'doc_';
+            maxSize = 20 * 1024 * 1024; // 20MB
+            break;
         }
-        
-        // Generar ruta en Storage
+
+        if (fileSize > maxSize) {
+          throw SaberMediaException.tamanoExcedido(item.url);
+        }
+
         final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final nombreArchivo = 'imagen_${timestamp}_${imagenesProcessadas.length}';
+        final nombreArchivo = '${prefix}${timestamp}_${procesadas.length}';
         final path = '$_saberesStoragePath/$saberId/$nombreArchivo';
-        
-        // Subir archivo
+
         final url = await _storageDataSource.uploadFile(
           file: file,
           path: path,
-          contentType: 'image/jpeg',
+          contentType: contentType,
           metadata: {
             'saberId': saberId,
             'timestamp': timestamp.toString(),
+            'tipo': item.tipo.value,
           },
         );
-        
-        // Crear nueva multimedia con la URL de Storage
-        final nuevaImagen = Multimedia(
+
+        procesadas.add(Multimedia(
           url: url,
-          tipo: imagen.tipo,
-          descripcion: imagen.descripcion,
-        );
-        
-        imagenesProcessadas.add(nuevaImagen);
+          tipo: item.tipo,
+          descripcion: item.descripcion,
+          orden: item.orden,
+        ));
       } else {
-        // URL no válida
-        throw SaberMediaException.formatoInvalido(imagen.url);
+        throw SaberMediaException.formatoInvalido(item.url);
       }
     }
-    
-    return imagenesProcessadas;
+    return procesadas;
   }
 
   /// Obtiene un agregado completo de saber popular
