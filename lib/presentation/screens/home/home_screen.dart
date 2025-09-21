@@ -14,6 +14,7 @@ import '../../widgets/relatos/relato_detail_overlay.dart';
 import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../eventos/eventos_screen.dart';
+import '../saberes/saberes_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String title;
@@ -263,8 +264,6 @@ class _BibliotecaTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Biblioteca de Saberes', style: AppTypography.textTheme.headlineMedium),
-    );
+    return const SaberesScreen();
   }
 }
