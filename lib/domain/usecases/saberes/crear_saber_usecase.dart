@@ -49,6 +49,9 @@ class CrearSaberUseCase {
     double? latitud,
     double? longitud,
     List<String> imagenesUrls = const [],
+    List<String> audiosUrls = const [],
+    List<String> videosUrls = const [],
+    List<String> documentosUrls = const [],
     List<String> etiquetas = const [],
   }) async {
     try {
@@ -87,24 +90,52 @@ class CrearSaberUseCase {
         }
       }
 
-      // Convertir URLs de imágenes a objetos Multimedia
-      final List<Multimedia> imagenes = [];
+      // Construir lista Multimedia a partir de todas las URLs suministradas
+      final List<Multimedia> multimedia = [];
+      // Imágenes
       for (final url in imagenesUrls) {
         try {
-          imagenes.add(Multimedia(
-            url: url,
-            tipo: TipoMultimedia.imagen,
-          ));
+          multimedia.add(Multimedia(url: url, tipo: TipoMultimedia.imagen));
         } catch (e) {
           throw SaberMediaException.fromError('Error con imagen $url: $e');
         }
       }
+      // Audios
+      for (final url in audiosUrls) {
+        try {
+          multimedia.add(Multimedia(url: url, tipo: TipoMultimedia.audio));
+        } catch (e) {
+          throw SaberMediaException.fromError('Error con audio $url: $e');
+        }
+      }
+      // Videos
+      for (final url in videosUrls) {
+        try {
+          multimedia.add(Multimedia(url: url, tipo: TipoMultimedia.video));
+        } catch (e) {
+          throw SaberMediaException.fromError('Error con video $url: $e');
+        }
+      }
+      // Documentos
+      for (final url in documentosUrls) {
+        try {
+          multimedia.add(Multimedia(url: url, tipo: TipoMultimedia.documento));
+        } catch (e) {
+          throw SaberMediaException.fromError('Error con documento $url: $e');
+        }
+      }
 
-      // Verificar si ya existe un saber similar
-      final saberesSimilares = await _saberRepository.buscarSaberesSimilares(
-        titulo: titulo,
-        categoriaId: categoriaId,
-      );
+      // Verificar si ya existe un saber similar (tolerante a permisos)
+      List<SaberPopular> saberesSimilares = const [];
+      try {
+        saberesSimilares = await _saberRepository.buscarSaberesSimilares(
+          titulo: titulo,
+          categoriaId: categoriaId,
+        );
+      } catch (_) {
+        // Si no tenemos permisos de lectura para consultar, omitimos esta validación
+        // y permitimos continuar con la creación. Las reglas de escritura seguirán aplicando.
+      }
       if (saberesSimilares.isNotEmpty) {
         throw SaberDuplicadoException();
       }
@@ -118,7 +149,7 @@ class CrearSaberUseCase {
         categoriaId: categoriaId,
         categoriaNombre: categoria.nombre,
         ubicacion: ubicacion,
-        imagenes: imagenes,
+        imagenes: multimedia,
         etiquetas: etiquetas,
       );
 

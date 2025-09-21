@@ -49,6 +49,9 @@ class ActualizarSaberUseCase {
     double? latitud,
     double? longitud,
     List<String>? imagenesUrls,
+    List<String>? audiosUrls,
+    List<String>? videosUrls,
+    List<String>? documentosUrls,
     List<String>? etiquetas,
   }) async {
     try {
@@ -98,20 +101,31 @@ class ActualizarSaberUseCase {
         }
       }
 
-      // Procesar imágenes
-      List<Multimedia> nuevasImagenes = saber.imagenes;
+      // Procesar multimedia
+      List<Multimedia> nuevaMultimedia = saber.multimedia;
+      final List<Multimedia> reemplazo = [];
       if (imagenesUrls != null) {
-        nuevasImagenes = [];
         for (final url in imagenesUrls) {
-          try {
-            nuevasImagenes.add(Multimedia(
-              url: url,
-              tipo: TipoMultimedia.imagen,
-            ));
-          } catch (e) {
-            throw SaberMediaException.formatoInvalido(url);
-          }
+          try { reemplazo.add(Multimedia(url: url, tipo: TipoMultimedia.imagen)); } catch (e) { throw SaberMediaException.formatoInvalido(url); }
         }
+      }
+      if (audiosUrls != null) {
+        for (final url in audiosUrls) {
+          try { reemplazo.add(Multimedia(url: url, tipo: TipoMultimedia.audio)); } catch (e) { throw SaberMediaException.formatoInvalido(url); }
+        }
+      }
+      if (videosUrls != null) {
+        for (final url in videosUrls) {
+          try { reemplazo.add(Multimedia(url: url, tipo: TipoMultimedia.video)); } catch (e) { throw SaberMediaException.formatoInvalido(url); }
+        }
+      }
+      if (documentosUrls != null) {
+        for (final url in documentosUrls) {
+          try { reemplazo.add(Multimedia(url: url, tipo: TipoMultimedia.documento)); } catch (e) { throw SaberMediaException.formatoInvalido(url); }
+        }
+      }
+      if (reemplazo.isNotEmpty) {
+        nuevaMultimedia = reemplazo;
       }
 
       // Obtener comentarios y verificaciones (en una implementación real se obtendrían del repositorio)
@@ -128,7 +142,7 @@ class ActualizarSaberUseCase {
         categoriaId: nuevaCategoriaId,
         categoriaNombre: nuevaCategoriaNombre,
         ubicacion: nuevaUbicacion,
-        imagenes: nuevasImagenes,
+        imagenes: nuevaMultimedia,
         etiquetas: etiquetas,
       );
       

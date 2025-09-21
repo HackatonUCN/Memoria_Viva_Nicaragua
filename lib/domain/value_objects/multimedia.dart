@@ -4,7 +4,8 @@ import '../exceptions/value_object_exception.dart';
 enum TipoMultimedia {
   imagen('imagen', ['jpg', 'jpeg', 'png', 'webp']),
   audio('audio', ['mp3', 'wav', 'm4a']),
-  video('video', ['mp4', 'mov', 'webm']);
+  video('video', ['mp4', 'mov', 'webm']),
+  documento('documento', ['pdf', 'epub', 'doc', 'docx', 'txt', 'rtf']);
 
   final String value;
   final List<String> extensionesPermitidas;
@@ -113,6 +114,9 @@ class Multimedia {
         return url.replaceAll(RegExp(r'\.[^.]+$'), '_thumb.jpg');
       case TipoMultimedia.audio:
         return 'https://storage.googleapis.com/memoria-viva/assets/audio_thumbnail.png';
+      case TipoMultimedia.documento:
+        // Miniatura genérica para documentos (PDF/EPUB/DOC/TXT)
+        return 'https://storage.googleapis.com/memoria-viva/assets/document_thumbnail.png';
     }
   }
 
