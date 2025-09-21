@@ -718,6 +718,9 @@ class _MediaCarouselState extends State<_MediaCarousel> {
             ),
           ),
         );
+      case TipoMultimedia.documento:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 }
