@@ -28,17 +28,15 @@ rules_version = '2';
 
     function isAdmin() {
       return hasRole('admin') || (
-        isSignedIn() && (
-          (
-            exists(/databases/$(database)/documents/users/$(userId())) &&
-            get(/databases/$(database)/documents/users/$(userId())).data.rol == 'admin'
-          ) || (
-            exists(/databases/$(database)/documents/usuarios/$(userId())) &&
-            get(/databases/$(database)/documents/usuarios/$(userId())).data.rol == 'admin'
-          ) || (
-            exists(/databases/$(database)/documents/users/$(userId())) &&
-            get(/databases/$(database)/documents/users/$(userId())).data.esAdmin == true
-          )
+        (
+          exists(/databases/$(database)/documents/users/$(userId())) &&
+          get(/databases/$(database)/documents/users/$(userId())).data.rol == 'admin'
+        ) || (
+          exists(/databases/$(database)/documents/usuarios/$(userId())) &&
+          get(/databases/$(database)/documents/usuarios/$(userId())).data.rol == 'admin'
+        ) || (
+          exists(/databases/$(database)/documents/users/$(userId())) &&
+          get(/databases/$(database)/documents/users/$(userId())).data.esAdmin == true
         )
       );
     }
@@ -116,7 +114,7 @@ rules_version = '2';
       // Editar propio (contenido/ubicación/etiquetas/multimedia/categoría)
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(
-          ['titulo','contenido','etiquetas','ubicacion','multimedia','categoriaId','categoriaNombre','fechaActualizacion']
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion','categoriaId','categoriaNombre']
         );
 
       // Soft delete (propietario puede marcar como eliminado)
@@ -186,7 +184,7 @@ rules_version = '2';
 
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(
-          ['titulo','contenido','etiquetas','ubicacion','imagenes','fechaActualizacion']
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion','categoriaId','categoriaNombre']
         );
 
       // Likes/Compartidos
