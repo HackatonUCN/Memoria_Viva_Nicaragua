@@ -186,17 +186,30 @@ class UserRepositoryImpl implements IUserRepository {
         throw UserException.noEncontrado(userId: userId);
       }
 
-      // Si se proporciona un delta, sumarlo al valor actual
+      // Si se proporciona un delta, sumarlo al valor actual y evitar negativos
+      final int? nextRelatos = relatosPublicados != null
+          ? (() {
+              final int computed = userData.relatosPublicados + relatosPublicados;
+              return computed < 0 ? 0 : computed;
+            })()
+          : null;
+      final int? nextSaberes = saberesCompartidos != null
+          ? (() {
+              final int computed = userData.saberesCompartidos + saberesCompartidos;
+              return computed < 0 ? 0 : computed;
+            })()
+          : null;
+      final int? nextPuntaje = puntajeTotal != null
+          ? (() {
+              final int computed = userData.puntajeTotal + puntajeTotal;
+              return computed < 0 ? 0 : computed;
+            })()
+          : null;
+
       final updatedModel = userData.copyWith(
-        relatosPublicados: relatosPublicados != null 
-            ? userData.relatosPublicados + relatosPublicados 
-            : null,
-        saberesCompartidos: saberesCompartidos != null 
-            ? userData.saberesCompartidos + saberesCompartidos 
-            : null,
-        puntajeTotal: puntajeTotal != null 
-            ? userData.puntajeTotal + puntajeTotal 
-            : null,
+        relatosPublicados: nextRelatos,
+        saberesCompartidos: nextSaberes,
+        puntajeTotal: nextPuntaje,
       );
 
       await _firestoreDataSource.save(updatedModel);

@@ -82,9 +82,9 @@ class UserModel implements BaseModel<User> {
       municipio: municipio,
       biografia: biografia,
       activo: activo,
-      relatosPublicados: relatosPublicados,
-      saberesCompartidos: saberesCompartidos,
-      puntajeTotal: puntajeTotal,
+      relatosPublicados: relatosPublicados < 0 ? 0 : relatosPublicados,
+      saberesCompartidos: saberesCompartidos < 0 ? 0 : saberesCompartidos,
+      puntajeTotal: puntajeTotal < 0 ? 0 : puntajeTotal,
       notificacionesActivas: notificacionesActivas,
     );
   }
