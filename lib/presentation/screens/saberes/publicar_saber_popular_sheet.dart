@@ -346,14 +346,19 @@ class _MetaSection extends StatelessWidget {
     return _SectionCard(
       title: 'Datos y Multimedia',
       icon: Icons.tune_outlined,
-      children: const [
-        _CategoriaDropdown(),
-        SizedBox(height: 12),
-        _UbicacionSelector(),
-        SizedBox(height: 12),
-        _SaberMediaPickerRow(),
-        SizedBox(height: 12),
-        _MediaLivePreview(),
+      children: [
+        const _CategoriaDropdown(),
+        const SizedBox(height: 12),
+        // Ocultar selector de ubicación si la categoría no permite ubicación manual
+        Builder(builder: (context) {
+          final form = context.watch<SaberFormProvider>();
+          if (!form.isLocationAllowed) return const SizedBox.shrink();
+          return const _UbicacionSelector();
+        }),
+        const SizedBox(height: 12),
+        const _SaberMediaPickerRow(),
+        const SizedBox(height: 12),
+        const _MediaLivePreview(),
       ],
     );
   }

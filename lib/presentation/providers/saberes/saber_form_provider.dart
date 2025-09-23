@@ -95,6 +95,7 @@ class SaberFormProvider extends ChangeNotifier {
 
   // Internos
   String? _currentUserId;
+  bool _currentUserIsAdmin = false;
   StreamSubscription<List<Categoria>>? _catsSub;
   final Map<String, http.Client> _clientsByUpload = {};
   bool _isDisposed = false;
@@ -117,7 +118,7 @@ class SaberFormProvider extends ChangeNotifier {
 
     final bool cacheFresh = _memCacheCategorias.isNotEmpty && (_memCacheAt != null) && DateTime.now().difference(_memCacheAt!) < _memCacheTtl;
     if (cacheFresh) {
-      categorias = List.of(_memCacheCategorias);
+      categorias = _filtrarCategoriasPorRol(_memCacheCategorias);
       categoriasLoading = false;
       _notify();
       // Refresh en background sin bloquear UI
@@ -134,12 +135,12 @@ class SaberFormProvider extends ChangeNotifier {
       final uc = _getIt<ObtenerCategoriasPorTipoUseCase>();
       final res = await uc.execute(TipoContenido.saber).timeout(const Duration(seconds: 8));
       final data = res.valueOrNull ?? _memCacheCategorias;
-      categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      categorias = _filtrarCategoriasPorRol(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
       _memCacheCategorias = List.of(categorias);
       _memCacheAt = DateTime.now();
       _catsSub?.cancel();
       _catsSub = uc.observe(TipoContenido.saber).listen((data) {
-        categorias = List.of(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+        categorias = _filtrarCategoriasPorRol(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
         _memCacheCategorias = List.of(categorias);
         _memCacheAt = DateTime.now();
         _notify();
@@ -212,7 +213,38 @@ class SaberFormProvider extends ChangeNotifier {
 
   void setTitulo(String v) { titulo = v; notifyListeners(); }
   void setContenido(String v) { contenido = v; notifyListeners(); }
-  void setCategoria(String? id) { categoriaId = id; notifyListeners(); }
+  
+  
+  bool get isLocationAllowed {
+    final String? id = categoriaId;
+    if (id != null) {
+      if (id == 'saber_musica_danza' || id == 'saber_gastronomia') return true;
+    }
+    try {
+      final cat = categorias.firstWhere((c) => c.id == categoriaId, orElse: () => categorias.firstWhere((_) => false));
+      final name = cat.nombre.toLowerCase();
+      if (name.contains('danza') && (name.contains('música') || name.contains('musica'))) return true;
+      if (name.contains('gastronomía') || name.contains('gastronomia')) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  void _applyLocationPolicy() {
+    if (isLocationAllowed) return;
+    // Ubicación nacional por defecto
+    departamento = 'Nacional';
+    municipio = 'Nicaragua';
+    final n = NicaraguaCoordinates.getDepartamentoCoordinates('Nacional') ?? {'lat': 12.8654, 'lng': -85.2072};
+    latitud = n['lat'];
+    longitud = n['lng'];
+  }
+
+  @override
+  void setCategoria(String? id) {
+    categoriaId = id;
+    _applyLocationPolicy();
+    notifyListeners();
+  }
 
   void addEtiqueta(String tag) {
     final t = tag.trim();
@@ -225,6 +257,7 @@ class SaberFormProvider extends ChangeNotifier {
   void removeEtiqueta(String tag) { etiquetas.remove(tag); notifyListeners(); }
 
   void setUbicacion({String? dep, String? mun, double? lat, double? lng}) {
+    if (!isLocationAllowed) return;
     departamento = dep;
     municipio = mun;
     latitud = lat;
@@ -233,6 +266,7 @@ class SaberFormProvider extends ChangeNotifier {
   }
 
   void setDepartamento(String? dep) {
+    if (!isLocationAllowed) return;
     departamento = dep;
     // Autocoords si hay municipio también
     final coords = NicaraguaCoordinates.getBestCoordinates(departamento, municipio);
@@ -242,6 +276,7 @@ class SaberFormProvider extends ChangeNotifier {
   }
 
   void setMunicipio(String? mun) {
+    if (!isLocationAllowed) return;
     municipio = mun;
     final coords = NicaraguaCoordinates.getBestCoordinates(departamento, municipio);
     latitud = coords['lat'];
@@ -251,6 +286,14 @@ class SaberFormProvider extends ChangeNotifier {
 
   // Pickers
   Future<void> addImagenDesdeGaleria() async {
+    await _ensureCurrentUser();
+    bool isLibro = false;
+    try {
+      final c = categorias.firstWhere((c) => c.id == categoriaId);
+      final name = c.nombre.toLowerCase();
+      isLibro = (name == 'libro' || name == 'libros');
+    } catch (_) {}
+    final bool allowDocs = _currentUserIsAdmin && isLibro;
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       final List<XFile> files = await _picker.pickMultipleMedia(imageQuality: 90);
       if (files.isEmpty) return;
@@ -265,20 +308,26 @@ class SaberFormProvider extends ChangeNotifier {
       return;
     }
 
+    final allowedExtensions = [
+      ...TipoMultimedia.imagen.extensionesPermitidas,
+      ...TipoMultimedia.video.extensionesPermitidas,
+      if (allowDocs) ...TipoMultimedia.documento.extensionesPermitidas,
+    ];
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowMultiple: true,
-      allowedExtensions: [
-        ...TipoMultimedia.imagen.extensionesPermitidas,
-        ...TipoMultimedia.video.extensionesPermitidas,
-      ],
+      allowedExtensions: allowedExtensions,
       withData: kIsWeb,
     );
     if (result == null || result.files.isEmpty) return;
     for (final f in result.files) {
       final name = f.name.toLowerCase();
       final bool isVideo = TipoMultimedia.video.extensionesPermitidas.any((e) => name.endsWith('.$e'));
-      final TipoMultimedia tipo = isVideo ? TipoMultimedia.video : TipoMultimedia.imagen;
+      final bool isDoc = TipoMultimedia.documento.extensionesPermitidas.any((e) => name.endsWith('.$e'));
+      if (isDoc && !allowDocs) continue;
+      final TipoMultimedia tipo = isVideo
+          ? TipoMultimedia.video
+          : (isDoc ? TipoMultimedia.documento : TipoMultimedia.imagen);
       if (!_canAdd(tipo)) continue;
       if (kIsWeb) {
         if (f.bytes == null) continue;
@@ -299,15 +348,25 @@ class SaberFormProvider extends ChangeNotifier {
   }
 
   Future<void> addDesdeArchivos() async {
+    await _ensureCurrentUser();
+    // Solo admin con categoría Libro puede subir documentos (pdf/epub/doc/docx/rtf/txt)
+    bool isLibro = false;
+    try {
+      final c = categorias.firstWhere((c) => c.id == categoriaId);
+      final name = c.nombre.toLowerCase();
+      isLibro = (name == 'libro' || name == 'libros');
+    } catch (_) {}
+    final bool allowDocs = _currentUserIsAdmin && isLibro;
+    final allowedExtensions = [
+      ...TipoMultimedia.imagen.extensionesPermitidas,
+      ...TipoMultimedia.video.extensionesPermitidas,
+      ...TipoMultimedia.audio.extensionesPermitidas,
+      if (allowDocs) ...TipoMultimedia.documento.extensionesPermitidas,
+    ];
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowMultiple: true,
-      allowedExtensions: [
-        ...TipoMultimedia.imagen.extensionesPermitidas,
-        ...TipoMultimedia.video.extensionesPermitidas,
-        ...TipoMultimedia.audio.extensionesPermitidas,
-        ...TipoMultimedia.documento.extensionesPermitidas,
-      ],
+      allowedExtensions: allowedExtensions,
       withData: kIsWeb,
     );
     if (result == null || result.files.isEmpty) return;
@@ -321,6 +380,8 @@ class SaberFormProvider extends ChangeNotifier {
       } else if (TipoMultimedia.audio.extensionesPermitidas.any((e) => name.endsWith('.$e'))) {
         tipo = TipoMultimedia.audio;
       } else {
+        // Documento: sólo si allowDocs
+        if (!allowDocs) continue;
         tipo = TipoMultimedia.documento;
       }
       if (!_canAdd(tipo)) continue;
@@ -519,6 +580,8 @@ class SaberFormProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    // Aplicar política de ubicación por categoría antes de enviar
+    _applyLocationPolicy();
     if (_currentUserId == null || _currentUserId!.isEmpty) {
       errorMessage = 'Debes iniciar sesión para publicar.';
       notifyListeners();
@@ -640,7 +703,18 @@ class SaberFormProvider extends ChangeNotifier {
     if (_currentUserId == null || _currentUserId!.isEmpty) {
       final current = await _useCases.auth.getCurrentUser.execute();
       _currentUserId = current.valueOrNull?.id;
+      try {
+        _currentUserIsAdmin = (current.valueOrNull?.rol.value == 'admin');
+      } catch (_) {
+        _currentUserIsAdmin = false;
+      }
     }
+  }
+
+  List<Categoria> _filtrarCategoriasPorRol(List<Categoria> data) {
+    if (_currentUserIsAdmin) return List.of(data);
+    // Ocultar categoría "Libro" para no admin
+    return data.where((c) => c.nombre.toLowerCase() != 'libro' && c.nombre.toLowerCase() != 'libros').toList();
   }
 
   // Construye un Saber mínimo usando el estado del formulario para UI optimista

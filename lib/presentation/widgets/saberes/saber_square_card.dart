@@ -106,26 +106,7 @@ class SaberSquareCard extends StatelessWidget {
                 ),
               ),
               
-              // Badge de categoría (esquina superior derecha)
-              Positioned(
-                top: 6,
-                right: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _getCategoryIcon(saber.categoriaId),
-                    style: const TextStyle(
-                      color: AppColors.textLight,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
+              // (oculto) Badge de categoría: solo icono y título según requerimiento
             ],
           ),
         ),

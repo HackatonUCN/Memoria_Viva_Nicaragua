@@ -11,6 +11,30 @@ import '../common/cultural_icon.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../utils/date_formatter.dart';
 
+// Helper function for Cloudinary image optimization
+String _cloudinaryScaled(String url, {required int width}) {
+  try {
+    final uri = Uri.parse(url);
+    if (!uri.host.contains('res.cloudinary.com')) return url;
+    final segments = List<String>.from(uri.pathSegments);
+    final uploadIndex = segments.indexOf('upload');
+    if (uploadIndex == -1) return url;
+    // Insert transformation preserving existing ones
+    final String transform = 'f_auto,q_auto,w_$width';
+    if (uploadIndex + 1 < segments.length && segments[uploadIndex + 1].isNotEmpty && !segments[uploadIndex + 1].contains(',')) {
+      segments.insert(uploadIndex + 1, transform);
+    } else if (uploadIndex + 1 < segments.length) {
+      segments[uploadIndex + 1] = '${segments[uploadIndex + 1]},$transform';
+    } else {
+      segments.add(transform);
+    }
+    final newUri = uri.replace(pathSegments: segments);
+    return newUri.toString();
+  } catch (_) {
+    return url;
+  }
+}
+
 // Helper function for formatting relative dates
 String _formatRelativeDate(DateTime fecha) {
   final now = DateTime.now();
@@ -239,7 +263,7 @@ class SaberCard extends StatelessWidget {
                                   Icon(
                                     isLiked ? Icons.favorite : Icons.favorite_border,
                                     size: 18,
-                                    color: isLiked ? AppColors.error : AppColors.textSecondary,
+                                    color: isLiked ? AppColors.accent : AppColors.textSecondary,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
@@ -286,10 +310,44 @@ class SaberCard extends StatelessWidget {
                             ),
                           ),
                           
+                          const SizedBox(width: 16),
+                          
+                          // Reportar (visible para todos)
+                          InkWell(
+                            onTap: onReport,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.flag_outlined,
+                                    size: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Reportar',
+                                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
                           const Spacer(),
                           
-                          // Ubicación si existe
-                          if (saber.ubicacion != null)
+                          // Ubicación si existe y no es la ubicación predeterminada
+                          if (saber.ubicacion != null && 
+                              !(saber.ubicacion!.departamento == 'Nacional' && 
+                                saber.ubicacion!.municipio == 'Nicaragua'))
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -436,6 +494,7 @@ class _SaberMediaCarousel extends StatefulWidget {
 class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
+  bool _autoplayTried = false;
 
   @override
   void dispose() {
@@ -446,6 +505,7 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
   @override
   Widget build(BuildContext context) {
     if (widget.multimedia.isEmpty) return const SizedBox.shrink();
+    final bool showArrows = widget.multimedia.length > 1;
 
     return SizedBox(
       height: 200,
@@ -471,8 +531,60 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
             },
           ),
           
+          // Deshabilitar autoplay en carrusel para evitar decodificación simultánea
+          if (!_autoplayTried) const SizedBox.shrink(),
+          
+          // Flechas de navegación
+          if (showArrows)
+            Positioned(
+              left: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.black26,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      final prev = (_currentIndex - 1).clamp(0, widget.multimedia.length - 1);
+                      _pageController.animateToPage(prev, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(6.0),
+                      child: Icon(Icons.chevron_left, size: 28, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
+          if (showArrows)
+            Positioned(
+              right: 8,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Material(
+                  color: Colors.black26,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      final next = (_currentIndex + 1).clamp(0, widget.multimedia.length - 1);
+                      _pageController.animateToPage(next, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(6.0),
+                      child: Icon(Icons.chevron_right, size: 28, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          
           // Indicadores de página
-          if (widget.multimedia.length > 1)
+          if (showArrows)
             Positioned(
               bottom: 8,
               left: 0,
@@ -481,17 +593,7 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
                   widget.multimedia.length,
-                  (index) => Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: index == _currentIndex
-                          ? AppColors.textLight
-                          : AppColors.textLight.withOpacity(0.4),
-                    ),
-                  ),
+                  (index) => _dot(index == _currentIndex),
                 ),
               ),
             ),
@@ -499,26 +601,51 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
       ),
     );
   }
+  
+  Widget _dot(bool active) => Container(
+    width: active ? 10 : 6,
+    height: active ? 10 : 6,
+    margin: const EdgeInsets.symmetric(horizontal: 3),
+    decoration: BoxDecoration(
+      color: active ? AppColors.accent : AppColors.withOpacity(AppColors.accent, 0.4),
+      shape: BoxShape.circle,
+    ),
+  );
 
   Widget _buildMediaPreview(Multimedia media) {
     switch (media.tipo) {
       case TipoMultimedia.imagen:
-        return CachedNetworkImage(
-          imageUrl: media.url,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: AppColors.background,
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: AppColors.background,
-            child: const Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                size: 48,
-                color: AppColors.textSecondary,
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          color: AppColors.background,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Hero(
+                  tag: 'saber_media_${media.url}',
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+                      final int targetW = (constraints.maxWidth * devicePixelRatio).clamp(360.0, 1600.0).round();
+                      final String url = _cloudinaryScaled(media.url, width: targetW);
+                      return CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        fadeInDuration: const Duration(milliseconds: 160),
+                        fadeOutDuration: const Duration(milliseconds: 120),
+                        placeholder: (c, _) => Container(color: AppColors.background),
+                        errorWidget: (c, _, __) => Container(
+                          color: AppColors.background, 
+                          child: const Icon(Icons.broken_image_outlined)
+                        ),
+                        memCacheWidth: targetW,
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -529,14 +656,25 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
           color: AppColors.primaryDark,
           child: Stack(
             children: [
-              // Placeholder para video
+              // Placeholder para video con mejor presentación
               Container(
                 color: AppColors.background,
-                child: const Center(
-                  child: Icon(
-                    Icons.play_circle_outline,
-                    size: 64,
-                    color: AppColors.textSecondary,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Container(
+                        color: Colors.black,
+                        child: const Center(
+                          child: Icon(
+                            Icons.play_circle_outline,
+                            size: 64,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
