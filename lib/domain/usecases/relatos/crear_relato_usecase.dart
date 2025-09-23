@@ -158,7 +158,7 @@ class CrearRelatoUseCase {
       // Actualizar estadísticas del usuario
       await _userRepository.actualizarEstadisticas(
         userId: autorId,
-        relatosPublicados: autor.relatosPublicados + 1,
+        relatosPublicados: 1,
       );
 
       // ignore: avoid_print
