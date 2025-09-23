@@ -124,6 +124,13 @@ rules_version = '2';
         ) &&
         request.resource.data.eliminado == true;
 
+      // Soft delete (propietario puede marcar como eliminado)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['eliminado','fechaEliminacion','fechaActualizacion']
+        ) &&
+        request.resource.data.eliminado == true;
+
       // Likes (toggle idempotente). Permite +1 si el usuario aún NO ha dado like; permite -1 si SÍ ha dado like
       allow update: if isSignedIn() &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes','fechaActualizacion']) &&
@@ -187,6 +194,13 @@ rules_version = '2';
           ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion','categoriaId','categoriaNombre']
         );
 
+      // Soft delete (propietario puede marcar como eliminado)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['eliminado','fechaEliminacion','fechaActualizacion']
+        ) &&
+        request.resource.data.eliminado == true;
+
       // Likes/Compartidos
       allow update: if isSignedIn() &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['likes','fechaActualizacion']) &&
@@ -200,6 +214,14 @@ rules_version = '2';
       allow update: if isSignedIn() &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['estado','fechaActualizacion']) &&
         request.resource.data.estado == 'reportado';
+
+      // Subcolección likes (igual a relatos)
+      match /likes/{uid} {
+        allow create: if isSignedIn() && uid == userId();
+        allow delete: if isSignedIn() && uid == userId();
+        allow read: if isSignedIn() && uid == userId();
+        allow update: if false;
+      }
     }
 
     // =============================
