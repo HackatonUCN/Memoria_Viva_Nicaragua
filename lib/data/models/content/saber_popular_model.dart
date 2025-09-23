@@ -134,6 +134,17 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
 
   /// Crea una instancia de SaberPopularModel desde un Map de Firestore
   factory SaberPopularModel.fromMap(Map<String, dynamic> map) {
+    Timestamp _asTimestamp(dynamic v) {
+      if (v == null) return Timestamp.now();
+      if (v is Timestamp) return v;
+      if (v is DateTime) return Timestamp.fromDate(v);
+      if (v is int) return Timestamp.fromMillisecondsSinceEpoch(v);
+      if (v is double) return Timestamp.fromMillisecondsSinceEpoch(v.toInt());
+      if (v is String) {
+        try { return Timestamp.fromDate(DateTime.parse(v)); } catch (_) { return Timestamp.now(); }
+      }
+      return Timestamp.now();
+    }
     // Compatibilidad: preferir 'multimedia' con fallback a 'imagenes'
     final List<Map<String, dynamic>> multimedia =
         (map['multimedia'] as List<dynamic>?)
@@ -156,15 +167,15 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
           : null,
       multimedia: multimedia,
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
-      fechaCreacion: map['fechaCreacion'] as Timestamp,
-      fechaActualizacion: map['fechaActualizacion'] as Timestamp,
+      fechaCreacion: _asTimestamp(map['fechaCreacion']),
+      fechaActualizacion: _asTimestamp(map['fechaActualizacion']),
       estado: map['estado'] as String? ?? 'activo',
       reportes: map['reportes'] as int? ?? 0,
       procesado: map['procesado'] as bool? ?? false,
       likes: map['likes'] as int? ?? 0,
       compartidos: map['compartidos'] as int? ?? 0,
       eliminado: map['eliminado'] as bool? ?? false,
-      fechaEliminacion: map['fechaEliminacion'] as Timestamp?,
+      fechaEliminacion: map['fechaEliminacion'] != null ? _asTimestamp(map['fechaEliminacion']) : null,
     );
   }
 

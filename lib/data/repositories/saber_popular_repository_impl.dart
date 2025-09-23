@@ -399,16 +399,15 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
   @override
   Stream<List<SaberPopular>> observarSaberes() {
     try {
-      // Usamos watchWhere ya que watchCollection no soporta filtros múltiples
-      return _firestoreDataSource.watchWhere(
-        field: 'estado',
-        isEqualTo: EstadoModeracion.activo.value,
+      // Importante: incluir todos los filtros exigidos por reglas (estado activo y eliminado=false)
+      return _firestoreDataSource.watchQuery(
+        filters: {
+          'estado': EstadoModeracion.activo.value,
+          'eliminado': false,
+        },
         orderBy: 'fechaCreacion',
         descending: true,
-      ).map((saberes) => saberes
-          .where((model) => !model.eliminado)
-          .map((model) => model.toDomain())
-          .toList());
+      ).map((saberes) => saberes.map((model) => model.toDomain()).toList());
     } catch (e) {
       throw SaberException('Error al observar saberes: $e');
     }
@@ -426,16 +425,16 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
   @override
   Stream<List<SaberPopular>> observarSaberesPorCategoria(String categoriaId) {
     try {
-      // Usamos watchWhere para filtrar por categoría
-      return _firestoreDataSource.watchWhere(
-        field: 'categoriaId',
-        isEqualTo: categoriaId,
+      // Incluir filtros requeridos por reglas además de categoría
+      return _firestoreDataSource.watchQuery(
+        filters: {
+          'categoriaId': categoriaId,
+          'estado': EstadoModeracion.activo.value,
+          'eliminado': false,
+        },
         orderBy: 'fechaCreacion',
         descending: true,
-      ).map((saberes) => saberes
-          .where((model) => !model.eliminado && model.estado == EstadoModeracion.activo.value)
-          .map((model) => model.toDomain())
-          .toList());
+      ).map((saberes) => saberes.map((model) => model.toDomain()).toList());
     } catch (e) {
       throw SaberException('Error al observar saberes por categoría: $e');
     }
@@ -542,20 +541,30 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
     }
     
     // Validar que el departamento sea válido
-    final departamentosNicaragua = [
+    // Se aceptan nombres oficiales, aliases y el valor 'Nacional' (ubicación nacional por defecto)
+    final Set<String> departamentosValidos = {
+      // Ubicación nacional y alias comunes
+      'Nacional', 'Nicaragua',
+      // Departamentos
       'Boaco', 'Carazo', 'Chinandega', 'Chontales', 'Estelí',
       'Granada', 'Jinotega', 'León', 'Madriz', 'Managua',
       'Masaya', 'Matagalpa', 'Nueva Segovia', 'Río San Juan',
-      'Rivas', 'Región Autónoma de la Costa Caribe Norte',
+      'Rivas',
+      // Regiones autónomas (nombres completos y siglas históricas)
+      'Región Autónoma de la Costa Caribe Norte',
       'Región Autónoma de la Costa Caribe Sur',
-    ];
-    
-    if (ubicacion.departamento != null && 
-        !departamentosNicaragua.contains(ubicacion.departamento)) {
-      throw SaberLocationException(
-        'El departamento ${ubicacion.departamento} no es válido en Nicaragua',
-        code: 'DEPARTAMENTO_INVALIDO',
-      );
+      'RAAN', 'RAAS',
+    };
+
+    if (ubicacion.departamento != null) {
+      final String dep = ubicacion.departamento!;
+      final bool valido = departamentosValidos.contains(dep) || departamentosValidos.contains(dep.trim());
+      if (!valido) {
+        throw SaberLocationException(
+          'El departamento ${ubicacion.departamento} no es válido en Nicaragua',
+          code: 'DEPARTAMENTO_INVALIDO',
+        );
+      }
     }
   }
 
