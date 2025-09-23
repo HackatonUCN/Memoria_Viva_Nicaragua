@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../../config/app_router.dart';
 import '../../providers/auth_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 enum DrawerCategory { personal, games }
 
@@ -119,22 +120,12 @@ class _AppDrawerState extends State<AppDrawer> {
         height: 100,
         padding: const EdgeInsets.all(8.0),
         child: Center(
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppColors.nicaraguaGradient,
-            ),
-            child: Center(
-              child: Text(
-                'MV',
-                style: AppTypography.textTheme.titleMedium?.copyWith(
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+          child: SvgPicture.asset(
+            'assets/icons/logotipo (principal).svg',
+            width: 64,
+            height: 64,
+            fit: BoxFit.contain,
+            semanticsLabel: 'Logotipo Memoria Viva',
           ),
         ),
       );
@@ -148,65 +139,30 @@ class _AppDrawerState extends State<AppDrawer> {
             height: 100,
             padding: const EdgeInsets.all(8.0),
             child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.nicaraguaGradient,
-                ),
-                child: Center(
-                  child: Text(
-                    'MV',
-                    style: AppTypography.textTheme.titleMedium?.copyWith(
-                      color: AppColors.textLight,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              child: SvgPicture.asset(
+                'assets/icons/logotipo (principal).svg',
+                width: 56,
+                height: 56,
+                fit: BoxFit.contain,
+                semanticsLabel: 'Logotipo Memoria Viva',
               ),
             ),
           );
         }
 
+        final logoWidth = (constraints.maxWidth - 32).toDouble();
         return Container(
           height: 180,
           padding: const EdgeInsets.all(16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Logo y título (extendido)
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.nicaraguaGradient,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'MV',
-                        style: AppTypography.textTheme.titleLarge?.copyWith(
-                          color: AppColors.textLight,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Memoria Viva\nNicaragua',
-                      style: AppTypography.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ),
-                ],
+              // Logotipo principal
+              SvgPicture.asset(
+                'assets/icons/logotipo (principal).svg',
+                width: logoWidth,
+                fit: BoxFit.contain,
+                semanticsLabel: 'Logotipo Memoria Viva',
               ),
 
               const SizedBox(height: 16),

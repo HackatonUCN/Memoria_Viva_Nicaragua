@@ -14,6 +14,7 @@ import '../../widgets/auth/animated_button.dart';
 import '../../widgets/auth/fade_animation.dart';
 import '../home/home_screen.dart';
 import '../../../core/constants/app_icons.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -281,22 +282,28 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
                   FadeAnimation(
                     delay: 0.2,
                     child: Center(
-                      child: Container(
-                        width: isWeb ? 100 : 120,
-                        height: isWeb ? 100 : 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppColors.nicaraguaGradient,
-                        ),
-                        child: Center(
-                          child: Text(
-                            'MV',
-                            style: AppTypography.textTheme.displayMedium?.copyWith(
-                              color: AppColors.textLight,
-                              fontWeight: FontWeight.bold,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final screen = MediaQuery.of(context).size;
+                          final circle = (screen.width * 0.22).clamp(72.0, 160.0).toDouble();
+                          return Container(
+                            width: circle,
+                            height: circle,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primary.withOpacity(0.12),
                             ),
-                          ),
-                        ),
+                            child: Center(
+                              child: SvgPicture.asset(
+                                'assets/icons/logotipo (iniciales).svg',
+                                width: circle * 0.72,
+                                height: circle * 0.72,
+                                fit: BoxFit.contain,
+                                semanticsLabel: 'Logotipo iniciales',
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),

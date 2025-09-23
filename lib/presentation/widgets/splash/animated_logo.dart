@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class AnimatedLogo extends StatefulWidget {
   final VoidCallback onAnimationComplete;
@@ -66,34 +65,21 @@ class _AnimatedLogoState extends State<AnimatedLogo>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        final size = MediaQuery.of(context).size;
+        // Más grande: hasta 80% del ancho y 50% del alto (mínimo entre ambos), con límites
+        final widthBound = (size.width * 1.5).clamp(200.0, 560.0).toDouble();
+        final heightBound = (size.height * 1.2).clamp(180.0, 520.0).toDouble();
+        final dimension = widthBound < heightBound ? widthBound : heightBound;
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: Opacity(
             opacity: _opacityAnimation.value,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppColors.nicaraguaGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: AppSpacing.lg,
-                    spreadRadius: AppSpacing.xs,
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  'MV',  // Aquí irá el logo real
-                  style: TextStyle(
-                    color: AppColors.textLight,
-                    fontSize: 64,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            child: SvgPicture.asset(
+              'assets/icons/logotipo (vertical).svg',
+              width: dimension,
+              height: dimension,
+              fit: BoxFit.contain,
+              semanticsLabel: 'Logotipo Memoria Viva - vertical',
             ),
           ),
         );
