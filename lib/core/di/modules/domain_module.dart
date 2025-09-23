@@ -56,6 +56,8 @@ import '../../../domain/usecases/saberes/actualizar_saber_usecase.dart';
 import '../../../domain/usecases/saberes/eliminar_saber_usecase.dart';
 import '../../../domain/usecases/saberes/moderar_saber_usecase.dart';
 import '../../../domain/usecases/saberes/obtener_saberes_usecase.dart';
+import '../../../domain/usecases/saberes/dar_like_saber_usecase.dart';
+import '../../../domain/usecases/saberes/registrar_compartido_saber_usecase.dart';
 
 // Casos de uso - Eventos Culturales
 import '../../../domain/usecases/eventos/crear_evento_usecase.dart';
@@ -201,6 +203,8 @@ class DomainModule {
           getIt<IUserRepository>(),
         ));
     getIt.registerFactory<ObtenerSaberesUseCase>(() => ObtenerSaberesUseCase(getIt<ISaberPopularRepository>()));
+    getIt.registerFactory<DarLikeSaberUseCase>(() => DarLikeSaberUseCase(getIt<ISaberPopularRepository>()));
+    getIt.registerFactory<RegistrarCompartidoSaberUseCase>(() => RegistrarCompartidoSaberUseCase(getIt<ISaberPopularRepository>()));
 
     // Eventos Culturales
     getIt.registerFactory<CrearEventoUseCase>(() => CrearEventoUseCase(
