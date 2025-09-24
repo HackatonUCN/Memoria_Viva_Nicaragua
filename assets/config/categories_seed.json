@@ -44,6 +44,61 @@
     "categoriaPadreId": null
   },
   {
+    "id": "evento_conciertos",
+    "nombre": "Conciertos",
+    "descripcion": "Eventos musicales y presentaciones artísticas",
+    "tipo": "evento",
+    "icono": "marimba",
+    "color": "#D81B60",
+    "orden": 2,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "evento_talleres",
+    "nombre": "Talleres",
+    "descripcion": "Talleres y actividades educativas culturales",
+    "tipo": "evento",
+    "icono": "artesania",
+    "color": "#8E24AA",
+    "orden": 3,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "evento_exposiciones",
+    "nombre": "Exposiciones",
+    "descripcion": "Exhibiciones de arte y cultura",
+    "tipo": "evento",
+    "icono": "camara",
+    "color": "#5E35B1",
+    "orden": 4,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "evento_gastronomia",
+    "nombre": "Gastronomía",
+    "descripcion": "Eventos culinarios y ferias gastronómicas",
+    "tipo": "evento",
+    "icono": "apple",
+    "color": "#FB8C00",
+    "orden": 5,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
+    "id": "evento_danza",
+    "nombre": "Danza",
+    "descripcion": "Presentaciones de baile tradicional y contemporáneo",
+    "tipo": "evento",
+    "icono": "gueguense",
+    "color": "#D81B60",
+    "orden": 6,
+    "activa": true,
+    "categoriaPadreId": null
+  },
+  {
     "id": "relato_leyendas_mitos",
     "nombre": "Leyendas y Mitos",
     "descripcion": "Relatos sobre leyendas, mitos y tradiciones orales",

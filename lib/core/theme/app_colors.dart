@@ -38,6 +38,14 @@ class AppColors {
   static const Color leyendaColor = Color(0xFF7E57C2);      // Leyenda: púrpura místico
   static const Color danzaColor = Color(0xFFD81B60);        // Danza: fucsia intenso
   static const Color musicaColor = Color(0xFF1E88E5);       // Música: azul vibrante
+  
+  // Colores para categorías de eventos
+  static const Color eventoFestividadesColor = Color(0xFFF57C00); // Festividades: naranja
+  static const Color eventoConciertosColor = Color(0xFFD81B60);   // Conciertos: magenta
+  static const Color eventoTalleresColor = Color(0xFF8E24AA);     // Talleres: púrpura
+  static const Color eventoExposicionesColor = Color(0xFF5E35B1); // Exposiciones: índigo
+  static const Color eventoGastronomiaColor = Color(0xFFFB8C00);  // Gastronomía: naranja ámbar
+  static const Color eventoDanzaColor = Color(0xFFD81B60);        // Danza: fucsia intenso
 
   // Colores para el modo oscuro
   static const Color darkBackground = Color(0xFF121212);
@@ -59,7 +67,12 @@ class AppColors {
     'relato_tradiciones': Color(0xFF2A9D8F),
     'relato_costumbres': Color(0xFFF4A261),
     'saber_recetas': Color(0xFFFF7043),
-    'evento_festividades': Color(0xFFF57C00),
+    'evento_festividades': eventoFestividadesColor,
+    'evento_conciertos': eventoConciertosColor,
+    'evento_talleres': eventoTalleresColor,
+    'evento_exposiciones': eventoExposicionesColor,
+    'evento_gastronomia': eventoGastronomiaColor,
+    'evento_danza': eventoDanzaColor,
     'relato_leyendas_mitos': Color(0xFF7E57C2),
     'relato_historia_oral': Color(0xFFDAA520),
     'relato_personajes': Color(0xFF8D6E63),

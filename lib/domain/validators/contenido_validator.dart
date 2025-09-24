@@ -10,6 +10,7 @@ class ContenidoValidator {
   static const int MIN_TITULO_LENGTH = 5;
   static const int MAX_TITULO_LENGTH = 100;
   static const int MIN_DESCRIPCION_LENGTH = 20;
+  static const int MIN_EVENTO_DESCRIPCION_LENGTH = 10; // Menor para eventos
   static const int MAX_DESCRIPCION_LENGTH = 5000;
   static const int MAX_IMAGENES = 10;
   static const int MAX_VIDEOS = 3;
@@ -100,8 +101,8 @@ class ContenidoValidator {
       errores.add('El nombre debe tener entre $MIN_TITULO_LENGTH y $MAX_TITULO_LENGTH caracteres');
     }
 
-    if (evento.descripcion.length < MIN_DESCRIPCION_LENGTH || evento.descripcion.length > MAX_DESCRIPCION_LENGTH) {
-      errores.add('La descripción debe tener entre $MIN_DESCRIPCION_LENGTH y $MAX_DESCRIPCION_LENGTH caracteres');
+    if (evento.descripcion.length < MIN_EVENTO_DESCRIPCION_LENGTH || evento.descripcion.length > MAX_DESCRIPCION_LENGTH) {
+      errores.add('La descripción debe tener entre $MIN_EVENTO_DESCRIPCION_LENGTH y $MAX_DESCRIPCION_LENGTH caracteres');
     }
 
     try {
@@ -133,8 +134,8 @@ class ContenidoValidator {
       errores.add('El nombre debe tener entre $MIN_TITULO_LENGTH y $MAX_TITULO_LENGTH caracteres');
     }
 
-    if (sugerencia.descripcion.length < MIN_DESCRIPCION_LENGTH || sugerencia.descripcion.length > MAX_DESCRIPCION_LENGTH) {
-      errores.add('La descripción debe tener entre $MIN_DESCRIPCION_LENGTH y $MAX_DESCRIPCION_LENGTH caracteres');
+    if (sugerencia.descripcion.length < MIN_EVENTO_DESCRIPCION_LENGTH || sugerencia.descripcion.length > MAX_DESCRIPCION_LENGTH) {
+      errores.add('La descripción debe tener entre $MIN_EVENTO_DESCRIPCION_LENGTH y $MAX_DESCRIPCION_LENGTH caracteres');
     }
 
     try {

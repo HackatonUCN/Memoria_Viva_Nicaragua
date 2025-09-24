@@ -18,6 +18,8 @@ import 'presentation/providers/media_playback_provider.dart';
 import 'config/app_router.dart';
 import 'package:url_strategy/url_strategy.dart';
 import 'core/services/deep_link_service.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +40,10 @@ void main() async {
 
   // Inicializar ScreenUtil para diseño responsive
   await ScreenUtil.ensureScreenSize();
+  // Inicializar datos de localización para formatos de fecha (e.g., es_ES)
+  try {
+    await initializeDateFormatting('es_ES');
+  } catch (_) {}
   runApp(const MyApp());
 }
 
@@ -74,6 +80,16 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.light,
             debugShowCheckedModeBanner: false,
+            locale: const Locale('es', 'ES'),
+            supportedLocales: const [
+              Locale('es', 'ES'),
+              Locale('en', 'US'),
+            ],
+            localizationsDelegates: [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
             // Registramos el observador de rutas para controlar las animaciones
             navigatorObservers: [LoginScreen.routeObserver],
             navigatorKey: AppRouter.navigatorKey,

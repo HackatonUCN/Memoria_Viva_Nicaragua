@@ -1,32 +1,47 @@
 rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
+                                        service cloud.firestore {
+                                          match /databases/{database}/documents {
 
-    // =============================
-    // Helper functions
-    // =============================
-    function isSignedIn() {
-      return request.auth != null;
-    }
+                                            // =============================
+                                            // Helper functions
+                                            // =============================
+                                            function isSignedIn() {
+                                              return request.auth != null;
+                                            }
 
-    function userId() {
-      return request.auth != null ? request.auth.uid : null;
-    }
+                                            function userId() {
+                                              return request.auth != null ? request.auth.uid : null;
+                                            }
 
-    // Role checks use custom auth claims to avoid recursive reads.
-    // Supported formats:
-    // - request.auth.token.admin == true
-    // - request.auth.token.role == 'admin'
-    // - request.auth.token.roles.admin == true
-    function hasRole(role) {
-      return isSignedIn() && (
-        request.auth.token[role] == true ||
-        (request.auth.token.roles != null && request.auth.token.roles[role] == true) ||
+                                            // Role checks use custom auth claims to avoid recursive reads.
+                                            // Supported formats:
+                                            // - request.auth.token.admin == true
+                                            // - request.auth.token.role == 'admin'
+                                            // - request.auth.token.roles.admin == true
+                                            function hasRole(role) {
+                                              return isSignedIn() && (
+                                                request.auth.token[role] == true ||
+                                                (request.auth.token.roles != null && request.auth.token.roles[role] == true) ||
         request.auth.token.role == role
       );
     }
 
-    function isAdmin() { return hasRole('admin'); }
+    function isAdmin() {
+      return hasRole('admin') || (
+        isSignedIn() && (
+          (
+            exists(/databases/$(database)/documents/users/$(userId())) &&
+            get(/databases/$(database)/documents/users/$(userId())).data.rol == 'admin'
+          ) || (
+            exists(/databases/$(database)/documents/usuarios/$(userId())) &&
+            get(/databases/$(database)/documents/usuarios/$(userId())).data.rol == 'admin'
+          ) || (
+            exists(/databases/$(database)/documents/users/$(userId())) &&
+            get(/databases/$(database)/documents/users/$(userId())).data.esAdmin == true
+          )
+        )
+      );
+    }
     function isVerificador() { return hasRole('verificador'); }
 
     function isOwnerBy(field, data) {
@@ -201,11 +216,12 @@ service cloud.firestore {
     // categorias collection (lectura pública)
     // =============================
     match /categorias/{categoriaId} {
-      // Permite lectura pública de categorías activas
-      allow read: if resource.data != null && (resource.data.activa == true || resource.data.activa == null);
-      // TEMP MIGRATION: permitir crear/actualizar categorías a cualquier usuario autenticado (incluye anónimo)
-      // IMPORTANTE: Revertir tras la migración para endurecer seguridad
-      allow create, update: if isSignedIn();
+      // Permite lectura por id (get) para migraciones y usos directos
+      allow get: if true;
+      // Listado/queries públicas sólo de categorías activas
+      allow list: if resource.data != null && (resource.data.activa == true || resource.data.activa == null);
+      // Escrituras solo para administradores
+      allow create, update: if isAdmin();
       // Eliminar sigue restringido a administradores
       allow delete: if isAdmin();
     }

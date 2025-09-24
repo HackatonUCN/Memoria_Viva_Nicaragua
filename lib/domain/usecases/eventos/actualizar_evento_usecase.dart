@@ -151,7 +151,7 @@ class ActualizarEventoUseCase {
         fechaActualizacion: DateTime.now(),
         eliminado: evento.eliminado,
         fechaEliminacion: evento.fechaEliminacion,
-        creadoPorNombre: '',
+        creadoPorNombre: evento.creadoPorNombre,
       );
 
       await _eventoRepository.actualizarEvento(eventoActualizado);

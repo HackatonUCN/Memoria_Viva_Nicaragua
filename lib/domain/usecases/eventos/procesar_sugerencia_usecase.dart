@@ -1,4 +1,3 @@
-import '../../entities/evento_cultural.dart';
 import '../../enums/roles_usuario.dart';
 import '../../exceptions/evento_exception.dart';
 import '../../repositories/evento_cultural_repository.dart';
@@ -59,27 +58,7 @@ class ProcesarSugerenciaUseCase {
       }
 
       if (aprobar) {
-        // Crear el evento oficial
-        final evento = EventoCultural.crear(
-          nombre: sugerencia.nombre,
-          descripcion: sugerencia.descripcion,
-          categoriaId: sugerencia.categoriaId,
-          categoriaNombre: sugerencia.categoriaNombre,
-          tipo: sugerencia.tipo,
-          ubicacion: sugerencia.ubicacion,
-          fechaInicio: sugerencia.fechaInicio,
-          fechaFin: sugerencia.fechaFin,
-          esRecurrente: sugerencia.esRecurrente,
-          frecuencia: sugerencia.frecuencia,
-          organizador: sugerencia.organizador,
-          contacto: sugerencia.contacto,
-          imagenes: sugerencia.imagenes,
-          creadoPorId: adminId,
-          creadoPorNombre: admin!.nombre,
-        );
-
-        // Guardar evento y actualizar sugerencia
-        await _eventoRepository.guardarEvento(evento);
+        // Aprobar sugerencia (esto crea el evento y actualiza la sugerencia en una transacción)
         await _eventoRepository.aprobarSugerencia(
           sugerenciaId: sugerenciaId,
           adminId: adminId,

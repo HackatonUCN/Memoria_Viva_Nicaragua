@@ -12,6 +12,10 @@ import '../usecases/eventos/obtener_eventos_usecase.dart';
 import '../usecases/eventos/buscar_eventos_usecase.dart';
 import '../usecases/eventos/crear_sugerencia_usecase.dart';
 import '../usecases/eventos/procesar_sugerencia_usecase.dart';
+import '../usecases/eventos/obtener_sugerencias_pendientes_usecase.dart';
+import '../usecases/eventos/obtener_eventos_carrusel_por_categoria_usecase.dart';
+import '../usecases/eventos/obtener_eventos_por_rango_y_busqueda_usecase.dart';
+import '../usecases/eventos/obtener_marcadores_por_mes_usecase.dart';
 
 /// Factory para construir casos de uso relacionados con Eventos Culturales
 class EventoUseCaseFactory {
@@ -64,6 +68,19 @@ class EventoUseCaseFactory {
         _eventoRepository,
         _userRepository,
       );
+
+  ObtenerSugerenciasPendientesUseCase get obtenerSugerenciasPendientes =>
+      ObtenerSugerenciasPendientesUseCase(_eventoRepository);
+
+  // Nuevos casos de uso (segmentación por componente)
+  ObtenerEventosCarruselPorCategoriaUseCase get carruselPorCategoria =>
+      ObtenerEventosCarruselPorCategoriaUseCase(_eventoRepository);
+
+  ObtenerEventosPorRangoYBusquedaUseCase get porRangoYBusqueda =>
+      ObtenerEventosPorRangoYBusquedaUseCase(_eventoRepository);
+
+  ObtenerMarcadoresPorMesUseCase get marcadoresPorMes =>
+      ObtenerMarcadoresPorMesUseCase(_eventoRepository);
 }
 
 
