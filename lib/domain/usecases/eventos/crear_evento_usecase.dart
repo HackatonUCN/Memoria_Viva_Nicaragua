@@ -78,9 +78,7 @@ class CrearEventoUseCase {
       if (fechaInicio.isAfter(fechaFin)) {
         throw EventoInvalidDateException.fechaInicioMayorQueFin();
       }
-      if (fechaInicio.isBefore(DateTime.now()) && !esRecurrente) {
-        throw EventoInvalidDateException.fechaPasada();
-      }
+      // Permitimos fechas pasadas para administradores al crear eventos
 
       // Verificar si ya existe un evento similar
       final eventosExistentes = await _eventoRepository.buscarEventos(nombre);
