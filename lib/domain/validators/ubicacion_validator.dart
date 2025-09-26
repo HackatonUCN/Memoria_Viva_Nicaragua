@@ -19,18 +19,28 @@ class UbicacionValidator {
 
   /// Verifica si un municipio pertenece al departamento especificado
   bool municipioPerteneceADepartamento(String municipio, String departamento) {
-    // Normalizar a minúsculas para comparación
-    final depNormalizado = departamento.toLowerCase();
-    final munNormalizado = municipio.toLowerCase();
-    
-    // Usar el mapa definido en enums/departamentos.dart
-    final municipiosDelDepartamento = municipiosPorDepartamento[depNormalizado];
+    // Canonicalizar y normalizar
+    final String depCanonico = canonicalizarDepartamento(departamento);
+    final municipiosDelDepartamento = municipiosPorDepartamento[depCanonico];
     if (municipiosDelDepartamento == null) return false;
-    
-    // Comparar en minúsculas
-    return municipiosDelDepartamento
-        .map((m) => m.toLowerCase())
-        .contains(munNormalizado);
+
+    // Tabla de alias de municipio por departamento
+    final aliasDepto = municipioAliasPorDepartamento[depCanonico] ?? const {};
+
+    // Normalizar entrada del usuario
+    final String munNorm = normalizeTexto(municipio);
+
+    // Intentar resolver alias
+    final String? aliasMatch = aliasDepto[munNorm];
+    if (aliasMatch != null) {
+      return municipiosDelDepartamento.contains(aliasMatch);
+    }
+
+    // Comparar por normalización laxa contra la lista oficial
+    for (final oficial in municipiosDelDepartamento) {
+      if (normalizeTexto(oficial) == munNorm) return true;
+    }
+    return false;
   }
 
   /// Valida una ubicación completa y retorna errores o lanza excepciones
@@ -64,9 +74,11 @@ class UbicacionValidator {
   
   /// Valida departamento y lanza excepción si es inválido
   void validarDepartamento(String departamento) {
-    final departamentosNicaragua = Departamento.values.map((d) => d.nombre).toList();
-    
-    if (!departamentosNicaragua.any((d) => d.toLowerCase() == departamento.toLowerCase())) {
+    // Aceptar alias
+    final String depCanonico = canonicalizarDepartamento(departamento);
+    // Revisar contra los nombres del enum (propiedad `nombre`)
+    final departamentosNicaragua = Departamento.values.map((d) => d.nombre.toLowerCase()).toList();
+    if (!departamentosNicaragua.contains(depCanonico)) {
       throw UbicacionInvalidaException.departamentoInvalido(
         departamento: departamento,
       );

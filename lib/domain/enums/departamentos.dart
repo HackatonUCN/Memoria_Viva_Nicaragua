@@ -225,3 +225,86 @@ const municipiosPorDepartamento = {
     'Paiwas',
   ],
 };
+
+/// Mapa de alias -> clave canónica usada en [municipiosPorDepartamento]
+/// Permite aceptar nombres alternos como "Costa Caribe Norte" (RACCN) y
+/// "Costa Caribe Sur" (RACCS), así como variantes históricas (RAAN/RAAS).
+const Map<String, String> _departamentoAlias = {
+  // Costa Caribe Norte (RACCN)
+  'costa caribe norte': 'raccn',
+  'región autónoma de la costa caribe norte': 'raccn',
+  'region autonoma de la costa caribe norte': 'raccn',
+  'raacn': 'raccn',
+  'raan': 'raccn', // denominación histórica
+
+  // Costa Caribe Sur (RACCS)
+  'costa caribe sur': 'raccs',
+  'región autónoma de la costa caribe sur': 'raccs',
+  'region autonoma de la costa caribe sur': 'raccs',
+  'raacs': 'raccs',
+  'raas': 'raccs', // denominación histórica
+};
+
+/// Devuelve una clave canónica en minúsculas para un nombre de departamento.
+/// Si existe un alias mapeado (p. ej., "Costa Caribe Norte"), retorna
+/// la clave compatible con [municipiosPorDepartamento] (p. ej., "raccn").
+/// En otro caso, retorna el nombre en minúsculas trim.
+String canonicalizarDepartamento(String nombre) {
+  final String lower = nombre.toLowerCase().trim();
+  return _departamentoAlias[lower] ?? lower;
+}
+
+/// Intenta resolver un [Departamento] desde texto, aceptando alias.
+Departamento? tryDepartamentoFromString(String nombre) {
+  final String canon = canonicalizarDepartamento(nombre);
+  // Coincidir contra `nombre` del enum (por ejemplo, 'RACCN' -> 'raccn')
+  for (final d in Departamento.values) {
+    if (d.nombre.toLowerCase() == canon) return d;
+  }
+  return null;
+}
+
+/// Normaliza texto para comparaciones laxas: minúsculas, sin tildes,
+/// sin contenido entre paréntesis y espacios colapsados.
+String normalizeTexto(String input) {
+  String out = input.toLowerCase().trim();
+  // Eliminar contenido entre paréntesis para permitir 'Puerto Cabezas'
+  // vs 'Puerto Cabezas (Bilwi)'
+  int open = out.indexOf('(');
+  if (open != -1) {
+    out = out.substring(0, open).trim();
+  }
+  // Reemplazar tildes y caracteres comunes en español
+  const Map<String, String> repl = {
+    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u',
+    'à': 'a', 'è': 'e', 'ì': 'i', 'ò': 'o', 'ù': 'u',
+    'ä': 'a', 'ë': 'e', 'ï': 'i', 'ö': 'o', 'ñ': 'n',
+  };
+  final StringBuffer buf = StringBuffer();
+  for (final ch in out.split('')) {
+    buf.write(repl[ch] ?? ch);
+  }
+  out = buf.toString();
+  // Colapsar espacios múltiples
+  out = out.replaceAll(RegExp(r'\s+'), ' ');
+  return out;
+}
+
+/// Alias de municipios por departamento (clave canónica)
+const Map<String, Map<String, String>> municipioAliasPorDepartamento = {
+  'raccn': {
+    // Waspán / Waspan -> Waspam (grafías frecuentes)
+    'waspan': 'Waspam',
+    'waspam': 'Waspam',
+    'waspan ': 'Waspam',
+    'wasp an': 'Waspam',
+    'waspan (bilwi)': 'Waspam',
+    // Bilwi / Puerto Cabezas
+    'bilwi': 'Puerto Cabezas (Bilwi)',
+    'puerto cabezas': 'Puerto Cabezas (Bilwi)',
+  },
+  'raccs': {
+    'corn island': 'Corn Island (Islas del Maíz)',
+    'islas del maiz': 'Corn Island (Islas del Maíz)',
+  },
+};
