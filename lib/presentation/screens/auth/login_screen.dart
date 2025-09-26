@@ -33,14 +33,14 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
   bool _isLoading = false;
   String? _errorMessage;
   bool _passwordObscured = true;
-  
+
   // Clave para forzar la reconstrucción de las animaciones (fade y background)
   Key _animationKey = UniqueKey();
   // Clave adicional para reiniciar el subárbol de contenido (FadeAnimation)
   Key _contentAnimationKey = UniqueKey();
   // Versión para re-crear instancias específicas de FadeAnimation
   int _animVersion = 0;
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
       LoginScreen.routeObserver.subscribe(this, route);
     }
   }
-  
+
   @override
   void didPopNext() {
     // Cuando regresamos a esta pantalla (por ejemplo, desde register)
@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
     });
     super.didPopNext();
   }
-  
+
   @override
   void dispose() {
     LoginScreen.routeObserver.unsubscribe(this);
@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
       }
     }
   }
-  
+
   // Iniciar sesión con Google
   Future<void> _signInWithGoogle() async {
     setState(() {
@@ -183,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.resetPassword(_emailController.text.trim());
-      
+
       // Mostrar mensaje de éxito
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -256,274 +256,274 @@ class _LoginScreenState extends State<LoginScreen> with RouteAware {
     }
 
     return Scaffold(
-      body: AuthBackground(
-        // Clave en el background para re-crear su estado y animación al volver
-        key: _animationKey,
-        child: SingleChildScrollView(
-          // Clave para forzar re-creación de FadeAnimation en los controles
-          key: _contentAnimationKey,
-          child: Form(
-            key: _formKey,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                vertical: isWeb ? 20.0 : 16.0,
-                horizontal: isWeb ? 20.0 : 0.0,
-              ),
-              child: Container(
-                // Quitamos el ConstrainedBox para que se adapte al contenido
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisAlignment: isWeb ? MainAxisAlignment.center : MainAxisAlignment.start,
-                  children: [
-                    SizedBox(height: isWeb ? 0 : 16),
-                  
-                                    // Logo
-                  FadeAnimation(
-                    delay: 0.2,
-                    child: Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final screen = MediaQuery.of(context).size;
-                          final circle = (screen.width * 0.22).clamp(72.0, 160.0).toDouble();
-                          return Container(
-                            width: circle,
-                            height: circle,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.primary.withOpacity(0.12),
-                            ),
-                            child: Center(
-                              child: SvgPicture.asset(
-                                'assets/icons/logotipo (iniciales).svg',
-                                width: circle * 0.72,
-                                height: circle * 0.72,
-                                fit: BoxFit.contain,
-                                semanticsLabel: 'Logotipo iniciales',
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-              
-              SizedBox(height: isWeb ? 20 : 32),
-                  
-                  // Título
-                  FadeAnimation(
-                    delay: 0.4,
-                    child: Text(
-                      'Bienvenido',
-                      style: AppTypography.textTheme.displaySmall,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Subtítulo
-                  FadeAnimation(
-                    delay: 0.6,
-                    child: Text(
-                      'Inicia sesión para continuar',
-                      style: AppTypography.textTheme.titleMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  
-                  SizedBox(height: isWeb ? 16 : 32),
-                  
-                  // Mensaje de error
-                  if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(color: Colors.red.shade800),
-                      ),
-                    ),
-                  
-                  // Campos de texto
-                  FadeAnimation(
-                    delay: 0.8,
-                    key: ValueKey('fade_email_\${_animVersion}'),
-                    child: CustomTextField(
-                      controller: _emailController,
-                      hintText: 'Correo electrónico',
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      validator: _validateEmail,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  FadeAnimation(
-                    delay: 1.0,
-                    key: ValueKey('fade_password_\${_animVersion}'),
-                    child: CustomTextField(
-                      controller: _passwordController,
-                      hintText: 'Contraseña',
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: _passwordObscured,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _signInWithEmailAndPassword(),
-                      suffixIcon: Semantics(
-                        label: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                        button: true,
-                        child: IconButton(
-                          tooltip: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
-                          icon: Icon(_passwordObscured ? Icons.visibility_off : Icons.visibility),
-                          color: AppColors.textSecondary,
-                          onPressed: () {
-                            setState(() {
-                              _passwordObscured = !_passwordObscured;
-                            });
-                          },
+        body: AuthBackground(
+          // Clave en el background para re-crear su estado y animación al volver
+          key: _animationKey,
+          child: SingleChildScrollView(
+            // Clave para forzar re-creación de FadeAnimation en los controles
+            key: _contentAnimationKey,
+            child: Form(
+              key: _formKey,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: isWeb ? 20.0 : 16.0,
+                  horizontal: isWeb ? 20.0 : 0.0,
+                ),
+                child: Container(
+                  // Quitamos el ConstrainedBox para que se adapte al contenido
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: isWeb ? MainAxisAlignment.center : MainAxisAlignment.start,
+                    children: [
+                      SizedBox(height: isWeb ? 0 : 16),
+
+                      // Logo
+                      FadeAnimation(
+                        delay: 0.2,
+                        child: Center(
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final screen = MediaQuery.of(context).size;
+                              final circle = (screen.width * 0.18).clamp(64.0, 140.0).toDouble();
+                              return Container(
+                                width: circle,
+                                height: circle,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primary.withOpacity(0.12),
+                                ),
+                                child: Center(
+                                  child: SvgPicture.asset(
+                                    'assets/icons/logo (solo icono).svg',
+                                    width: circle * 0.75,
+                                    height: circle * 0.75,
+                                    fit: BoxFit.contain,
+                                    semanticsLabel: 'Logotipo iniciales',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                      validator: _validatePassword,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Botón de inicio de sesión
-                  FadeAnimation(
-                    delay: 1.2,
-                    child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : AnimatedButton(
+
+                      SizedBox(height: isWeb ? 20 : 32),
+
+                      // Título
+                      FadeAnimation(
+                        delay: 0.4,
+                        child: Text(
+                          'Bienvenido',
+                          style: AppTypography.textTheme.displaySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Subtítulo
+                      FadeAnimation(
+                        delay: 0.6,
+                        child: Text(
+                          'Inicia sesión para continuar',
+                          style: AppTypography.textTheme.titleMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                      SizedBox(height: isWeb ? 16 : 32),
+
+                      // Mensaje de error
+                      if (_errorMessage != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(color: Colors.red.shade800),
+                          ),
+                        ),
+
+                      // Campos de texto
+                      FadeAnimation(
+                        delay: 0.8,
+                        key: ValueKey('fade_email_\${_animVersion}'),
+                        child: CustomTextField(
+                          controller: _emailController,
+                          hintText: 'Correo electrónico',
+                          prefixIcon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          validator: _validateEmail,
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      FadeAnimation(
+                        delay: 1.0,
+                        key: ValueKey('fade_password_\${_animVersion}'),
+                        child: CustomTextField(
+                          controller: _passwordController,
+                          hintText: 'Contraseña',
+                          prefixIcon: Icons.lock_outline,
+                          obscureText: _passwordObscured,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _signInWithEmailAndPassword(),
+                          suffixIcon: Semantics(
+                            label: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                            button: true,
+                            child: IconButton(
+                              tooltip: _passwordObscured ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                              icon: Icon(_passwordObscured ? Icons.visibility_off : Icons.visibility),
+                              color: AppColors.textSecondary,
+                              onPressed: () {
+                                setState(() {
+                                  _passwordObscured = !_passwordObscured;
+                                });
+                              },
+                            ),
+                          ),
+                          validator: _validatePassword,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Botón de inicio de sesión
+                      FadeAnimation(
+                        delay: 1.2,
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : AnimatedButton(
                           text: 'Iniciar Sesión',
                           onPressed: _signInWithEmailAndPassword,
                         ),
-                  ),
-                      
-                  // Olvidé mi contraseña
-                  FadeAnimation(
-                    delay: 1.4,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _resetPassword,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          ),
-                          child: Text(
-                            '¿Olvidaste tu contraseña?',
-                            style: TextStyle(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                      ),
+
+                      // Olvidé mi contraseña
+                      FadeAnimation(
+                        delay: 1.4,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _resetPassword,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              ),
+                              child: Text(
+                                '¿Olvidaste tu contraseña?',
+                                style: TextStyle(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                      
-                  const SizedBox(height: 24),
-                      
-                  // Separador
-                  FadeAnimation(
-                    delay: 1.6,
-                    child: Row(
-                      children: [
-                        Expanded(child: Divider(color: AppColors.textSecondary.withOpacity(0.3))),
-                        Padding(
-                          padding: AppSpacing.marginHorizontalMd,
+
+                      const SizedBox(height: 24),
+
+                      // Separador
+                      FadeAnimation(
+                        delay: 1.6,
+                        child: Row(
+                          children: [
+                            Expanded(child: Divider(color: AppColors.textSecondary.withOpacity(0.3))),
+                            Padding(
+                              padding: AppSpacing.marginHorizontalMd,
+                              child: Text(
+                                'O continúa con',
+                                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                            Expanded(child: Divider(color: AppColors.textSecondary.withOpacity(0.3))),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Botón de Google
+                      FadeAnimation(
+                        delay: 1.8,
+                        child: Center(
+                          child: SocialLoginButton(
+                            icon: AppIcons.google,
+                            onPressed: () => _signInWithGoogle(),
+                          ),
+                        ),
+                      ),
+
+                      SizedBox(height: isWeb ? 16 : 24),
+
+                      // Botón de invitado
+                      FadeAnimation(
+                        delay: 2.0,
+                        child: TextButton(
+                          onPressed: () => _signInAnonymously(),
                           child: Text(
-                            'O continúa con',
-                            style: AppTypography.textTheme.bodyMedium?.copyWith(
+                            'Continuar como invitado',
+                            style: AppTypography.textTheme.labelLarge?.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(color: AppColors.textSecondary.withOpacity(0.3))),
-                      ],
-                    ),
-                  ),
-                      
-                  const SizedBox(height: 24),
-                      
-                  // Botón de Google
-                  FadeAnimation(
-                    delay: 1.8,
-                    child: Center(
-                      child: SocialLoginButton(
-                        icon: AppIcons.google,
-                        onPressed: () => _signInWithGoogle(),
                       ),
-                    ),
-                  ),
-                      
-                  SizedBox(height: isWeb ? 16 : 24),
-                      
-                  // Botón de invitado
-                  FadeAnimation(
-                    delay: 2.0,
-                    child: TextButton(
-                      onPressed: () => _signInAnonymously(),
-                      child: Text(
-                        'Continuar como invitado',
-                        style: AppTypography.textTheme.labelLarge?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                      
-                  const SizedBox(height: 16),
-                      
-                  // Link de registro
-                  FadeAnimation(
-                    delay: 2.2,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '¿No tienes una cuenta? ',
-                          style: AppTypography.textTheme.bodyMedium,
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'Regístrate',
-                            style: AppTypography.textTheme.labelLarge?.copyWith(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.bold,
+
+                      const SizedBox(height: 16),
+
+                      // Link de registro
+                      FadeAnimation(
+                        delay: 2.2,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '¿No tienes una cuenta? ',
+                              style: AppTypography.textTheme.bodyMedium,
                             ),
-                          ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const RegisterScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Regístrate',
+                                style: AppTypography.textTheme.labelLarge?.copyWith(
+                                  color: AppColors.accent,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
-      ));
+        ));
   }
 }
