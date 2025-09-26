@@ -19,9 +19,11 @@ import '../../providers/media_playback_provider.dart';
 
 class EventoDetailOverlay extends StatelessWidget {
   final EventoCultural evento;
-  const EventoDetailOverlay({super.key, required this.evento});
+  final String? heroTag;
+  final String? heroMatchUrl;
+  const EventoDetailOverlay({super.key, required this.evento, this.heroTag, this.heroMatchUrl});
 
-  static Future<void> open(BuildContext context, EventoCultural? evento, {String? eventoId}) async {
+  static Future<void> open(BuildContext context, EventoCultural? evento, {String? eventoId, String? heroTag, String? heroMatchUrl}) async {
     // Antes de abrir: pausar reproducción en cards
     try {
       final media = context.read<MediaPlaybackProvider>();
@@ -55,7 +57,7 @@ class EventoDetailOverlay extends StatelessWidget {
       barrierColor: AppColors.withOpacity(AppColors.primaryDark, 0.45),
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final content = _FadeIn(child: _OverlayScaffold(evento: evento, eventoId: eventoId));
+        final content = _FadeIn(child: _OverlayScaffold(evento: evento, eventoId: eventoId, heroTag: heroTag, heroMatchUrl: heroMatchUrl));
         if (eventosProvider != null) {
           // Inyectar el EventosProvider existente
           return ChangeNotifierProvider<EventosProvider>.value(
@@ -75,7 +77,9 @@ class EventoDetailOverlay extends StatelessWidget {
 class _OverlayScaffold extends StatelessWidget {
   final EventoCultural? evento;
   final String? eventoId;
-  const _OverlayScaffold({required this.evento, this.eventoId});
+  final String? heroTag;
+  final String? heroMatchUrl;
+  const _OverlayScaffold({required this.evento, this.eventoId, this.heroTag, this.heroMatchUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +101,7 @@ class _OverlayScaffold extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                child: _DetailContent(evento: evento, eventoId: eventoId, controller: controller),
+                child: _DetailContent(evento: evento, eventoId: eventoId, controller: controller, heroTag: heroTag, heroMatchUrl: heroMatchUrl),
               ),
             ),
           ),
@@ -154,7 +158,9 @@ class _DetailContent extends StatelessWidget {
   final EventoCultural? evento;
   final String? eventoId;
   final ScrollController controller;
-  const _DetailContent({required this.evento, this.eventoId, required this.controller});
+  final String? heroTag;
+  final String? heroMatchUrl;
+  const _DetailContent({required this.evento, this.eventoId, required this.controller, this.heroTag, this.heroMatchUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +195,7 @@ class _DetailContent extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: _MediaCarousel(multimedia: e.imagenes),
+              child: _MediaCarousel(multimedia: e.imagenes, heroTag: heroTag, heroMatchUrl: heroMatchUrl),
             ),
           ),
         
@@ -560,7 +566,9 @@ class _DetailContent extends StatelessWidget {
 
 class _MediaCarousel extends StatefulWidget {
   final List<Multimedia> multimedia;
-  const _MediaCarousel({super.key, required this.multimedia});
+  final String? heroTag;
+  final String? heroMatchUrl;
+  const _MediaCarousel({super.key, required this.multimedia, this.heroTag, this.heroMatchUrl});
 
   @override
   State<_MediaCarousel> createState() => _MediaCarouselState();
@@ -598,7 +606,7 @@ class _MediaCarouselState extends State<_MediaCarousel> {
                 physics: const PageScrollPhysics(),
                 onPageChanged: (i) => setState(() => _index = i),
                 itemCount: widget.multimedia.length,
-                itemBuilder: (ctx, i) => _buildMedia(ctx, widget.multimedia[i]),
+                itemBuilder: (ctx, i) => _buildMedia(ctx, widget.multimedia[i], i),
               ),
               // Controles de navegación
               if (widget.multimedia.length > 1) ...[
@@ -671,7 +679,7 @@ class _MediaCarouselState extends State<_MediaCarousel> {
         ),
       );
 
-  Widget _buildMedia(BuildContext context, Multimedia m) {
+  Widget _buildMedia(BuildContext context, Multimedia m, int position) {
     switch (m.tipo) {
       case TipoMultimedia.imagen:
         return Padding(
@@ -679,7 +687,9 @@ class _MediaCarouselState extends State<_MediaCarousel> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Hero(
-              tag: 'evento_media_${m.url}',
+              tag: widget.heroMatchUrl != null && widget.heroTag != null && widget.heroMatchUrl == m.url
+                  ? widget.heroTag!
+                  : 'evento_media_detail_${m.url}',
               child: InteractiveViewer(
                 minScale: 0.9,
                 maxScale: 4.0,

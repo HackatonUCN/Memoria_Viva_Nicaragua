@@ -46,7 +46,7 @@ class EventoSquareCard extends StatelessWidget {
             children: [
               if (image != null)
                 Hero(
-                  tag: 'evento_media_$image',
+                  tag: 'evento_media_square_${evento.id}_0',
                   child: CachedNetworkImage(imageUrl: image, fit: BoxFit.cover),
                 )
               else
