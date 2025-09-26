@@ -10,6 +10,7 @@ import '../../domain/enums/estado_moderacion.dart';
 import '../../domain/exceptions/saber_exception.dart';
 import '../../domain/repositories/saber_popular_repository.dart';
 import '../../domain/value_objects/ubicacion.dart';
+import '../../domain/enums/departamentos.dart';
 import '../../domain/value_objects/multimedia.dart';
 import '../../domain/aggregates/saber_popular_aggregate.dart';
 import '../datasources/firestore_datasource.dart';
@@ -452,8 +453,8 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
         return [];
       }
       
-      // Realizar búsqueda por título
-      final saberesPorTitulo = await _firestoreDataSource.query(
+      // Traer candidatos (activos y no eliminados)
+      final candidatos = await _firestoreDataSource.query(
         filters: {
           'eliminado': false,
           'estado': EstadoModeracion.activo.value,
@@ -462,14 +463,21 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
         descending: true,
       );
       
-      // Filtrar resultados que contengan las palabras clave en el título o contenido
-      final resultados = saberesPorTitulo.where((saber) {
-        final tituloLower = saber.titulo.toLowerCase();
-        final contenidoLower = saber.contenido.toLowerCase();
+      // Filtrar resultados que contengan keywords en título, contenido, etiquetas o nombre/id de categoría
+      final resultados = candidatos.where((saber) {
+        final String tituloLower = saber.titulo.toLowerCase();
+        final String contenidoLower = saber.contenido.toLowerCase();
+        final List<String> etiquetasLower = (saber.etiquetas).map((e) => e.toLowerCase()).toList();
+        final String catNombreLower = (saber.categoriaNombre).toLowerCase();
+        final String catIdLower = (saber.categoriaId).toLowerCase();
         
-        // Verificar si alguna palabra clave está en el título o contenido
-        return keywords.any((keyword) => 
-          tituloLower.contains(keyword) || contenidoLower.contains(keyword));
+        return keywords.any((k) =>
+          tituloLower.contains(k) ||
+          contenidoLower.contains(k) ||
+          etiquetasLower.any((et) => et.contains(k)) ||
+          catNombreLower.contains(k) ||
+          catIdLower.contains(k)
+        );
       }).toList();
       
       // Convertir a entidades de dominio
@@ -540,25 +548,10 @@ class SaberPopularRepositoryImpl implements ISaberPopularRepository {
       throw SaberLocationException.coordenadasInvalidas();
     }
     
-    // Validar que el departamento sea válido
-    // Se aceptan nombres oficiales, aliases y el valor 'Nacional' (ubicación nacional por defecto)
-    final Set<String> departamentosValidos = {
-      // Ubicación nacional y alias comunes
-      'Nacional', 'Nicaragua',
-      // Departamentos
-      'Boaco', 'Carazo', 'Chinandega', 'Chontales', 'Estelí',
-      'Granada', 'Jinotega', 'León', 'Madriz', 'Managua',
-      'Masaya', 'Matagalpa', 'Nueva Segovia', 'Río San Juan',
-      'Rivas',
-      // Regiones autónomas (nombres completos y siglas históricas)
-      'Región Autónoma de la Costa Caribe Norte',
-      'Región Autónoma de la Costa Caribe Sur',
-      'RAAN', 'RAAS',
-    };
-
+    // Validar que el departamento sea válido (aceptando alias y siglas RACCN/RACCS)
     if (ubicacion.departamento != null) {
       final String dep = ubicacion.departamento!;
-      final bool valido = departamentosValidos.contains(dep) || departamentosValidos.contains(dep.trim());
+      final bool valido = tryDepartamentoFromString(dep) != null || dep.trim().toLowerCase() == 'nicaragua';
       if (!valido) {
         throw SaberLocationException(
           'El departamento ${ubicacion.departamento} no es válido en Nicaragua',
