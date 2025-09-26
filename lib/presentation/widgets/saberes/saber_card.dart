@@ -10,6 +10,10 @@ import '../../../core/theme/app_spacing.dart';
 import '../common/cultural_icon.dart';
 import '../../../core/constants/app_icons.dart';
 import '../../../utils/date_formatter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../utils/web_downloader.dart';
+import '../../../utils/cloudinary_url.dart';
 
 // Helper function for Cloudinary image optimization
 String _cloudinaryScaled(String url, {required int width}) {
@@ -939,16 +943,33 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
               Positioned(
                 bottom: 8,
                 right: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.download,
-                    size: 16,
-                    color: AppColors.textLight,
+                child: InkWell(
+                  onTap: () async {
+                    final sanitized = sanitizeCloudinaryRawPdfUrl(media.url);
+                    final url = ensureAttachment(sanitized);
+                    if (kIsWeb) {
+                      // Log for diagnostics
+                      // ignore: avoid_print
+                      print('[PDF] Card download web sanitized=$sanitized url=$url');
+                      await triggerWebDownload(url);
+                    } else {
+                      // ignore: avoid_print
+                      print('[PDF] Card download mobile sanitized=$sanitized url=$url');
+                      await _launchExternal(url);
+                    }
+                  },
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.download,
+                      size: 16,
+                      color: AppColors.textLight,
+                    ),
                   ),
                 ),
               ),
@@ -1007,3 +1028,13 @@ class _SaberMediaCarouselState extends State<_SaberMediaCarousel> {
     }
   }
 }
+
+Future<void> _launchExternal(String url) async {
+  try {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {}
+}
+

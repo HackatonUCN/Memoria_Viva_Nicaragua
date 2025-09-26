@@ -8,6 +8,12 @@ import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
+import '../../../utils/web_downloader.dart';
+import '../../../utils/cloudinary_url.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -421,16 +427,21 @@ class _MediaCarouselState extends State<_MediaCarousel> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // Implementar descarga o visualización del documento
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Abriendo documento...')),
-                              );
-                              // Aquí se podría abrir el documento en un visor o descargarlo
-                            },
-                            icon: const Icon(Icons.open_in_new),
-                            label: const Text('Abrir documento'),
+                          Wrap(
+                            spacing: 12,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _openDocument(context, m.url),
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text('Abrir documento'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => _downloadDocument(context, m.url),
+                                icon: const Icon(Icons.download),
+                                label: const Text('Descargar'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -506,6 +517,215 @@ class _MediaCarouselState extends State<_MediaCarousel> {
         ],
       ),
     );
+  }
+
+  Future<void> _openDocument(BuildContext context, String url) async {
+    final String lower = url.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      if (kIsWeb) {
+        // En Web: si el content-type es PDF abrimos en navegador, si no, descargamos
+        debugPrint('[PDF] Web pre-check url=$url');
+        try {
+          final head = await http.head(Uri.parse(url)).timeout(const Duration(seconds: 6));
+          final ct = head.headers['content-type'] ?? '';
+          debugPrint('[Probe] HEAD status=${head.statusCode} ct=$ct');
+          if (head.statusCode >= 200 && head.statusCode < 400 && ct.contains('application/pdf')) {
+            debugPrint('[PDF] Web open in browser url=$url');
+            await _launchExternal(url, context);
+          } else {
+            debugPrint('[PDF] Web fallback to download url=$url');
+            try {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('No se puede previsualizar (HTTP ${head.statusCode}). Descargando…')),
+              );
+            } catch (_) {}
+            await triggerWebDownload(ensureAttachment(url));
+          }
+        } catch (e) {
+          debugPrint('[Probe] HEAD failed: $e; fallback to download');
+          await triggerWebDownload(ensureAttachment(url));
+        }
+        return;
+      }
+      debugPrint('[PDF] Mobile open in dialog url=$url');
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) {
+          final Size size = MediaQuery.of(ctx).size;
+          final double w = (size.width * 0.92).clamp(280.0, 820.0);
+          final double h = (size.height * 0.78).clamp(280.0, 820.0);
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: SizedBox(
+              width: w,
+              height: h,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.picture_as_pdf, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Vista previa del PDF', style: AppTypography.textTheme.titleMedium),
+                        ),
+                        IconButton(
+                          tooltip: 'Abrir en navegador',
+                          icon: const Icon(Icons.open_in_new),
+                          onPressed: () => _launchExternal(url, ctx),
+                        ),
+                        IconButton(
+                          tooltip: 'Descargar',
+                          icon: const Icon(Icons.download),
+                          onPressed: () async {
+                            if (kIsWeb) {
+                              // NO usar ensureAttachment aquí, enviar la URL original
+                              // El proxy se encargará de la descarga
+                              final sanitizedUrl = sanitizeCloudinaryRawPdfUrl(url);
+                              await triggerWebDownload(sanitizedUrl);
+                            } else {
+                              await _downloadDocument(ctx, url);
+                            }
+                          },
+                        ),
+                        IconButton(
+                          tooltip: 'Cerrar',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                      child: SfPdfViewer.network(
+                        url,
+                        canShowScrollHead: true,
+                        canShowScrollStatus: false,
+                        pageLayoutMode: PdfPageLayoutMode.single,
+                        onDocumentLoaded: (details) {
+                          debugPrint('[PDF] Loaded ok: pages=${details.document.pages.count} url=$url');
+                        },
+                        onDocumentLoadFailed: (details) {
+                          try {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('No se pudo cargar el PDF: '+details.error), duration: const Duration(seconds: 3)),
+                            );
+                          } catch (_) {}
+                          debugPrint('[PDF] Load failed url=$url error=${details.error} desc=${details.description}');
+                          _probeUrl(url);
+                          _launchExternal(url, ctx);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      await _launchExternal(url, context);
+    }
+  }
+
+  Future<void> _launchExternal(String url, BuildContext context) async {
+    try {
+      final uri = Uri.parse(url);
+      final can = await canLaunchUrl(uri);
+      if (!can) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el documento')));
+        }
+        return;
+      }
+      // En dispositivos móviles, abre en el lector PDF nativo
+      // En web, abre en una nueva pestaña
+      final LaunchMode mode = kIsWeb ? LaunchMode.externalApplication : LaunchMode.platformDefault;
+      await launchUrl(uri, mode: mode);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el documento')));
+      }
+    }
+  }
+
+  Future<void> _downloadDocument(BuildContext context, String url) async {
+    try {
+      // Sanitize malformed RAW URLs that have duplicated .pdf segments
+      final sanitized = sanitizeCloudinaryRawPdfUrl(url);
+      final Uri uri = Uri.parse(sanitized);
+      
+      // IMPORTANTE: NO añadir fl_attachment aquí, lo añadiremos en el proxy
+      // Esto evita el error 404 en Cloudinary
+      debugPrint('[PDF] Download request original=$url sanitized=$sanitized web=$kIsWeb');
+      
+      if (kIsWeb) {
+        // Mostrar mensaje de descarga iniciada
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Descargando documento...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } catch (_) {}
+        
+        // Enviar la URL sanitizada directamente al proxy
+        // El proxy se encargará de añadir Content-Disposition: attachment
+        await triggerWebDownload(sanitized);
+      } else {
+        // En móvil, abrir con el visor nativo
+        await _launchExternal(sanitized, context);
+      }
+    } catch (e) {
+      debugPrint('[PDF] Download exception for url=$url error=$e');
+      if (kIsWeb) {
+        // Si falla, intentar con la URL original sin sanitizar
+        try {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Intentando descarga directa...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } catch (_) {}
+        await triggerWebDownload(url);
+      } else {
+        await _launchExternal(url, context);
+      }
+    }
+  }
+
+  // Simple diagnostic probe to inspect reachability and headers
+  Future<void> _probeUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      debugPrint('[Probe] HEAD $url');
+      final head = await http.head(uri).timeout(const Duration(seconds: 8));
+      debugPrint('[Probe] HEAD status=${head.statusCode} ct=${head.headers['content-type']} cl=${head.headers['content-length']}');
+    } catch (e) {
+      debugPrint('[Probe] HEAD failed: $e');
+      try {
+        debugPrint('[Probe] GET range 0-0 $url');
+        final get = await http.get(Uri.parse(url), headers: {'Range': 'bytes=0-0'}).timeout(const Duration(seconds: 8));
+        debugPrint('[Probe] GET status=${get.statusCode} ct=${get.headers['content-type']} cors=${get.headers['access-control-allow-origin']}');
+      } catch (e2) {
+        debugPrint('[Probe] GET failed: $e2');
+      }
+    }
   }
   
   Widget _dot(bool active) => Container(
