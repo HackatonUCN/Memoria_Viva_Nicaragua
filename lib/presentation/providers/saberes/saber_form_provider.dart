@@ -23,6 +23,7 @@ import '../../../domain/failures/result.dart';
 import '../../../domain/services/i_geolocation_service.dart';
 import '../../../utils/nicaragua_coordinates.dart';
 import '../../../domain/value_objects/ubicacion.dart';
+import '../../../domain/enums/departamentos.dart';
 
 enum SaberUploadStatus { queued, uploading, done, error, cancelled }
 
@@ -68,6 +69,12 @@ class SaberFormProvider extends ChangeNotifier {
   static DateTime? _memCacheAt;
   static const Duration _memCacheTtl = Duration(minutes: 10);
 
+  // Sembrar cache desde otras capas (por ejemplo FeedProvider)
+  static void seedCategoriasCache(List<Categoria> cats) {
+    _memCacheCategorias = List.of(cats);
+    _memCacheAt = DateTime.now();
+  }
+
   // Ubicación elegida o null
   String? departamento;
   String? municipio;
@@ -107,9 +114,8 @@ class SaberFormProvider extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    // Cargar usuario actual en segundo plano
-    // ignore: discarded_futures
-    _ensureCurrentUser();
+    // Cargar usuario actual ANTES de cargar categorías para aplicar filtros por rol correctamente
+    await _ensureCurrentUser();
 
     // Cargar categorías con cache en memoria y refresh en background
     categoriasLoading = true;
@@ -136,12 +142,14 @@ class SaberFormProvider extends ChangeNotifier {
       final res = await uc.execute(TipoContenido.saber).timeout(const Duration(seconds: 8));
       final data = res.valueOrNull ?? _memCacheCategorias;
       categorias = _filtrarCategoriasPorRol(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
-      _memCacheCategorias = List.of(categorias);
+      // Guardar SIEMPRE la lista sin filtrar en caché
+      _memCacheCategorias = List.of(data);
       _memCacheAt = DateTime.now();
       _catsSub?.cancel();
       _catsSub = uc.observe(TipoContenido.saber).listen((data) {
         categorias = _filtrarCategoriasPorRol(data)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
-        _memCacheCategorias = List.of(categorias);
+        // Mantener caché sin filtrar
+        _memCacheCategorias = List.of(data);
         _memCacheAt = DateTime.now();
         _notify();
       });
@@ -150,7 +158,7 @@ class SaberFormProvider extends ChangeNotifier {
       _notify();
     } on TimeoutException {
       if (_memCacheCategorias.isNotEmpty) {
-        categorias = List.of(_memCacheCategorias);
+        categorias = _filtrarCategoriasPorRol(_memCacheCategorias)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
         categoriasLoading = false;
         categoriasError = null;
         _notify();
@@ -258,8 +266,22 @@ class SaberFormProvider extends ChangeNotifier {
 
   void setUbicacion({String? dep, String? mun, double? lat, double? lng}) {
     if (!isLocationAllowed) return;
-    departamento = dep;
-    municipio = mun;
+    // Canonicalizar departamento a nombre usado en Dropdown (enum.nombre)
+    String? depFinal = dep;
+    if (dep != null && dep.trim().isNotEmpty) {
+      final d = tryDepartamentoFromString(dep);
+      depFinal = d?.nombre ?? dep;
+    }
+    // Resolver alias de municipio según departamento canónico
+    String? munFinal = mun;
+    if (depFinal != null && mun != null && mun.trim().isNotEmpty) {
+      final depKey = canonicalizarDepartamento(depFinal);
+      final aliasMap = municipioAliasPorDepartamento[depKey];
+      final repl = aliasMap != null ? aliasMap[mun.toLowerCase().trim()] : null;
+      munFinal = repl ?? mun;
+    }
+    departamento = depFinal;
+    municipio = (depFinal == 'Nacional') ? 'Nicaragua' : munFinal;
     latitud = lat;
     longitud = lng;
     notifyListeners();
@@ -267,7 +289,26 @@ class SaberFormProvider extends ChangeNotifier {
 
   void setDepartamento(String? dep) {
     if (!isLocationAllowed) return;
-    departamento = dep;
+    // Canonicalizar a nombre de enum para coincidir con Dropdown items
+    String? newDep = dep;
+    if (dep != null && dep.trim().isNotEmpty) {
+      final d = tryDepartamentoFromString(dep);
+      newDep = d?.nombre ?? dep;
+    }
+    final bool changed = departamento != newDep;
+    departamento = newDep;
+    if (changed) {
+      if (departamento == 'Nacional') {
+        municipio = 'Nicaragua';
+      } else {
+        // Limpiar municipio si no pertenece al nuevo departamento
+        final depKey = canonicalizarDepartamento(departamento ?? '');
+        final list = municipiosPorDepartamento[depKey] ?? const <String>[];
+        if (municipio == null || !list.contains(municipio)) {
+          municipio = null;
+        }
+      }
+    }
     // Autocoords si hay municipio también
     final coords = NicaraguaCoordinates.getBestCoordinates(departamento, municipio);
     latitud = coords['lat'];
@@ -707,6 +748,11 @@ class SaberFormProvider extends ChangeNotifier {
         _currentUserIsAdmin = (current.valueOrNull?.rol.value == 'admin');
       } catch (_) {
         _currentUserIsAdmin = false;
+      }
+      // Si ya tenemos categorías en caché, re-aplicar filtro con el rol correcto
+      if (_memCacheCategorias.isNotEmpty) {
+        categorias = _filtrarCategoriasPorRol(_memCacheCategorias)..sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+        _notify();
       }
     }
   }

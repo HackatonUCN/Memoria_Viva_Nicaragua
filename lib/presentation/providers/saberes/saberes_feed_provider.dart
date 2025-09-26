@@ -5,11 +5,13 @@ import 'package:get_it/get_it.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../domain/entities/saber_popular.dart';
+import '../../../domain/entities/categoria.dart';
 import '../../../domain/factories/usecases.dart';
 import '../../../domain/services/i_connectivity_service.dart';
 import '../../../domain/services/i_analytics_service.dart';
 import '../../../domain/usecases/categorias/obtener_categorias_por_tipo_usecase.dart';
 import '../../../domain/enums/tipos_contenido.dart';
+import 'saber_form_provider.dart';
 
 enum FeedFilter { recientes, populares, mis, liked }
 
@@ -51,12 +53,13 @@ class SaberesFeedProvider extends ChangeNotifier {
   bool isLiked(String saberId) => _likedByMe.contains(saberId);
   bool _awaitingFeedForLiked = false;
 
-  // Destacados (tipo "libro"): derivados de la fuente completa
+  // Destacados (tipo "libro"): afectados solo por la búsqueda, no por otros filtros
   List<SaberPopular> get destacadosLibres {
-    final List<SaberPopular> libros = _allSaberes
+    final List<SaberPopular> source = _activeSource();
+    final List<SaberPopular> libros = source
         .where((s) => (
-          s.categoriaId == 'saber_libros' || 
-          s.categoriaNombre.toLowerCase() == 'libro' || 
+          s.categoriaId == 'saber_libros' ||
+          s.categoriaNombre.toLowerCase() == 'libro' ||
           s.categoriaNombre.toLowerCase() == 'libros'
         ))
         .toList();
@@ -69,12 +72,19 @@ class SaberesFeedProvider extends ChangeNotifier {
     return libros.length > 10 ? libros.sublist(0, 10) : libros;
   }
 
+  bool _esLibro(SaberPopular s) {
+    final String nombre = s.categoriaNombre.toLowerCase();
+    return s.categoriaId == 'saber_libros' || nombre == 'libro' || nombre == 'libros';
+  }
+
   Future<void> init() async {
     _listenConnectivity();
     await _loadCurrentUser();
     if (_currentUserId != null) {
       await _loadAllLikedIds();
     }
+    // Prefetch categorías para el sheet de publicación/edición (seed cache)
+    unawaited(_loadCategorias());
     _authSub?.cancel();
     _authSub = _useCases.auth.getCurrentUser.observe().listen((user) async {
       _currentUserId = user?.id;
@@ -158,6 +168,8 @@ class SaberesFeedProvider extends ChangeNotifier {
 
   List<SaberPopular> _applyFilterAndSort(List<SaberPopular> input) {
     List<SaberPopular> out = List.of(input);
+    // Omitir libros del feed principal (siempre fuera de la lista)
+    out = out.where((r) => !_esLibro(r)).toList();
     switch (filtro) {
       case FeedFilter.recientes:
         out.sort((a, b) => b.fechaCreacion.compareTo(a.fechaCreacion));
@@ -198,10 +210,6 @@ class SaberesFeedProvider extends ChangeNotifier {
 
   Future<void> setFiltro(FeedFilter value) async {
     _debounce?.cancel();
-    searchQuery = '';
-    searchError = null;
-    searching = false;
-    _searchResults = [];
     feedError = null;
     _pageSize = 20;
 
@@ -298,6 +306,21 @@ class SaberesFeedProvider extends ChangeNotifier {
         );
       }
     }
+  }
+
+  // ========= CRUD Optimista: insertar =========
+  void insertarOptimista(SaberPopular nuevo) {
+    if (_idToIndex.containsKey(nuevo.id) || _allSaberes.any((r) => r.id == nuevo.id)) {
+      final int idx = _idToIndex[nuevo.id] ?? _allSaberes.indexWhere((r) => r.id == nuevo.id);
+      if (idx >= 0) {
+        _allSaberes[idx] = nuevo;
+      }
+    } else {
+      _allSaberes.insert(0, nuevo);
+    }
+    _rebuildIndex(startFrom: 0);
+    saberes = _applyFilterAndSort(_activeSource());
+    notifyListeners();
   }
 
   // ========= CRUD Optimista: actualizar =========
@@ -517,6 +540,19 @@ class SaberesFeedProvider extends ChangeNotifier {
     _authSub?.cancel();
     _debounce?.cancel();
     super.dispose();
+  }
+}
+
+// ======== Helpers privados adicionales ========
+extension _CategoriasSeed on SaberesFeedProvider {
+  Future<void> _loadCategorias() async {
+    try {
+      final usecase = _getIt<ObtenerCategoriasPorTipoUseCase>();
+      final res = await usecase.execute(TipoContenido.saber);
+      final List<Categoria> cats = res.valueOrNull ?? const [];
+      cats.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+      try { SaberFormProvider.seedCategoriasCache(cats); } catch (_) {}
+    } catch (_) {}
   }
 }
 
