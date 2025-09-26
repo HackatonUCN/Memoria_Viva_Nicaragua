@@ -24,7 +24,7 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         onError: Colors.white,
       ),
-      textTheme: AppTypography.textTheme,
+      textTheme: AppTypography.withFallback(AppTypography.textTheme),
       
       // AppBar
       appBarTheme: AppBarTheme(
@@ -119,7 +119,7 @@ class AppTheme {
         onSurface: AppColors.darkTextPrimary,
         onError: Colors.white,
       ),
-      textTheme: AppTypography.textTheme.apply(
+      textTheme: AppTypography.withFallback(AppTypography.textTheme).apply(
         bodyColor: AppColors.darkTextPrimary,
         displayColor: AppColors.darkTextPrimary,
       ),
