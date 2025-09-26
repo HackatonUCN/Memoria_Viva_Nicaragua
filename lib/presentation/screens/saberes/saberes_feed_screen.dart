@@ -23,10 +23,18 @@ class SaberesFeedScreen extends StatefulWidget {
 class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  bool _loadMoreScheduled = false;
 
   bool _onScrollNotification(ScrollNotification n, SaberesFeedProvider provider) {
     if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200) {
-      provider.loadMore();
+      if (!_loadMoreScheduled) {
+        _loadMoreScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          provider.loadMore();
+          _loadMoreScheduled = false;
+        });
+      }
     }
     return false;
   }
@@ -60,42 +68,18 @@ class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
                       slivers: [
                         // Sin AppBar (requerimiento)
 
-                        // Search bar
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: const InputDecoration(
-                                labelText: 'Buscar saberes',
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                              onChanged: provider.setSearchQuery,
-                            ),
-                          ),
-                        ),
+                        // (Search bar moved below carousel)
 
                         // Encabezado sobre el carrusel
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.10),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.menu_book, color: AppColors.primary),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Libros destacados',
-                                  style: AppTypography.textTheme.titleMedium?.copyWith(
-                                    color: AppColors.primaryDark,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                                  child: Text('Biblioteca de saberes', style: AppTypography.textTheme.titleLarge?.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
@@ -152,6 +136,21 @@ class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
                           ),
                         ),
 
+                        // Search bar (moved below carousel)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: const InputDecoration(
+                                labelText: 'Buscar saberes',
+                                prefixIcon: Icon(Icons.search),
+                              ),
+                              onChanged: provider.setSearchQuery,
+                            ),
+                          ),
+                        ),
+
                         // Filter chips
                         SliverToBoxAdapter(
                           child: Padding(
@@ -178,7 +177,7 @@ class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
                                   final creado = await PublicarSaberPopularSheet.open(context);
                                   if (!mounted) return;
                                   if (creado != null) {
-                                    await provider.refresh();
+                                    provider.insertarOptimista(creado);
                                   }
                                 },
                                 icon: const Icon(Icons.edit_outlined),

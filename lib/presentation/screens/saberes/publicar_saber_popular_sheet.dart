@@ -782,7 +782,7 @@ class _UbicacionSelector extends StatelessWidget {
                 ),
                 isExpanded: true,
                 items: () {
-                  final depKey = (provider.departamento ?? '').toLowerCase();
+                  final depKey = canonicalizarDepartamento(provider.departamento ?? '');
                   final munis = municipiosPorDepartamento[depKey] ?? const <String>[];
                   return munis
                       .map((m) => DropdownMenuItem<String>(
