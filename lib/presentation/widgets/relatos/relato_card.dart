@@ -71,7 +71,7 @@ class RelatoCard extends StatelessWidget {
                       )
                     ],
               // Borde sutil con color de acento; ancho 1 para eficiencia
-              border: Border.all(color: AppColors.withOpacity(AppColors.accent, 0.18), width: 1),
+              border: Border.all(color: AppColors.withOpacity(AppColors.accent, 0.01), width: 3),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

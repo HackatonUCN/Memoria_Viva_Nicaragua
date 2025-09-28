@@ -588,10 +588,9 @@ class _MediaCarouselState extends State<_MediaCarousel> {
                           icon: const Icon(Icons.download),
                           onPressed: () async {
                             if (kIsWeb) {
-                              // NO usar ensureAttachment aquí, enviar la URL original
-                              // El proxy se encargará de la descarga
-                              final sanitizedUrl = sanitizeCloudinaryRawPdfUrl(url);
-                              await triggerWebDownload(sanitizedUrl);
+                              // Enviar la URL original al proxy (sin sanitizar)
+                              // El proxy reenvía con Content-Disposition para forzar descarga
+                              await triggerWebDownload(url);
                             } else {
                               await _downloadDocument(ctx, url);
                             }
