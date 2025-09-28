@@ -65,68 +65,40 @@ class _SheetScaffold extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              // Header unificado con gradiente y botón cerrar
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                decoration: const BoxDecoration(
+                  gradient: AppColors.nicaraguaGradient,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
+                ),
                 child: Row(
                   children: [
-                    Text(provider.isEditing ? 'Editar saber popular' : 'Publicar saber popular',
-                        style: AppTypography.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: provider.isPublishing
-                          ? null
-                          : () {
-                              Navigator.of(context).maybePop();
-                            },
-                      child: const Text('Cancelar'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.textLight,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            provider.isEditing ? 'Editar saber popular' : 'Publicar saber popular',
+                            style: AppTypography.textTheme.headlineSmall?.copyWith(
+                              color: AppColors.textLight,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Comparte y preserva conocimientos culturales de tu comunidad',
+                            style: AppTypography.textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textLight.withOpacity(0.9),
+                            ),
+                          ),
+                        ],
                       ),
-                      onPressed: provider.formularioValido && !provider.isPublishing
-                          ? () async {
-                              final ok = await context.read<SaberFormProvider>().publicar();
-                              if (!context.mounted) return;
-                              if (ok) {
-                                final offline = context.read<SaberFormProvider>().lastPublishOffline;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    backgroundColor: offline ? AppColors.warning : AppColors.success,
-                                    content: Text(
-                                      offline
-                                          ? 'Sin conexión: tu saber se publicará cuando vuelvas a estar en línea'
-                                          : (provider.isEditing ? 'Cambios guardados' : 'Saber publicado con éxito'),
-                                    ),
-                                  ),
-                                );
-                                SaberPopular? salida;
-                                if (provider.isEditing) {
-                                  salida = provider.saberEditadoMinimo();
-                                } else {
-                                  salida = provider.lastCreatedSaber ?? provider.saberConstruidoMinimo();
-                                }
-                                final nav = Navigator.of(context);
-                                WidgetsBinding.instance.addPostFrameCallback((_) async {
-                                  if (nav.canPop()) nav.pop(salida);
-                                });
-                              } else {
-                                final err = context.read<SaberFormProvider>().errorMessage;
-                                if (err != null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(backgroundColor: AppColors.error, content: Text(err)),
-                                  );
-                                }
-                              }
-                            }
-                          : null,
-                      child: provider.isPublishing
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(provider.isEditing ? 'Guardar cambios' : 'Publicar'),
-                    )
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.close_rounded, color: AppColors.textLight, size: 28),
+                    ),
                   ],
                 ),
               ),
@@ -165,11 +137,76 @@ class _SheetScaffold extends StatelessWidget {
                   },
                 ),
               ),
+              const Divider(height: 1),
+              // Footer con botón de acción unificado
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: provider.formularioValido && !provider.isPublishing ? () => _handleSubmit(context) : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: AppColors.textLight,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                        ),
+                        icon: provider.isPublishing
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Icon(provider.isEditing ? Icons.save_rounded : Icons.send_rounded),
+                        label: Text(
+                          provider.isEditing ? 'Guardar cambios' : 'Publicar',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _handleSubmit(BuildContext context) async {
+    final form = context.read<SaberFormProvider>();
+    final ok = await form.publicar();
+    if (!context.mounted) return;
+    if (ok) {
+      final offline = form.lastPublishOffline;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: offline ? AppColors.warning : AppColors.success,
+          content: Text(
+            offline
+                ? 'Sin conexión: tu saber se publicará cuando vuelvas a estar en línea'
+                : (form.isEditing ? 'Cambios guardados' : 'Saber publicado con éxito'),
+          ),
+        ),
+      );
+      SaberPopular? salida;
+      if (form.isEditing) {
+        salida = form.saberEditadoMinimo();
+      } else {
+        salida = form.lastCreatedSaber ?? form.saberConstruidoMinimo();
+      }
+      final nav = Navigator.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (nav.canPop()) nav.pop(salida);
+      });
+    } else {
+      final err = form.errorMessage;
+      if (err != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(backgroundColor: AppColors.error, content: Text(err)),
+        );
+      }
+    }
   }
 }
 
@@ -179,22 +216,43 @@ class _CategoriaDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<SaberFormProvider>();
     if (provider.categoriasLoading) {
-      return const ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text('Categoría'),
-        subtitle: LinearProgressIndicator(),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+        child: Row(children: const [
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 12),
+          Text('Cargando categorías...'),
+        ]),
       );
     }
     if (provider.categoriasError != null) {
-      return ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Categoría'),
-      subtitle: Text(provider.categoriasError!, style: const TextStyle(color: AppColors.error)),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+        ),
+        child: Row(children: [
+          Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text('Error al cargar categorías: ${provider.categoriasError}', style: TextStyle(color: AppColors.error))),
+        ]),
       );
     }
     return DropdownButtonFormField<String>(
       value: provider.categoriaId,
-      decoration: const InputDecoration(labelText: 'Categoría', prefixIcon: Icon(Icons.category_outlined)),
+      decoration: InputDecoration(
+        labelText: 'Categoría',
+        prefixIcon: const Icon(Icons.category_outlined),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+      ),
       items: provider.categorias
           .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.nombre)))
           .toList(),
@@ -269,29 +327,26 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 12, offset: const Offset(0, 6)),
-        ],
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.inputBorder.withOpacity(0.3)),
       ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(gradient: AppColors.accentGradient, shape: BoxShape.circle),
-                child: Icon(icon, color: Colors.white, size: 18),
-              ),
+              Icon(icon, color: AppColors.primaryDark, size: 20),
               const SizedBox(width: 8),
-              Text(title, style: AppTypography.textTheme.titleLarge?.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: AppTypography.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -378,41 +433,38 @@ class _CounterField extends StatelessWidget {
   const _CounterField({
     required this.label,
     required this.icon,
+    this.helper,
     required this.value,
     required this.max,
-    required this.invalid,
-    required this.onChanged,
-    this.helper,
     this.min,
     this.multiline = false,
+    this.invalid = false,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final int len = value.length;
-    final bool belowMin = min != null && len < min! && len > 0;
-    final Color countColor = belowMin || invalid ? AppColors.error : AppColors.textSecondary;
+    final count = value.length;
+    final hasError = invalid || (min != null && count > 0 && count < min!);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
+          initialValue: value,
+          onChanged: onChanged,
+          maxLines: multiline ? 4 : 1,
+          minLines: multiline ? 3 : 1,
           decoration: InputDecoration(
             labelText: label,
             prefixIcon: Icon(icon),
             helperText: helper,
-            errorText: invalid ? 'Revisa este campo' : null,
+            errorText: hasError ? (min != null && count > 0 && count < min! ? 'Mínimo $min caracteres' : 'Campo inválido') : null,
+            counterText: '$count/$max',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            ),
           ),
-          initialValue: value,
-          onChanged: onChanged,
-          maxLines: multiline ? 6 : 1,
-        ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            '${min != null ? '$len/$min mín · ' : ''}$len/$max',
-            style: AppTypography.textTheme.bodySmall?.copyWith(color: countColor),
-          ),
+          maxLength: max,
         ),
       ],
     );

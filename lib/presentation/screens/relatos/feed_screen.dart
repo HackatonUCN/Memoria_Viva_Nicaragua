@@ -458,6 +458,8 @@ class _FeedScreenState extends State<FeedScreen> {
                       heroTag: "feed_scroll_top",
                       mini: true,
                       tooltip: 'Ir al inicio',
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: AppColors.textLight,
                       onPressed: () => _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut),
                       child: const Icon(Icons.vertical_align_top),
                     ),

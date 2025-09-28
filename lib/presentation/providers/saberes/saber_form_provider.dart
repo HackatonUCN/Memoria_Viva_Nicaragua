@@ -114,8 +114,9 @@ class SaberFormProvider extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    // Cargar usuario actual ANTES de cargar categorías para aplicar filtros por rol correctamente
-    await _ensureCurrentUser();
+    // Cargar usuario actual en segundo plano para no bloquear la carga de categorías
+    // ignore: discarded_futures
+    _ensureCurrentUser();
 
     // Cargar categorías con cache en memoria y refresh en background
     categoriasLoading = true;

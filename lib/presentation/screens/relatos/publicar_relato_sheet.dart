@@ -89,96 +89,40 @@ class _Content extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header decorado
+          // Header unificado (como EventoFormSheet)
           Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
             decoration: const BoxDecoration(
               gradient: AppColors.nicaraguaGradient,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusLg)),
             ),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
             child: Row(
               children: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(null);
-                  },
-                  child: const Text('Cancelar', style: TextStyle(color: AppColors.textLight)),
-                ),
                 Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Publicar Relato', style: AppTypography.textTheme.displaySmall?.copyWith(color: AppColors.textLight)),
-                      const SizedBox(height: 2),
+                      Text(
+                        provider.isEditing ? 'Editar Relato' : 'Publicar Relato',
+                        style: AppTypography.textTheme.headlineSmall?.copyWith(
+                          color: AppColors.textLight,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         'Comparte tus memorias culturales con la comunidad',
-                        style: AppTypography.metadata.copyWith(color: AppColors.withOpacity(AppColors.textLight, 0.9)),
-                        textAlign: TextAlign.center,
+                        style: AppTypography.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textLight.withOpacity(0.9),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.textLight,
-                  ),
-                  onPressed: provider.formularioValido && !provider.isPublishing ? () async {
-                    final uid = context.read<RelatoFormProvider>();
-                    debugPrint('[PUBLICAR_SHEET][PRESS] t=${DateTime.now().toIso8601String()} uid=${uid}');
-                    final ok = await context.read<RelatoFormProvider>().publicar();
-                    if (!context.mounted) return;
-                    if (ok) {
-                      final offline = context.read<RelatoFormProvider>().lastPublishOffline;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: offline ? AppColors.warning : AppColors.success,
-                          content: Text(
-                            offline
-                                ? 'Sin conexión: tu relato se publicará cuando vuelvas a estar en línea'
-                                : (provider.isEditing ? 'Cambios guardados' : 'Relato publicado con éxito'),
-                          ),
-                        ),
-                      );
-                      // Devolver relato mínimo para UI optimista (crear o editar) y cerrar el sheet de forma segura
-                      Relato? salida;
-                      if (provider.isEditing) {
-                        salida = provider.relatoEditadoMinimo();
-                      } else {
-                        // Preferir el relato real creado si está disponible para evitar duplicados
-                        salida = provider.lastCreatedRelato ?? provider.relatoConstruidoMinimo();
-                      }
-                      final nav = Navigator.of(context);
-                      WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (!context.mounted) return;
-                        if (await nav.maybePop(salida) == false) {
-                          // Fallback por si ya se cerró
-                        }
-                      });
-                    } else if (provider.errorMessage != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(backgroundColor: AppColors.error, content: Text(provider.errorMessage!)),
-                      );
-                    }
-                  } : null,
-                  child: provider.isPublishing
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(provider.isEditing ? 'Guardando…' : 'Publicando…'),
-                          ],
-                        )
-                      : Text(provider.isEditing ? 'Guardar cambios' : 'Publicar'),
-                )
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textLight, size: 28),
+                ),
               ],
             ),
           ),
@@ -218,9 +162,73 @@ class _Content extends StatelessWidget {
               },
             ),
           ),
+          const Divider(height: 1),
+          // Footer de acción
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: provider.formularioValido && !provider.isPublishing ? () => _handleSubmit(context) : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.textLight,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      ),
+                    ),
+                    icon: provider.isPublishing
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Icon(provider.isEditing ? Icons.save_rounded : Icons.send_rounded),
+                    label: Text(
+                      provider.isEditing ? 'Guardar cambios' : 'Publicar',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _handleSubmit(BuildContext context) async {
+    final provider = context.read<RelatoFormProvider>();
+    debugPrint('[PUBLICAR_RELATO][PRESS] t=${DateTime.now().toIso8601String()}');
+    final ok = await provider.publicar();
+    if (!context.mounted) return;
+    if (ok) {
+      final offline = provider.lastPublishOffline;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: offline ? AppColors.warning : AppColors.success,
+          content: Text(
+            offline
+                ? 'Sin conexión: tu relato se publicará cuando vuelvas a estar en línea'
+                : (provider.isEditing ? 'Cambios guardados' : 'Relato publicado con éxito'),
+          ),
+        ),
+      );
+      Relato? salida;
+      if (provider.isEditing) {
+        salida = provider.relatoEditadoMinimo();
+      } else {
+        salida = provider.lastCreatedRelato ?? provider.relatoConstruidoMinimo();
+      }
+      final nav = Navigator.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!context.mounted) return;
+        await nav.maybePop(salida);
+      });
+    } else if (provider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(provider.errorMessage!)),
+      );
+    }
   }
 }
 
@@ -229,22 +237,52 @@ class _CategoriaDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<RelatoFormProvider>();
     if (provider.categoriasLoading) {
-      return const ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: LinearProgressIndicator(),
-        subtitle: Text('Cargando categorías...'),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+        child: Row(
+          children: const [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 12),
+            Text('Cargando categorías...'),
+          ],
+        ),
       );
     }
     if (provider.categoriasError != null) {
-      return ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Categoría'),
-        subtitle: Text(provider.categoriasError!, style: const TextStyle(color: AppColors.error)),
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Error al cargar categorías: ${provider.categoriasError}',
+                style: TextStyle(color: AppColors.error),
+              ),
+            ),
+          ],
+        ),
       );
     }
     return DropdownButtonFormField<String>(
       value: provider.categoriaId,
-      decoration: const InputDecoration(labelText: 'Categoría', prefixIcon: Icon(Icons.category_outlined)),
+      decoration: InputDecoration(
+        labelText: 'Categoría',
+        prefixIcon: const Icon(Icons.category_outlined),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+      ),
       items: provider.categorias
           .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.nombre)))
           .toList(),
@@ -319,29 +357,28 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 12, offset: const Offset(0, 6)),
-        ],
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.inputBorder.withOpacity(0.3)),
       ),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(gradient: AppColors.accentGradient, shape: BoxShape.circle),
-                child: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
-              ),
+              Icon(icon, color: AppColors.primaryDark, size: 20),
               const SizedBox(width: 8),
-              Text(title, style: AppTypography.textTheme.titleLarge?.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w700)),
+              Text(
+                title,
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -422,41 +459,39 @@ class _CounterField extends StatelessWidget {
   const _CounterField({
     required this.label,
     required this.icon,
+    this.helper,
     required this.value,
     required this.max,
-    required this.invalid,
-    required this.onChanged,
-    this.helper,
     this.min,
     this.multiline = false,
+    this.invalid = false,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final int len = value.length;
-    final bool belowMin = min != null && len < min! && len > 0;
-    final Color countColor = belowMin || invalid ? AppColors.error : AppColors.textSecondary;
+    final count = value.length;
+    final hasError = invalid || (min != null && count > 0 && count < min!);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
+          initialValue: value,
+          onChanged: onChanged,
+          maxLines: multiline ? 4 : 1,
+          minLines: multiline ? 3 : 1,
           decoration: InputDecoration(
             labelText: label,
             prefixIcon: Icon(icon),
             helperText: helper,
-            errorText: invalid ? 'Revisa este campo' : null,
+            errorText: hasError ? (min != null && count > 0 && count < min! ? 'Mínimo $min caracteres' : 'Campo inválido') : null,
+            counterText: '$count/$max',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            ),
           ),
-          initialValue: value,
-          onChanged: onChanged,
-          maxLines: multiline ? 6 : 1,
-        ),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            '${min != null ? '$len/$min mín · ' : ''}$len/$max',
-            style: AppTypography.textTheme.bodySmall?.copyWith(color: countColor),
-          ),
+          maxLength: max,
         ),
       ],
     );

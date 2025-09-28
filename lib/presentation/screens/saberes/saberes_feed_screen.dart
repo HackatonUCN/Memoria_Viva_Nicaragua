@@ -24,6 +24,16 @@ class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   bool _loadMoreScheduled = false;
+  bool _showScrollTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(() {
+      final bool show = _scrollCtrl.hasClients && _scrollCtrl.offset > 300;
+      if (mounted && show != _showScrollTop) setState(() => _showScrollTop = show);
+    });
+  }
 
   bool _onScrollNotification(ScrollNotification n, SaberesFeedProvider provider) {
     if (n.metrics.pixels >= n.metrics.maxScrollExtent - 200) {
@@ -285,17 +295,24 @@ class _SaberesFeedScreenState extends State<SaberesFeedScreen> {
                   ),
                 ),
 
-                // Floating back-to-top
+                // Botón flotante Ir al inicio (estilo unificado)
                 Positioned(
                   right: 16,
                   bottom: 16,
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-                    },
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.textLight,
-                    child: const Icon(Icons.arrow_upward),
+                  child: AnimatedScale(
+                    scale: _showScrollTop ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: FloatingActionButton(
+                      heroTag: "saberes_scroll_top",
+                      mini: true,
+                      tooltip: 'Ir al inicio',
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.textLight,
+                      onPressed: () {
+                        _scrollCtrl.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+                      },
+                      child: const Icon(Icons.vertical_align_top),
+                    ),
                   ),
                 ),
 
