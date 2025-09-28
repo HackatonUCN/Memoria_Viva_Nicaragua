@@ -23,17 +23,22 @@ class CulturalIcon extends StatelessWidget {
         Theme.of(context).iconTheme.color ??
         Colors.black;
 
-    return SvgPicture.asset(
-      svgPath,
-      width: size,
-      height: size,
-      // Solo aplicar tinte cuando se pasa color explícito.
-      colorFilter: explicitColor != null
-          ? ColorFilter.mode(explicitColor, BlendMode.srcIn)
-          : null,
-      // currentColor para SVGs que lo utilicen.
-      theme: SvgTheme(
-        currentColor: explicitColor ?? resolvedCurrentColor,
+    return ClipRect(
+      clipBehavior: Clip.none,
+      child: SvgPicture.asset(
+        svgPath,
+        width: size,
+        height: size,
+        // No recortar fuera del viewBox si el SVG trae márgenes intencionales
+        allowDrawingOutsideViewBox: true,
+        // Solo aplicar tinte cuando se pasa color explícito.
+        colorFilter: explicitColor != null
+            ? ColorFilter.mode(explicitColor, BlendMode.srcIn)
+            : null,
+        // currentColor para SVGs que lo utilicen.
+        theme: SvgTheme(
+          currentColor: explicitColor ?? resolvedCurrentColor,
+        ),
       ),
     );
   }

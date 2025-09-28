@@ -23,13 +23,7 @@ class RegisterUserUseCase {
     required String nombre,
   }) async {
     try {
-      // Verificar si el email ya existe
-      final emailExiste = await _userRepository.verificarEmailExiste(email);
-      if (emailExiste) {
-        throw EmailAlreadyInUseException();
-      }
-
-      // Registrar usuario
+      // Registrar usuario (si el email ya existe, Firebase Auth lanzará la excepción)
       final user = await _userRepository.registrarEmail(
         email: email,
         password: password,

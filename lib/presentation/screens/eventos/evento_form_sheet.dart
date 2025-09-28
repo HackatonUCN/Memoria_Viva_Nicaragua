@@ -192,11 +192,11 @@ class _Content extends StatelessWidget {
                   return SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: bodyPad,
-                    child: const Column(
+                    child: Column(
                       children: [
-                        _ContentSection(),
-                        SizedBox(height: 16),
-                        _MetaSection(),
+                        const _ContentSection(),
+                        const SizedBox(height: 16),
+                        _MetaSection(publicarDirecto: publicarDirecto, isEdit: initial != null),
                       ],
                     ),
                   );
@@ -204,12 +204,12 @@ class _Content extends StatelessWidget {
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: bodyPad,
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 3, child: _ContentSection()),
-                      SizedBox(width: 16),
-                      Expanded(flex: 2, child: _MetaSection()),
+                      const Expanded(flex: 3, child: _ContentSection()),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 2, child: _MetaSection(publicarDirecto: publicarDirecto, isEdit: initial != null)),
                     ],
                   ),
                 );
@@ -318,7 +318,10 @@ class _ContentSection extends StatelessWidget {
 }
 
 class _MetaSection extends StatelessWidget {
-  const _MetaSection();
+  final bool publicarDirecto;
+  final bool isEdit;
+
+  const _MetaSection({required this.publicarDirecto, required this.isEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +333,7 @@ class _MetaSection extends StatelessWidget {
         const SizedBox(height: 12),
         const _UbicacionSelector(),
         const SizedBox(height: 12),
-        const _FechasSelector(),
+        _FechasSelector(permitirFechasPasadas: publicarDirecto || isEdit),
         const SizedBox(height: 12),
         const _RecurrenciaSection(),
         const SizedBox(height: 12),
@@ -670,7 +673,9 @@ class _UbicacionSelector extends StatelessWidget {
 }
 
 class _FechasSelector extends StatelessWidget {
-  const _FechasSelector();
+  final bool permitirFechasPasadas;
+
+  const _FechasSelector({this.permitirFechasPasadas = false});
 
   @override
   Widget build(BuildContext context) {
@@ -729,7 +734,7 @@ class _FechasSelector extends StatelessWidget {
     final date = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime.now(),
+      firstDate: permitirFechasPasadas ? DateTime(2000, 1, 1) : DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
 
@@ -749,10 +754,11 @@ class _RecurrenciaSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<EventoFormProvider>();
-    const List<String> opciones = ['Ninguna', 'Semanal', 'Mensual', 'Anual', 'Cada 15 días'];
+    // Usar claves en minúsculas como valores y etiquetas amigables para mostrar
+    const List<String> opcionesKeys = ['ninguna', 'semanal', 'mensual', 'anual', 'cada 15 días'];
     
     return DropdownButtonFormField<String>(
-      value: provider.frecuencia ?? 'Ninguna',
+      value: (provider.frecuencia ?? 'ninguna').toLowerCase(),
       decoration: InputDecoration(
         labelText: 'Frecuencia del evento',
         prefixIcon: const Icon(Icons.repeat_outlined),
@@ -762,27 +768,29 @@ class _RecurrenciaSection extends StatelessWidget {
         helperText: 'Selecciona si el evento se repite periódicamente',
       ),
       isExpanded: true,
-      items: opciones
-          .map((f) => DropdownMenuItem(
-            value: f,
-            child: Row(
-              children: [
-                Icon(
-                  f == 'Ninguna' ? Icons.event_outlined : Icons.repeat,
-                  size: 16,
-                  color: AppColors.textSecondary,
+      items: opcionesKeys
+          .map((key) => DropdownMenuItem<String>(
+                value: key,
+                child: Row(
+                  children: [
+                    Icon(
+                      key == 'ninguna' ? Icons.event_outlined : Icons.repeat,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      key == 'ninguna'
+                          ? 'Evento único (no se repite)'
+                          : (key == 'cada 15 días' ? 'Cada 15 días' : '${key[0].toUpperCase()}${key.substring(1)}'),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  f == 'Ninguna' ? 'Evento único (no se repite)' : f,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ))
+              ))
           .toList(),
       onChanged: (value) {
-        if (value == 'Ninguna') {
+        if (value == 'ninguna') {
           provider.setEsRecurrente(false);
           provider.setFrecuencia(null);
         } else {

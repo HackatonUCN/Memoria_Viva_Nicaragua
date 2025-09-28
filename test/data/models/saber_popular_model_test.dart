@@ -67,7 +67,7 @@ void main() {
         expect(model.id, 's1');
         expect(model.titulo, 'Dicho');
         expect(model.contenido, 'Contenido');
-        expect(model.imagenes, isNotEmpty);
+        expect(model.multimedia, isNotEmpty);
         expect(model.ubicacion, isNotNull);
         expect(model.estado, 'activo');
       });
@@ -78,7 +78,7 @@ void main() {
         final doc = await firestore.collection('saberes').doc('s2').get();
         final model = SaberPopularModel.fromFirestore(doc);
         expect(model.ubicacion, isNull);
-        expect(model.imagenes, isEmpty);
+        expect(model.multimedia, isEmpty);
         expect(model.etiquetas, isEmpty);
         expect(model.reportes, 0);
         expect(model.procesado, isFalse);
@@ -129,7 +129,7 @@ void main() {
         expect(entity.id, model.id);
         expect(entity.titulo, model.titulo);
         expect(entity.estado, EstadoModeracion.activo);
-        expect(entity.imagenes.length, model.imagenes.length);
+        expect(entity.multimedia.length, model.multimedia.length);
       });
 
       test('convierte desde entidad correctamente', () {
@@ -144,7 +144,7 @@ void main() {
           ubicacion: vu.Ubicacion(
             latitud: 12.1, longitud: -86.3, departamento: 'Managua', municipio: 'Managua',
           ),
-          imagenes: [
+          multimedia: [
             vm.Multimedia(url: 'https://example.com/img.jpg'),
           ],
           etiquetas: const ['tag'],
@@ -154,7 +154,7 @@ void main() {
         final model = SaberPopularModel.fromDomain(entity);
         expect(model.id, entity.id);
         expect(model.ubicacion, isA<Map<String, dynamic>?>());
-        expect(model.imagenes, isA<List<Map<String, dynamic>>>());
+        expect(model.multimedia, isA<List<Map<String, dynamic>>>());
       });
     });
 

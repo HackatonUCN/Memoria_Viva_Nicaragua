@@ -1,8 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
 
 /// Tipografía de la aplicación
 class AppTypography {
+  // Familias de fuentes de fallback para glifos faltantes (símbolos y scripts amplios)
+  static final List<String> fallbackFamilies = <String>[
+    // Preferir familias de assets si están declaradas en pubspec
+    'Noto Sans',
+    'Noto Sans Symbols 2',
+    'Noto Serif',
+    // Fallback a GoogleFonts si las familias de assets no existen
+    GoogleFonts.notoSans().fontFamily ?? 'Noto Sans',
+    GoogleFonts.notoSansSymbols2().fontFamily ?? 'Noto Sans Symbols 2',
+    GoogleFonts.notoSerif().fontFamily ?? 'Noto Serif',
+  ];
+
   // Fuentes principales
   static final TextTheme textTheme = TextTheme(
     // Títulos grandes
@@ -122,4 +135,26 @@ class AppTypography {
     letterSpacing: 0.5,
     height: 1.6,
   );
+
+  // Aplica fallback de fuentes a todo el TextTheme
+  static TextTheme withFallback(TextTheme base) {
+    TextStyle? _f(TextStyle? s) => s?.copyWith(fontFamilyFallback: fallbackFamilies);
+    return TextTheme(
+      displayLarge: _f(base.displayLarge),
+      displayMedium: _f(base.displayMedium),
+      displaySmall: _f(base.displaySmall),
+      headlineLarge: _f(base.headlineLarge),
+      headlineMedium: _f(base.headlineMedium),
+      headlineSmall: _f(base.headlineSmall),
+      titleLarge: _f(base.titleLarge),
+      titleMedium: _f(base.titleMedium),
+      titleSmall: _f(base.titleSmall),
+      bodyLarge: _f(base.bodyLarge),
+      bodyMedium: _f(base.bodyMedium),
+      bodySmall: _f(base.bodySmall),
+      labelLarge: _f(base.labelLarge),
+      labelMedium: _f(base.labelMedium),
+      labelSmall: _f(base.labelSmall),
+    );
+  }
 }

@@ -28,17 +28,15 @@ rules_version = '2';
 
     function isAdmin() {
       return hasRole('admin') || (
-        isSignedIn() && (
-          (
-            exists(/databases/$(database)/documents/users/$(userId())) &&
-            get(/databases/$(database)/documents/users/$(userId())).data.rol == 'admin'
-          ) || (
-            exists(/databases/$(database)/documents/usuarios/$(userId())) &&
-            get(/databases/$(database)/documents/usuarios/$(userId())).data.rol == 'admin'
-          ) || (
-            exists(/databases/$(database)/documents/users/$(userId())) &&
-            get(/databases/$(database)/documents/users/$(userId())).data.esAdmin == true
-          )
+        (
+          exists(/databases/$(database)/documents/users/$(userId())) &&
+          get(/databases/$(database)/documents/users/$(userId())).data.rol == 'admin'
+        ) || (
+          exists(/databases/$(database)/documents/usuarios/$(userId())) &&
+          get(/databases/$(database)/documents/usuarios/$(userId())).data.rol == 'admin'
+        ) || (
+          exists(/databases/$(database)/documents/users/$(userId())) &&
+          get(/databases/$(database)/documents/users/$(userId())).data.esAdmin == true
         )
       );
     }
@@ -116,8 +114,15 @@ rules_version = '2';
       // Editar propio (contenido/ubicación/etiquetas/multimedia/categoría)
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(
-          ['titulo','contenido','etiquetas','ubicacion','multimedia','categoriaId','categoriaNombre','fechaActualizacion']
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion','categoriaId','categoriaNombre']
         );
+
+      // Soft delete (propietario puede marcar como eliminado)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['eliminado','fechaEliminacion','fechaActualizacion']
+        ) &&
+        request.resource.data.eliminado == true;
 
       // Soft delete (propietario puede marcar como eliminado)
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
@@ -186,8 +191,15 @@ rules_version = '2';
 
       allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(
-          ['titulo','contenido','etiquetas','ubicacion','imagenes','fechaActualizacion']
+          ['titulo','contenido','etiquetas','ubicacion','multimedia','fechaActualizacion','categoriaId','categoriaNombre']
         );
+
+      // Soft delete (propietario puede marcar como eliminado)
+      allow update: if isSignedIn() && isOwnerBy('autorId', resource.data) &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(
+          ['eliminado','fechaEliminacion','fechaActualizacion']
+        ) &&
+        request.resource.data.eliminado == true;
 
       // Likes/Compartidos
       allow update: if isSignedIn() &&
@@ -202,6 +214,14 @@ rules_version = '2';
       allow update: if isSignedIn() &&
         request.resource.data.diff(resource.data).changedKeys().hasOnly(['estado','fechaActualizacion']) &&
         request.resource.data.estado == 'reportado';
+
+      // Subcolección likes (igual a relatos)
+      match /likes/{uid} {
+        allow create: if isSignedIn() && uid == userId();
+        allow delete: if isSignedIn() && uid == userId();
+        allow read: if isSignedIn() && uid == userId();
+        allow update: if false;
+      }
     }
 
     // =============================

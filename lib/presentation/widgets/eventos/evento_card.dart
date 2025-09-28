@@ -78,7 +78,7 @@ class EventoCard extends StatelessWidget {
                           child: Container(
                             color: AppColors.surfaceVariant,
                             child: Hero(
-                              tag: 'evento_media_$imageUrl',
+                              tag: 'evento_media_list_${evento.id}_0',
                               child: CachedNetworkImage(
                                 imageUrl: imageUrl,
                                 fit: BoxFit.contain,

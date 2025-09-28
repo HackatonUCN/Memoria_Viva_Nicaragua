@@ -461,8 +461,17 @@ class FeedProvider extends ChangeNotifier {
 
   // ========= CRUD Optimista: insertar =========
   void insertarOptimista(Relato nuevo) {
-    // Insertar al principio de la fuente completa
-    _allRelatos.insert(0, nuevo);
+    // Evitar duplicados si el stream ya entregó el mismo relato
+    if (_idToIndex.containsKey(nuevo.id) || _allRelatos.any((r) => r.id == nuevo.id)) {
+      // Si existe, opcionalmente podemos actualizarlo para traer últimos campos
+      final int idx = _idToIndex[nuevo.id] ?? _allRelatos.indexWhere((r) => r.id == nuevo.id);
+      if (idx >= 0) {
+        _allRelatos[idx] = nuevo;
+      }
+    } else {
+      // Insertar al principio de la fuente completa
+      _allRelatos.insert(0, nuevo);
+    }
     _rebuildIndex(startFrom: 0);
     relatos = _applyFilterAndSort(_activeSource());
     notifyListeners();

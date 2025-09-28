@@ -10,6 +10,9 @@ import '../usecases/saberes/actualizar_saber_usecase.dart';
 import '../usecases/saberes/eliminar_saber_usecase.dart';
 import '../usecases/saberes/moderar_saber_usecase.dart';
 import '../usecases/saberes/obtener_saberes_usecase.dart';
+import '../usecases/saberes/dar_like_saber_usecase.dart';
+import '../usecases/saberes/registrar_compartido_saber_usecase.dart';
+import '../usecases/saberes/reportar_saber_usecase.dart';
 
 /// Factory para construir casos de uso relacionados con Saberes Populares
 class SaberPopularUseCaseFactory {
@@ -54,6 +57,12 @@ class SaberPopularUseCaseFactory {
       );
 
   ObtenerSaberesUseCase get obtener => ObtenerSaberesUseCase(_saberRepository);
+
+  DarLikeSaberUseCase get like => DarLikeSaberUseCase(_saberRepository);
+
+  RegistrarCompartidoSaberUseCase get compartir => RegistrarCompartidoSaberUseCase(_saberRepository);
+
+  ReportarSaberUseCase get reportar => ReportarSaberUseCase(_saberRepository, _userRepository);
 }
 
 

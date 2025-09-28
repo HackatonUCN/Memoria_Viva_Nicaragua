@@ -309,7 +309,12 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                                   cursor: SystemMouseCursors.click,
                                   child: EventoSquareCard(
                                 evento: headerEventos[i],
-                                onTap: () => EventoDetailOverlay.open(context, headerEventos[i]),
+                                onTap: () => EventoDetailOverlay.open(
+                                      context,
+                                      headerEventos[i],
+                                      heroTag: 'evento_media_square_${headerEventos[i].id}_0',
+                                      heroMatchUrl: headerEventos[i].imagenes.isNotEmpty ? headerEventos[i].imagenes.first.url : null,
+                                    ),
                                     isAdmin: isAdmin,
                                     onEdit: isAdmin
                                         ? () async {
@@ -630,7 +635,12 @@ class _EventosSliverContentState extends State<_EventosSliverContent> {
                                     cursor: SystemMouseCursors.click,
                                     child: EventoCard(
                             evento: e,
-                            onTap: () => EventoDetailOverlay.open(context, e),
+                            onTap: () => EventoDetailOverlay.open(
+                                      context,
+                                      e,
+                                      heroTag: 'evento_media_list_${e.id}_0',
+                                      heroMatchUrl: e.imagenes.isNotEmpty ? e.imagenes.first.url : null,
+                                    ),
                             isAdmin: isAdmin,
                             onEdit: isAdmin
                                 ? () async {
@@ -849,7 +859,12 @@ class _AgendaList extends StatelessWidget {
           organizador: e.organizador,
           onTap: () {
             onDebugTap?.call();
-            EventoDetailOverlay.open(context, e);
+            EventoDetailOverlay.open(
+              context,
+              e,
+              heroTag: 'evento_media_agenda_${e.id}_0',
+              heroMatchUrl: e.imagenes.isNotEmpty ? e.imagenes.first.url : null,
+            );
           },
           menuBuilder: context.read<EventosProvider>().isAdmin
               ? (ctx) => [

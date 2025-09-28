@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../providers/navigation_provider.dart';
 import '../../../config/app_router.dart';
 import '../../providers/auth_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 enum DrawerCategory { personal, games }
 
@@ -116,25 +117,15 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget _buildHeader(bool extended) {
     if (!extended) {
       return Container(
-        height: 100,
+        height: 110,
         padding: const EdgeInsets.all(8.0),
         child: Center(
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppColors.nicaraguaGradient,
-            ),
-            child: Center(
-              child: Text(
-                'MV',
-                style: AppTypography.textTheme.titleMedium?.copyWith(
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+          child: SvgPicture.asset(
+            'assets/icons/logo (solo icono).svg',
+            width: 80,
+            height: 80,
+            fit: BoxFit.contain,
+            semanticsLabel: 'Logotipo Memoria Viva',
           ),
         ),
       );
@@ -145,73 +136,54 @@ class _AppDrawerState extends State<AppDrawer> {
         // Si por alguna razón el ancho real es muy pequeño, usar versión compacta
         if (constraints.maxWidth < 120) {
           return Container(
-            height: 100,
+            height: 120,
             padding: const EdgeInsets.all(8.0),
             child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.nicaraguaGradient,
-                ),
-                child: Center(
-                  child: Text(
-                    'MV',
-                    style: AppTypography.textTheme.titleMedium?.copyWith(
-                      color: AppColors.textLight,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              child: SvgPicture.asset(
+                'assets/icons/logotipo (iniciales).svg',
+                width: 84,
+                height: 84,
+                fit: BoxFit.contain,
+                semanticsLabel: 'Logotipo Memoria Viva',
               ),
             ),
           );
         }
 
-        return Container(
-          height: 180,
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Logo y título (extendido)
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.nicaraguaGradient,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'MV',
-                        style: AppTypography.textTheme.titleLarge?.copyWith(
-                          color: AppColors.textLight,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+        final logoWidth = (constraints.maxWidth - 32).toDouble();
+        final headerHeight = constraints.hasBoundedHeight ? constraints.maxHeight : 180.0;
+        final double logoHeight = (headerHeight * 0.25).clamp(56.0, 96.0);
+        return SizedBox(
+          height: headerHeight,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Logotipo anclado arriba sin empujar el resto
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    height: logoHeight,
+                    child: SvgPicture.asset(
+                      'assets/icons/logotipo (solo texto).svg',
+                      width: logoWidth,
+                      fit: BoxFit.fitWidth,
+                      semanticsLabel: 'Logotipo Memoria Viva',
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Memoria Viva\nNicaragua',
-                      style: AppTypography.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ),
-                ],
-              ),
+                ),
 
-              const SizedBox(height: 16),
-              _buildCategorySelector(),
-            ],
+                // Selector de categoría ligeramente elevado del borde inferior
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 20,
+                  child: _buildCategorySelector(),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -432,34 +404,34 @@ class _AppDrawerState extends State<AppDrawer> {
             ),
             child: showLabel
                 ? Row(
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 20,
-                        color: isSelected ? AppColors.textLight : AppColors.textPrimary,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.textTheme.titleMedium?.copyWith(
-                            color: isSelected ? AppColors.textLight : AppColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Center(
-                    child: Icon(
-                      icon,
-                      size: 20,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: isSelected ? AppColors.textLight : AppColors.textPrimary,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.textTheme.titleMedium?.copyWith(
                       color: isSelected ? AppColors.textLight : AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
+                ),
+              ],
+            )
+                : Center(
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected ? AppColors.textLight : AppColors.textPrimary,
+              ),
+            ),
           ),
         );
       },

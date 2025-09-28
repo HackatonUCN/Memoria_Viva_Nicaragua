@@ -125,3 +125,4 @@ android/build/reports/**
 firestore.rules.backup
 firestore.rules.temp
 .cursor/
+acusticos/

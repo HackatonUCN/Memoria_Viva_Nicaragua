@@ -81,22 +81,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 32),
-
-                  // Título de la aplicación
-                  Text(
-                    'Memoria Viva',
-                    style: AppTypography.textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Subtítulo
-                  Text(
-                    'Nicaragua',
-                    style: AppTypography.textTheme.headlineMedium,
-                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

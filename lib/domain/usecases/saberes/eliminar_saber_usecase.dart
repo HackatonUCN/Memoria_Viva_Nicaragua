@@ -88,7 +88,7 @@ class EliminarSaberUseCase {
       if (autor != null) {
         await _userRepository.actualizarEstadisticas(
           userId: saber.autorId,
-          saberesCompartidos: autor.saberesCompartidos - 1,
+          saberesCompartidos: -1,
         );
       }
       return Success<void, Failure>(null);

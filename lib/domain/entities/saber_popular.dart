@@ -16,8 +16,8 @@ class SaberPopular {
   // Ubicación como value object
   final Ubicacion? ubicacion;
   
-  // Multimedia como value objects (solo imágenes)
-  final List<Multimedia> imagenes;
+  // Multimedia como value objects (imágenes, audios, videos, documentos)
+  final List<Multimedia> multimedia;
   
   // Información del autor
   final String autorId;
@@ -51,7 +51,7 @@ class SaberPopular {
     required this.fechaCreacion,
     required this.fechaActualizacion,
     this.ubicacion,
-    this.imagenes = const [],
+    this.multimedia = const [],
     this.etiquetas = const [],
     this.estado = EstadoModeracion.activo,
     this.reportes = 0,
@@ -98,7 +98,7 @@ class SaberPopular {
       autorId: autorId,
       autorNombre: autorNombre,
       ubicacion: ubicacion ?? this.ubicacion,
-      imagenes: imagenes ?? this.imagenes,
+      multimedia: imagenes ?? this.multimedia,
       etiquetas: etiquetas ?? this.etiquetas,
       fechaCreacion: fechaCreacion,
       fechaActualizacion: fechaActualizacion ?? DateTime.now().toUtc(),
@@ -112,7 +112,7 @@ class SaberPopular {
     );
   }
 
-  /// Convierte a Map para Firestore
+  /// Convierte a Map para Firestore/Offline
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -123,7 +123,8 @@ class SaberPopular {
       'autorId': autorId,
       'autorNombre': autorNombre,
       'ubicacion': ubicacion?.toMap(),
-      'imagenes': imagenes.map((i) => i.toMap()).toList(),
+      // Nuevo formato: escribir siempre en 'multimedia'
+      'multimedia': multimedia.map((i) => i.toMap()).toList(),
       'etiquetas': etiquetas,
       'fechaCreacion': fechaCreacion,
       'fechaActualizacion': fechaActualizacion,
@@ -137,8 +138,10 @@ class SaberPopular {
     };
   }
 
-  /// Crea desde Map de Firestore
+  /// Crea desde Map de Firestore u origen compatible
   factory SaberPopular.fromMap(Map<String, dynamic> map) {
+    // Compatibilidad: preferir 'multimedia', con fallback a 'imagenes'
+    final List<dynamic>? multimediaRaw = (map['multimedia'] as List<dynamic>?) ?? (map['imagenes'] as List<dynamic>?);
     return SaberPopular(
       id: map['id'] as String,
       titulo: map['titulo'] as String,
@@ -150,7 +153,7 @@ class SaberPopular {
       ubicacion: map['ubicacion'] != null 
           ? Ubicacion.fromMap(map['ubicacion'] as Map<String, dynamic>)
           : null,
-      imagenes: (map['imagenes'] as List<dynamic>?)
+      multimedia: (multimediaRaw)
           ?.map((i) => Multimedia.fromMap(i as Map<String, dynamic>))
           .toList() ?? [],
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
@@ -189,7 +192,7 @@ class SaberPopular {
       categoriaId: categoriaId,
       categoriaNombre: categoriaNombre,
       ubicacion: ubicacion,
-      imagenes: imagenes,
+      multimedia: imagenes,
       etiquetas: etiquetas,
       fechaCreacion: DateTime.now().toUtc(),
       fechaActualizacion: DateTime.now().toUtc(),

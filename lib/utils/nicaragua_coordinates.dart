@@ -21,7 +21,9 @@ class NicaraguaCoordinates {
     'Rivas': {'lat': 11.4372, 'lng': -85.8264},
     'Río San Juan': {'lat': 11.1167, 'lng': -84.7833},
     'RAAN': {'lat': 14.0272, 'lng': -83.3828}, // Región Autónoma Atlántico Norte
+    'RACCN': {'lat': 14.0272, 'lng': -83.3828}, // Alias moderno
     'RAAS': {'lat': 12.1628, 'lng': -83.7597}, // Región Autónoma Atlántico Sur
+    'RACCS': {'lat': 12.1628, 'lng': -83.7597}, // Alias moderno
   };
 
   /// Coordenadas de municipios principales por departamento
@@ -90,7 +92,30 @@ class NicaraguaCoordinates {
       'Waslala': {'lat': 13.3333, 'lng': -85.3667},
       'Waspam': {'lat': 14.7333, 'lng': -83.9667},
     },
+    'RACCN': {
+      'Bilwi': {'lat': 14.0272, 'lng': -83.3828},
+      'Bonanza': {'lat': 13.9500, 'lng': -84.5833},
+      'Prinzapolka': {'lat': 13.4167, 'lng': -83.5833},
+      'Rosita': {'lat': 13.9167, 'lng': -84.4000},
+      'Siuna': {'lat': 13.7333, 'lng': -84.7667},
+      'Waslala': {'lat': 13.3333, 'lng': -85.3667},
+      'Waspam': {'lat': 14.7333, 'lng': -83.9667},
+    },
     'RAAS': {
+      'Bluefields': {'lat': 12.0092, 'lng': -83.7597},
+      'Corn Island': {'lat': 12.1628, 'lng': -83.0628},
+      'Desembocadura de la Cruz de Río Grande': {'lat': 11.8167, 'lng': -83.9167},
+      'El Ayote': {'lat': 12.0833, 'lng': -85.1167},
+      'El Rama': {'lat': 12.1597, 'lng': -84.2197},
+      'El Tortuguero': {'lat': 12.8167, 'lng': -83.7167},
+      'Kukra Hill': {'lat': 12.2333, 'lng': -83.7500},
+      'La Cruz de Río Grande': {'lat': 11.9167, 'lng': -84.1667},
+      'Laguna de Perlas': {'lat': 12.3433, 'lng': -83.6717},
+      'Muelle de los Bueyes': {'lat': 12.0667, 'lng': -84.5500},
+      'Nueva Guinea': {'lat': 11.6833, 'lng': -84.4500},
+      'Paiwas': {'lat': 12.7833, 'lng': -85.0167},
+    },
+    'RACCS': {
       'Bluefields': {'lat': 12.0092, 'lng': -83.7597},
       'Corn Island': {'lat': 12.1628, 'lng': -83.0628},
       'Desembocadura de la Cruz de Río Grande': {'lat': 11.8167, 'lng': -83.9167},

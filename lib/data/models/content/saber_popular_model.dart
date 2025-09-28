@@ -10,7 +10,8 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
   final String titulo;
   final String contenido;
   final Map<String, dynamic>? ubicacion;
-  final List<Map<String, dynamic>> imagenes;
+  // Nuevo: multimedia general, con compatibilidad para 'imagenes'
+  final List<Map<String, dynamic>> multimedia;
   final List<String> etiquetas;
   final String estado;
   final int reportes;
@@ -29,7 +30,7 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
     required super.fechaCreacion,
     required super.fechaActualizacion,
     this.ubicacion,
-    this.imagenes = const [],
+    this.multimedia = const [],
     this.etiquetas = const [],
     this.estado = 'activo',
     this.reportes = 0,
@@ -53,7 +54,7 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
       ubicacion: ubicacion != null
           ? UbicacionModel.fromMap(ubicacion!).toDomain()
           : null,
-      imagenes: imagenes
+      multimedia: multimedia
           .map((i) => MultimediaModel.fromMap(i).toDomain())
           .toList(),
       etiquetas: etiquetas,
@@ -84,7 +85,7 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
       ubicacion: saber.ubicacion != null
           ? UbicacionModel.fromDomain(saber.ubicacion!).toMap()
           : null,
-      imagenes: saber.imagenes
+      multimedia: saber.multimedia
           .map((i) => MultimediaModel.fromDomain(i).toMap())
           .toList(),
       etiquetas: saber.etiquetas,
@@ -104,14 +105,15 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
 
   @override
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'id': id,
       'titulo': titulo,
       'contenido': contenido,
       'autorId': autorId,
       'autorNombre': autorNombre,
       'ubicacion': ubicacion,
-      'imagenes': imagenes,
+      // Nuevo: escribir siempre en 'multimedia'
+      'multimedia': multimedia,
       'categoriaId': categoriaId,
       'categoriaNombre': categoriaNombre,
       'etiquetas': etiquetas,
@@ -125,10 +127,33 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
       'eliminado': eliminado,
       'fechaEliminacion': fechaEliminacion,
     };
+    // ignore: avoid_print
+    print('[SABER_MODEL][TO_MAP] autorId=$autorId categoriaId=$categoriaId keys=${map.keys.length}');
+    return map;
   }
 
   /// Crea una instancia de SaberPopularModel desde un Map de Firestore
   factory SaberPopularModel.fromMap(Map<String, dynamic> map) {
+    Timestamp _asTimestamp(dynamic v) {
+      if (v == null) return Timestamp.now();
+      if (v is Timestamp) return v;
+      if (v is DateTime) return Timestamp.fromDate(v);
+      if (v is int) return Timestamp.fromMillisecondsSinceEpoch(v);
+      if (v is double) return Timestamp.fromMillisecondsSinceEpoch(v.toInt());
+      if (v is String) {
+        try { return Timestamp.fromDate(DateTime.parse(v)); } catch (_) { return Timestamp.now(); }
+      }
+      return Timestamp.now();
+    }
+    // Compatibilidad: preferir 'multimedia' con fallback a 'imagenes'
+    final List<Map<String, dynamic>> multimedia =
+        (map['multimedia'] as List<dynamic>?)
+                ?.map((i) => Map<String, dynamic>.from(i))
+                .toList() ??
+        (map['imagenes'] as List<dynamic>?)
+                ?.map((i) => Map<String, dynamic>.from(i))
+                .toList() ??
+        [];
     return SaberPopularModel(
       id: map['id'] as String,
       titulo: map['titulo'] as String,
@@ -140,20 +165,17 @@ class SaberPopularModel extends ContentModel<SaberPopular> {
       ubicacion: map['ubicacion'] != null
           ? Map<String, dynamic>.from(map['ubicacion'])
           : null,
-      imagenes: (map['imagenes'] as List<dynamic>?)
-              ?.map((i) => Map<String, dynamic>.from(i))
-              .toList() ??
-          [],
+      multimedia: multimedia,
       etiquetas: List<String>.from(map['etiquetas'] ?? []),
-      fechaCreacion: map['fechaCreacion'] as Timestamp,
-      fechaActualizacion: map['fechaActualizacion'] as Timestamp,
+      fechaCreacion: _asTimestamp(map['fechaCreacion']),
+      fechaActualizacion: _asTimestamp(map['fechaActualizacion']),
       estado: map['estado'] as String? ?? 'activo',
       reportes: map['reportes'] as int? ?? 0,
       procesado: map['procesado'] as bool? ?? false,
       likes: map['likes'] as int? ?? 0,
       compartidos: map['compartidos'] as int? ?? 0,
       eliminado: map['eliminado'] as bool? ?? false,
-      fechaEliminacion: map['fechaEliminacion'] as Timestamp?,
+      fechaEliminacion: map['fechaEliminacion'] != null ? _asTimestamp(map['fechaEliminacion']) : null,
     );
   }
 

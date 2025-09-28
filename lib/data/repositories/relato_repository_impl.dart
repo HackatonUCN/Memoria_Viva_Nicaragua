@@ -771,6 +771,9 @@ class RelatoRepositoryImpl implements IRelatoRepository {
                case TipoMultimedia.video:
                  contentType = 'video/mp4';
                  break;
+               case TipoMultimedia.documento:
+                 // TODO: Handle this case.
+                 throw UnimplementedError();
              }
             
             // Subir el archivo

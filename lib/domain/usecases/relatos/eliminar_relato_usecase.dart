@@ -64,7 +64,7 @@ class EliminarRelatoUseCase {
       if (autor != null) {
         await _userRepository.actualizarEstadisticas(
           userId: relato.autorId,
-          relatosPublicados: autor.relatosPublicados - 1,
+          relatosPublicados: -1,
         );
       }
       return Success<void, Failure>(null);
