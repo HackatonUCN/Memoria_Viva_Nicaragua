@@ -30,14 +30,14 @@ String _buildProxyUrl({String? url, String? publicId, String? fileName, String r
 Future<void> triggerWebDownload(String url, {String? fileName, String? publicId}) async {
   // Prefer proxy when configured, otherwise direct
   if (kIsWeb && Environment.DOWNLOAD_PROXY_BASE_URL.isNotEmpty) {
-    // Simplificar: usar siempre la URL directa con el proxy
+    // Usar siempre url= para evitar rutas que disparen demasiadas subrequests en el worker
     final proxy = _buildProxyUrl(url: url, fileName: fileName);
     if (proxy.isNotEmpty) {
       print('[WebDownloader] Using proxy with direct URL: $proxy');
       return impl.triggerWebDownload(proxy, fileName: fileName);
     }
   }
-  
+
   print('[WebDownloader] Using direct URL: $url');
   return impl.triggerWebDownload(url, fileName: fileName);
 }

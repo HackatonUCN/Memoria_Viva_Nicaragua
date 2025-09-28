@@ -62,70 +62,10 @@ function deriveFromCloudinaryUrl(u: string, cloudName: string): { resourceType: 
   }
 }
 
-// Generate a direct signed URL using Cloudflare Workers native crypto API
-async function tryDirectSignedUrl(env: Env, publicIdNoExt: string, resourceType: string, format: string): Promise<string | null> {
-  try {
-    // Calculate signature using SHA1 with Cloudflare Workers crypto
-    const timestamp = Math.floor(Date.now() / 1000);
-    const expiresAt = timestamp + 3600; // URL valid for 1 hour
-    
-    // Create signature base
-    const toSign = `public_id=${publicIdNoExt}&timestamp=${timestamp}${env.CLOUDINARY_API_SECRET}`;
-    
-    // Use Cloudflare Workers native crypto
-    const msgUint8 = new TextEncoder().encode(toSign);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
-    // Construct signed URL with authentication params
-    const params = new URLSearchParams({
-      'api_key': env.CLOUDINARY_API_KEY,
-      'timestamp': String(timestamp),
-      'signature': signature
-    });
-    
-    // Try different delivery formats
-    const formats = [
-      `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${resourceType}/authenticated/v${timestamp}/${publicIdNoExt}.${format}?${params.toString()}`,
-      `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${resourceType}/private/v${timestamp}/${publicIdNoExt}.${format}?${params.toString()}`,
-      `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${resourceType}/authenticated/${publicIdNoExt}.${format}?${params.toString()}`,
-      `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${resourceType}/private/${publicIdNoExt}.${format}?${params.toString()}`
-    ];
-    
-    console.log(`[Worker] Generated signed URLs to try`);
-    
-    // Try each format
-    for (const signedUrl of formats) {
-      try {
-        console.log(`[Worker] Trying signed URL: ${signedUrl.substring(0, 50)}...`);
-        const testResponse = await fetch(signedUrl, { method: 'HEAD' });
-        if (testResponse.ok || testResponse.status === 302) {
-          console.log(`[Worker] Signed URL succeeded with status ${testResponse.status}`);
-          return signedUrl;
-        } else {
-          console.log(`[Worker] Signed URL failed with status ${testResponse.status}`);
-        }
-      } catch (err) {
-        console.log(`[Worker] Error testing signed URL: ${err}`);
-      }
-    }
-    
-    return null;
-  } catch (err) {
-    console.log(`[Worker] Error generating direct signed URL: ${err}`);
-    return null;
-  }
-}
-
 // Try multiple variations of the public ID to handle different Cloudinary URL patterns
 async function tryMultiplePublicIdFormats(env: Env, publicIdNoExt: string, resourceType: string, format: string): Promise<string | null> {
-  // First try direct signed URL approach
-  let result = await tryDirectSignedUrl(env, publicIdNoExt, resourceType, format);
-  if (result) return result;
-  
-  // Then try the original private_download approach
-  result = await tryPrivateDownload(env, publicIdNoExt, resourceType, format);
+  // Use the Cloudinary private_download API first (low subrequest count)
+  let result = await tryPrivateDownload(env, publicIdNoExt, resourceType, format);
   if (result) return result;
   
   // Try with last segment removed (in case of IDs with extra filename at the end)
@@ -168,76 +108,7 @@ async function tryMultiplePublicIdFormats(env: Env, publicIdNoExt: string, resou
 }
 
 async function tryPrivateDownload(env: Env, publicIdNoExt: string, resourceType: string, format: string): Promise<string | null> {
-  // Para PDFs, intentamos primero usar el endpoint específico para raw assets
-  if (format.toLowerCase() === 'pdf') {
-    console.log(`[Worker] Trying raw asset approach for PDF: ${publicIdNoExt}`);
-    
-    // Intentar construir una URL firmada para raw assets (PDFs)
-    try {
-      const timestamp = Math.floor(Date.now() / 1000);
-      const expiresAt = timestamp + 3600; // 1 hora
-      
-      // Extraemos el último segmento del ID (el ID generado automáticamente)
-      const segments = publicIdNoExt.split('/');
-      const lastSegment = segments[segments.length - 1];
-      console.log(`[Worker] Last segment of ID (auto-generated part): ${lastSegment}`);
-      
-      // Construir una firma especial para PDFs
-      // Intenta con varios tipos de recursos y variaciones del ID
-      const pdfResourceTypes = ['raw', 'image', 'private', 'authenticated'];
-      const idVariations = [
-        publicIdNoExt,                // ID completo
-        lastSegment,                  // Solo el último segmento (ID autogenerado)
-        `memoria_viva/${lastSegment}` // Carpeta base + ID autogenerado
-      ];
-      
-      for (const rt of pdfResourceTypes) {
-        for (const idVar of idVariations) {
-          console.log(`[Worker] Trying with ${rt}/${idVar}`);
-          
-          // Probar diferentes formatos de URL para PDFs
-          const urlFormats = [
-            // URL directa con firma (resource_type/delivery_type/publicId.pdf) - Acceso público
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${rt}/upload/${idVar}.${format}`,
-            
-            // URL directa con firma - Public con API key
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${rt}/upload/${idVar}.${format}?api_key=${env.CLOUDINARY_API_KEY}`,
-            
-            // URL con parámetro de adjunto (fl_attachment) - Para forzar descarga
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${rt}/upload/fl_attachment/${idVar}.${format}`,
-            
-            // URL firmada completa para acceso seguro
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${rt}/upload/${idVar}.${format}?timestamp=${timestamp}&api_key=${env.CLOUDINARY_API_KEY}&signature=${await generateSignature(`public_id=${idVar}&timestamp=${timestamp}`, env.CLOUDINARY_API_SECRET)}`,
-            
-            // Acceso como raw resource explícito
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/raw/upload/${idVar}.${format}`,
-            
-            // Acceso directo al archivo PDF (sin transformaciones)
-            `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${rt}/upload/q_auto/${idVar}.${format}`
-          ];
-          
-          for (const url of urlFormats) {
-            console.log(`[Worker] Trying PDF URL: ${url.substring(0, 70)}...`);
-            try {
-              const response = await fetch(url, { method: 'HEAD' });
-              console.log(`[Worker] Response status for ${idVar}: ${response.status}`);
-              
-              if (response.ok || response.status === 302) {
-                console.log(`[Worker] Found working PDF URL with resource type ${rt} and ID ${idVar}`);
-                return url;
-              }
-            } catch (err) {
-              console.log(`[Worker] Error checking PDF URL: ${err}`);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.log(`[Worker] Error generating PDF URL: ${err}`);
-    }
-  }
-
-  // Si no es un PDF o el método anterior falló, usar el enfoque original
+  // Usar únicamente la API de private_download (máximo 3 subrequests)
   const endpoint = `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/${resourceType}/private_download`;
   const expiresAt = Math.floor(Date.now() / 1000) + 60;
   const auth = 'Basic ' + btoa(`${env.CLOUDINARY_API_KEY}:${env.CLOUDINARY_API_SECRET}`);
@@ -358,22 +229,52 @@ export default {
           }
         }
       } else if (directUrl) {
-        // Usar directamente la URL proporcionada sin intentar private_download
+        // Usar directamente la URL proporcionada sin intentar private_download ni derivaciones
+        // Esto evita múltiples subrequests cuando la URL ya es válida (p. ej., raw/upload/*.pdf)
         console.log(`[Worker] Using direct URL immediately: ${directUrl}`);
         sourceUrl = directUrl;
       } else {
         return new Response('Falta id o url', { status: 400 });
       }
 
-      const upstream = await fetch(sourceUrl);
+      // Asegurar que no forzamos 404 de Cloudinary por headers raros
+      let upstream = await fetch(sourceUrl, { redirect: 'follow' });
       console.log(`[Worker] Upstream fetch status=${upstream.status} ct=${upstream.headers.get('content-type')}`);
+
+      // Fallback: si usamos url= y Cloudinary devolvió error, intentar private_download con public_id derivado
+      if (!upstream.ok && directUrl) {
+        try {
+          const derived = deriveFromCloudinaryUrl(directUrl, env.CLOUDINARY_CLOUD_NAME);
+          if (derived) {
+            const effRt = derived.resourceType || resourceType;
+            const effFmt = (derived.format || format || 'pdf').toLowerCase();
+            console.log(`[Worker] Fallback to private_download using derived id=${derived.publicIdNoExt} rt=${effRt} fmt=${effFmt}`);
+            const pdUrl = await tryMultiplePublicIdFormats(env, derived.publicIdNoExt, effRt, effFmt);
+            if (pdUrl) {
+              sourceUrl = pdUrl;
+              upstream = await fetch(sourceUrl, { redirect: 'follow' });
+              console.log(`[Worker] Fallback upstream status=${upstream.status} ct=${upstream.headers.get('content-type')}`);
+            }
+          }
+        } catch (e) {
+          console.log(`[Worker] Fallback error: ${e}`);
+        }
+      }
+
       if (!upstream.ok) return new Response(`Cloudinary devolvió ${upstream.status}`, { status: upstream.status });
 
       const ct = upstream.headers.get('content-type') || 'application/octet-stream';
-      const headers = new Headers(upstream.headers);
+      // Crear nuevos headers en lugar de copiar los de upstream (pueden causar problemas)
+      const headers = new Headers();
       headers.set('Content-Type', ct);
+      // Forzar descarga con Content-Disposition
       headers.set('Content-Disposition', `attachment; filename="${fileName}"`);
       headers.set('Cache-Control', 'private, max-age=60');
+      
+      // Permitir CORS para descargas desde cualquier origen
+      headers.set('Access-Control-Allow-Origin', '*');
+      headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      headers.set('Access-Control-Allow-Headers', 'Content-Type');
 
       return new Response(upstream.body, { status: 200, headers });
     } catch (e) {

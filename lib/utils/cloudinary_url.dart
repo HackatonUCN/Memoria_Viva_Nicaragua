@@ -32,36 +32,11 @@ String addCloudinaryFlag(String url, String flag) {
 String ensureAttachment(String url) => addCloudinaryFlag(url, 'fl_attachment');
 
 
-/// Best-effort fix for malformed Cloudinary RAW URLs that contain duplicated
-/// "/something.pdf/<id>.pdf" segments. Keeps only the last ".pdf" segment.
+/// NOTA: Desactivada la sanitización de URLs de Cloudinary, ya que puede eliminar
+/// segmentos importantes del path. Ahora simplemente devuelve la URL original.
 String sanitizeCloudinaryRawPdfUrl(String url) {
-  try {
-    final uri = Uri.parse(url);
-    if (!uri.host.contains('res.cloudinary.com')) return url;
-    final segments = List<String>.from(uri.pathSegments);
-    final uploadIdx = segments.indexOf('upload');
-    if (uploadIdx == -1) return url;
-    // Collect indexes of segments that end with .pdf after the upload segment
-    final pdfIdxs = <int>[];
-    for (int i = uploadIdx + 1; i < segments.length; i++) {
-      if (segments[i].toLowerCase().endsWith('.pdf')) {
-        pdfIdxs.add(i);
-      }
-    }
-    if (pdfIdxs.length <= 1) return url; // nothing to sanitize
-    // Keep only the last .pdf segment, remove earlier ones
-    final keep = pdfIdxs.last;
-    for (int i = pdfIdxs.length - 2; i >= 0; i--) {
-      final idx = pdfIdxs[i];
-      if (idx >= 0 && idx < segments.length) {
-        segments.removeAt(idx);
-      }
-    }
-    final newUri = uri.replace(pathSegments: segments);
-    return newUri.toString();
-  } catch (_) {
-    return url;
-  }
+  // Devolver la URL original sin modificar
+  return url;
 }
 
 /// Derive Cloudinary public_id (without extension) from a secure_url.
